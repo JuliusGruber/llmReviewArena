@@ -118,6 +118,45 @@ limits:
 
 These are **spec-level limits** that the orchestrator enforces. OS-level resource controls (memory, CPU, disk quotas) are deployment-specific and outside this spec's scope—use containerization or OS process limits for production deployments.
 
+### Process Timeouts
+
+The arena enforces time limits on agent processes to prevent indefinite hangs:
+
+**Configuration:**
+
+```yaml
+timeouts:
+  agent_timeout_ms: 300000      # Per-agent process timeout (default: 5 minutes)
+  round_timeout_ms: 900000      # Per-round timeout (default: 15 minutes)
+  grace_period_ms: 5000         # Graceful shutdown window before SIGKILL
+
+  per_agent:                    # Optional per-agent overrides
+    claude: 600000              # 10 minutes (Claude tends to be thorough)
+    codex: 300000
+    gemini: 300000
+
+  on_timeout: "kill_and_skip"   # kill_and_skip | kill_and_abort
+  preserve_partial_output: false # If true, keep incomplete output with warning
+```
+
+> **Default Rationale:** 5 minutes allows thorough review of ~1000 LOC diffs. Complex reviews may need longer; use `per_agent` overrides as needed.
+
+**Timeout Behavior:**
+
+| Timeout Type | Trigger | Action |
+|--------------|---------|--------|
+| Agent timeout | Single agent exceeds `agent_timeout_ms` | SIGTERM → wait `grace_period_ms` → SIGKILL, exclude from round |
+| Round timeout | Round exceeds `round_timeout_ms` | Kill all running agents, proceed with completed outputs |
+
+**Timeout Actions:**
+
+| Action | Behavior |
+|--------|----------|
+| `kill_and_skip` | Terminate agent, exclude from round, continue tournament |
+| `kill_and_abort` | Terminate agent, abort entire tournament |
+
+Partial output from timed-out agents is discarded by default. Set `preserve_partial_output: true` to keep incomplete reviews (marked with a `[TIMEOUT: incomplete]` warning header).
+
 ### Output Validation
 
 The orchestrator validates agent output after each round:
@@ -127,6 +166,7 @@ The orchestrator validates agent output after each round:
 | Output file exists (`review.md`) | Agent excluded from round, warning logged |
 | File is non-empty | Agent excluded from round, warning logged |
 | File within size limit | Truncated to limit, warning logged |
+| Agent completes within timeout | Agent killed, excluded from round, warning logged |
 
 **Configuration:**
 
