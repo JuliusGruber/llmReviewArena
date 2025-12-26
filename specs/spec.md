@@ -251,3 +251,225 @@ After the last round, run one more agent process in a dedicated role:
 | **Cross-pollination** | Each round, agents see competitors' outputs and improve |
 | **Avoid combinatorial blow-up** | One combined markdown file per round (not pairwise) |
 | **Optional state reset** | Fresh process each round for strict isolation |
+
+## Agent Prompt Templates
+
+The following prompts drive the multi-round tournament. They are designed to:
+- Work with Claude / Codex / Gemini CLI
+- Not assume API usage
+- Keep output structured and comparable
+- Converge rather than drift
+
+### Global Invariants (task.md)
+
+This file is referenced every round and defines the shared context:
+
+```markdown
+# Code Review Arena – Task
+
+You are participating in a multi-round code review arena.
+
+## Goal
+Produce the highest-quality, most useful code review possible.
+
+The review should help a human author:
+- find real bugs and risks
+- understand why they matter
+- fix them efficiently
+
+## Review Rubric
+Evaluate the code with respect to:
+
+1. Correctness & edge cases
+2. Security & privacy
+3. Performance & scalability
+4. Maintainability & design
+5. Tests & observability
+
+## Constraints
+- Be concrete and actionable
+- Prefer evidence over speculation
+- Reference files, symbols, or diff hunks where possible
+- Avoid generic advice
+- Do not repeat trivial style nitpicks unless they matter
+
+## Output Contract
+Write your review to `review.md` using **exactly** this structure:
+
+### Summary
+### High-risk issues (must fix)
+### Medium / low-risk issues
+### Suggested patches (diff snippets or pseudocode)
+### Test suggestions
+### Questions for the author
+```
+
+### Round 0 — Independent Review
+
+**Purpose:** Establish diverse, unpolluted first-pass reviews.
+
+**Each agent sees:**
+- The code/diff
+- `task.md`
+- No other agent output
+
+**Prompt:** `round-0/prompt.txt`
+
+```
+You are an expert software engineer performing a rigorous code review.
+
+This is Round 0.
+No other reviews exist yet.
+
+Your task:
+- Review the provided code or diff thoroughly.
+- Identify concrete issues using the rubric in task.md.
+- Prioritize correctness and real risk over stylistic preferences.
+
+Rules:
+- Do NOT assume missing context unless clearly required.
+- Do NOT mention other reviewers or models.
+- Write only the final review.
+
+Write your output to `review.md` following the required structure.
+```
+
+### Round 1 — Review of Reviews (Core Tournament Step)
+
+**Purpose:** The core tournament mechanism — see competitors' outputs, identify misses, merge the best ideas.
+
+**Each agent sees:**
+- Original code
+- All Round-0 reviews merged into `all_reviews.md`
+- Still produces its own improved review
+
+**Prompt:** `round-1/prompt.txt`
+
+```
+This is Round 1 of a multi-round code review arena.
+
+You are given:
+- the original code under review
+- a file containing reviews from other agents (all_reviews.md)
+
+Your task:
+1. Read all competing reviews carefully.
+2. Identify:
+   - issues they missed
+   - incorrect or weak claims
+   - places where an issue is mentioned but not actionable
+3. Produce a strictly better review by:
+   - keeping the strongest insights
+   - removing noise or speculation
+   - adding missing high-impact issues
+   - improving prioritization and clarity
+
+Important:
+- Do NOT reference other reviewers by name.
+- Do NOT argue defensively.
+- Act as if you want the best possible review to exist, regardless of authorship.
+
+Write a complete, standalone review to `review.md`
+using the same structure as before.
+```
+
+> This prompt is the direct analog of the "which solution is better, and can you combine the best of both?" step.
+
+### Round 2 — Precision, Evidence, and Fixability
+
+**Purpose:** Reviews often converge conceptually but remain vague. This round forces engineering precision.
+
+**Each agent sees:**
+- Original code
+- Round-1 `all_reviews.md`
+
+**Prompt:** `round-2/prompt.txt`
+
+```
+This is Round 2.
+
+You are reviewing an already strong set of reviews.
+
+Your task:
+- Increase precision and usefulness.
+- Eliminate vague or speculative comments.
+- Ensure every high-risk issue includes:
+  - concrete evidence (file, function, behavior)
+  - why it matters
+  - how to fix or mitigate it
+
+Focus especially on:
+- subtle correctness bugs
+- edge cases
+- security implications
+- design flaws that will cause future bugs
+
+If multiple reviews mention the same issue:
+- consolidate it
+- choose the strongest framing
+- remove duplication
+
+Write a refined, high-signal review to `review.md`.
+```
+
+### Round 3 — Final Convergence (Optional)
+
+**Purpose:** Produce near-identical, very high-quality reviews.
+
+**Prompt:** `round-3/prompt.txt`
+
+```
+This is the final refinement round.
+
+Assume the author will read only one review.
+
+Your task:
+- Produce the cleanest, clearest, most authoritative review possible.
+- Remove redundancy.
+- Ensure severity levels are correct.
+- Ensure suggested fixes are realistic.
+
+Bias toward:
+- fewer but higher-impact comments
+- clarity over exhaustiveness
+- decisions the author can act on immediately
+
+Write the final review to `review.md`.
+```
+
+> At this point, agents typically differ only in wording, not substance.
+
+### Final Synthesizer Round (Optional)
+
+**Purpose:** Produce one canonical review from multiple high-quality finals.
+
+**Prompt:** `final-synth/prompt.txt`
+
+```
+You are the final synthesizer in a code review arena.
+
+You are given multiple high-quality final reviews.
+
+Your task:
+- Merge them into one single, cohesive review.
+- Remove duplicates.
+- Resolve conflicting recommendations.
+- Keep the strongest phrasing and evidence.
+
+Do NOT introduce new issues.
+Do NOT speculate.
+
+Produce one final review in `champion_review.md`
+using the standard review structure.
+```
+
+### Why This Works
+
+| Property | Description |
+|----------|-------------|
+| Independent first pass | Diverse initial perspectives without contamination |
+| Iterative cross-review | Each round builds on competitors' insights |
+| Shared combined file | One `all_reviews.md` per round avoids pairwise explosion |
+| Fresh context each round | New process = clean slate |
+| Convergence over debate | Prompts drive toward agreement, not argument |
+| Filesystem-grounded | Real files, real diffs, real CLI agents |
