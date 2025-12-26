@@ -260,7 +260,7 @@ After the last round, run one more agent process in a dedicated role:
 | **Same initial prompt** | All agents receive identical starting prompt |
 | **Cross-pollination** | Each round, agents see competitors' outputs and improve |
 | **Avoid combinatorial blow-up** | One combined markdown file per round (not pairwise) |
-| **Optional state reset** | Fresh process each round for strict isolation |
+| **Ephemeral processes** | Fresh process each round for strict isolation (recommended) |
 
 ## Agent Prompt Templates
 
