@@ -83,6 +83,27 @@ This approach ensures:
 - Predictable, reproducible behavior
 - Simple resource management
 
+### Execution Parallelism
+
+Within a single round, agents MAY execute in parallel since they operate on isolated directories and produce independent outputs. Across rounds, execution is always sequential (round N must complete before round N+1 begins).
+
+| Mode | Description |
+|------|-------------|
+| **Parallel** (default) | All agents in a round start simultaneously |
+| **Bounded parallel** | Limit concurrent agents (useful for rate-limited backends) |
+| **Sequential** | One agent at a time (easier debugging, lower resource usage) |
+
+Results are semantically identical regardless of execution order within a round.
+
+**Configuration:**
+
+```yaml
+execution:
+  max_concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
+```
+
+> **Note:** Higher concurrency increases resource usage (memory, API rate limits). Use bounded or sequential execution when running agents that share rate-limited backends.
+
 ## Arena Filesystem
 
 Since agents are local and tool-enabled, the **filesystem becomes the shared communication layer** - not tokens.
