@@ -89,23 +89,30 @@ Since agents are local and tool-enabled, the **filesystem becomes the shared com
 
 ### Directory Structure
 
+The following structure is used for **code review tournaments** (the primary use case for this arena):
+
 ```
 .arena/
-├── task.md                    # Current task definition
+├── task.md                    # Task definition, rubric, and constraints
+├── target/                    # Code under review (checkout, patch, or diff)
 ├── rounds/
 │   ├── round-0/
 │   │   ├── claude/
-│   │   │   └── solution.md
+│   │   │   └── review.md
 │   │   ├── codex/
-│   │   │   └── solution.md
+│   │   │   └── review.md
 │   │   └── gemini/
-│   │       └── solution.md
+│   │       └── review.md
 │   ├── round-1/
 │   │   └── ...
 │   └── final/
 └── evaluation/
-    └── README.md
+    └── summary.md
 ```
+
+> **Note:** For other tournament types (e.g., code generation), the output file would change accordingly (e.g., `solution.md`). The structure remains the same.
+
+> See [Code Review Tournament Flow](#code-review-tournament-flow) for the complete structure including combined review files and final outputs.
 
 ### Agent Capabilities
 
@@ -165,6 +172,8 @@ The arena creates a deterministic structure for code review tasks:
 │       ├── suggested_patches/
 │       ├── questions.md
 │       └── champion_review.md
+└── evaluation/
+    └── summary.md                    # Tournament metrics and analysis
 ```
 
 ### 2) Round 0 – Independent Reviews
