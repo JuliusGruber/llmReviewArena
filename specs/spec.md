@@ -118,6 +118,28 @@ limits:
 
 These are **spec-level limits** that the orchestrator enforces. OS-level resource controls (memory, CPU, disk quotas) are deployment-specific and outside this spec's scope—use containerization or OS process limits for production deployments.
 
+### Output Validation
+
+The orchestrator validates agent output after each round:
+
+| Check | Behavior on Failure |
+|-------|---------------------|
+| Output file exists (`review.md`) | Agent excluded from round, warning logged |
+| File is non-empty | Agent excluded from round, warning logged |
+| File within size limit | Truncated to limit, warning logged |
+
+**Configuration:**
+
+```yaml
+validation:
+  required_file: "review.md"
+  on_missing: "skip"    # skip = exclude agent from round, abort = stop tournament
+```
+
+The tournament continues with remaining agents. If ALL agents fail validation in a round, the tournament aborts.
+
+> **Note:** Section-level validation (checking for "Summary", "High-risk issues", etc.) is optional and implementation-specific. The prompts instruct agents on required format; strict enforcement may cause unnecessary failures.
+
 ## Arena Filesystem
 
 Since agents are local and tool-enabled, the **filesystem becomes the shared communication layer** - not tokens.
