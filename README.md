@@ -28,7 +28,7 @@ Round 0 (Independent Reviews)
 └── Gemini CLI → review-gemini.md
 
 Round 1 (Cross-Pollination)
-├── All agents read: reviews.md (combined output)
+├── All agents read: all_reviews.md (combined output)
 ├── Each produces: improved review incorporating best ideas
 └── Context reset: fresh process, no conversation inertia
 
@@ -50,7 +50,7 @@ Round N (Convergence)
 
 Instead of each agent reviewing each other agent's output (N x N comparisons), we:
 
-1. **Combine all outputs** into a single shared file (`reviews.md`)
+1. **Combine all outputs** into a single shared file (`all_reviews.md`)
 2. **Reset context** each round with a fresh agent process
 3. **Single prompt** instructs: "synthesize the best ideas from ALL reviews"
 
@@ -76,7 +76,7 @@ This keeps complexity linear while maximizing cross-pollination.
 │   │   └── gemini/
 │   │       └── review.md
 │   ├── round-1/
-│   │   ├── reviews.md         # Combined reviews from round-0
+│   │   ├── all_reviews.md     # Combined reviews from round-0
 │   │   └── [agent]/
 │   │       └── review.md      # Synthesized improvements
 │   └── final/
@@ -103,7 +103,7 @@ prompt: "Review this code. Write your review to review.md"
 
 # Round 1+: Collaborative synthesis
 prompt: |
-  Read reviews.md containing all previous reviews.
+  Read all_reviews.md containing all previous reviews.
   Identify the best ideas from each.
   Synthesize an improved review that combines complementary insights.
   Write to review.md
