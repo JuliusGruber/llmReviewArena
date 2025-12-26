@@ -106,6 +106,7 @@ The following structure is used for **code review tournaments** (the primary use
 │   ├── round-1/
 │   │   └── ...
 │   └── final/
+│       └── champion_review.md # Synthesized final review
 └── evaluation/
     └── summary.md
 ```
