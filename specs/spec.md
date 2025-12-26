@@ -67,9 +67,9 @@ This abstraction keeps the arena:
 
 ## Agent Execution Model
 
-### Ephemeral Agents (Recommended)
+### Ephemeral Agents (Mandatory)
 
-The recommended execution model uses **ephemeral agents** - stateless, short-lived processes that are created fresh for each round:
+The arena **requires ephemeral agents** - stateless, short-lived processes that are created fresh for each round. This ensures a clean context window every time:
 
 1. **Start** agent process
 2. **Feed** it a prompt (via stdin)
@@ -260,7 +260,7 @@ After the last round, run one more agent process in a dedicated role:
 | **Same initial prompt** | All agents receive identical starting prompt |
 | **Cross-pollination** | Each round, agents see competitors' outputs and improve |
 | **Avoid combinatorial blow-up** | One combined markdown file per round (not pairwise) |
-| **Ephemeral processes** | Fresh process each round for strict isolation (recommended) |
+| **Ephemeral processes** | Fresh process each round for strict isolation (mandatory) |
 
 ## Agent Prompt Templates
 

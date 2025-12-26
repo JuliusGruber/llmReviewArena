@@ -43,7 +43,7 @@ Round N (Convergence)
 | **No REST / No Model APIs** | Process orchestration, not API orchestration |
 | **Local CLI Agents Only** | Claude CLI, Codex CLI, Gemini CLI as subprocesses |
 | **Filesystem as Communication** | Shared markdown files, not token passing |
-| **Ephemeral Agents** | Fresh context each round prevents anchoring |
+| **Ephemeral Agents** | Fresh context window each round (mandatory) |
 | **Shared Output File** | Avoids combinatorial explosion of pairwise comparisons |
 
 ## Avoiding Combinatorial Explosion
