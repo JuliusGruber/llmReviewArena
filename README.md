@@ -67,18 +67,20 @@ This keeps complexity linear while maximizing cross-pollination.
 ```
 .arena/
 ├── task.md                    # Code to review / PR description
+├── target/                    # Code under review
 ├── rounds/
 │   ├── round-0/
 │   │   ├── claude/
 │   │   │   └── review.md
 │   │   ├── codex/
 │   │   │   └── review.md
-│   │   └── gemini/
-│   │       └── review.md
+│   │   ├── gemini/
+│   │   │   └── review.md
+│   │   └── all_reviews.md     # Combined output (input for round-1)
 │   ├── round-1/
-│   │   ├── all_reviews.md     # Combined reviews from round-0
-│   │   └── [agent]/
-│   │       └── review.md      # Synthesized improvements
+│   │   ├── [agent]/
+│   │   │   └── review.md      # Synthesized improvements
+│   │   └── all_reviews.md     # Combined output (input for round-2)
 │   └── final/
 │       └── review.md          # Converged final review
 └── evaluation/
