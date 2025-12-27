@@ -386,6 +386,30 @@ After the last round, run one more agent process in a dedicated role:
 
 ## Agent Prompt Templates
 
+### Prompt Storage Location
+
+All prompt templates are stored as Markdown files in the `resources/prompts/` directory:
+
+```
+resources/prompts/
+├── task.md              # Global invariants (review rubric, constraints, output contract)
+├── round-0.md           # Round 0 - Independent review prompt
+├── round-1.md           # Round 1 - Review of reviews prompt
+├── round-2.md           # Round 2 - Precision and evidence prompt
+├── round-3.md           # Round 3 - Final convergence prompt (optional)
+└── final-synth.md       # Final synthesizer prompt (optional)
+```
+
+**Rationale:**
+- Markdown format allows rich formatting and is human-readable
+- Centralized location makes prompts easy to find and modify
+- Prompts can be version-controlled and reviewed like any other code
+- Enables future extensibility (e.g., custom prompt sets for different review types)
+
+At runtime, the orchestrator loads these templates and injects them into agents. The templates may contain placeholders (e.g., `{{round_number}}`, `{{agent_name}}`) that are substituted at runtime.
+
+### Prompt Content
+
 The following prompts drive the multi-round tournament. They are designed to:
 - Work with Claude / Codex / Gemini CLI
 - Not assume API usage
