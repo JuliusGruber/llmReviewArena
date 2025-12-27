@@ -180,6 +180,33 @@ The tournament continues with remaining agents. If ALL agents fail validation in
 
 > **Note:** Section-level validation (checking for "Summary", "High-risk issues", etc.) is optional and implementation-specific. The prompts instruct agents on required format; strict enforcement may cause unnecessary failures.
 
+### Error Handling
+
+When an agent fails during a round (crash, timeout, or invalid output), the orchestrator uses the **skip** strategy:
+
+| Behavior | Description |
+|----------|-------------|
+| **Exclude from current round** | The failed agent's output is not included in `all_reviews.md` |
+| **Exclude from subsequent rounds** | The agent is removed from the tournament entirely |
+| **Log error to console** | Failure details are printed to stderr for visibility |
+
+**Failure Types:**
+
+| Failure | Detection | Logged Message |
+|---------|-----------|----------------|
+| Process crash | Non-zero exit code or unexpected termination | `[ERROR] Agent '<name>' crashed in round <N>: <exit_code/signal>` |
+| Timeout | Exceeds `agent_timeout_ms` | `[ERROR] Agent '<name>' timed out in round <N> after <ms>ms` |
+| Invalid output | Missing or empty `review.md` | `[ERROR] Agent '<name>' produced invalid output in round <N>: <reason>` |
+
+**Example console output:**
+
+```
+[ERROR] Agent 'codex' crashed in round 1: exit code 1
+[INFO] Excluding 'codex' from remaining rounds. Continuing with: claude, gemini
+```
+
+The tournament continues with the remaining agents. This ensures a single flaky agent does not block the entire review process.
+
 ## Arena Filesystem
 
 Since agents are local and tool-enabled, the **filesystem becomes the shared communication layer** - not tokens.
@@ -341,7 +368,7 @@ Human picks:
 - The best final review, or
 - A merged "champion review"
 
-### 7) Optional: Synthesizer Final Step
+### 7) Synthesizer Final Step
 
 After the last round, run one more agent process in a dedicated role:
 
