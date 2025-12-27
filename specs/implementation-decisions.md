@@ -9,7 +9,8 @@ This document captures all implementation decisions made for the LLM Review Aren
 | Language | Java 21 LTS |
 | Build System | Maven |
 | CLI Parsing | picocli |
-| YAML Parsing | SnakeYAML |
+| Configuration | SmallRye Config (MicroProfile Config) |
+| YAML Parsing | SnakeYAML (via SmallRye Config) |
 | Logging | SLF4J + Logback |
 | Template Placeholders | String.replace() |
 
@@ -19,6 +20,116 @@ This document captures all implementation decisions made for the LLM Review Aren
 <groupId>dev.reviewarena</groupId>
 <artifactId>review-arena</artifactId>
 ```
+
+## Configuration with MicroProfile Config
+
+The project uses **SmallRye Config** (the reference implementation of MicroProfile Config) to enable type-safe configuration injection via `@ConfigProperty`.
+
+### Maven Dependencies
+
+```xml
+<dependency>
+    <groupId>io.smallrye.config</groupId>
+    <artifactId>smallrye-config</artifactId>
+    <version>3.5.4</version>
+</dependency>
+<dependency>
+    <groupId>io.smallrye.config</groupId>
+    <artifactId>smallrye-config-source-yaml</artifactId>
+    <version>3.5.4</version>
+</dependency>
+```
+
+### Configuration Sources
+
+SmallRye Config loads configuration from multiple sources in priority order:
+
+| Priority | Source | Description |
+|----------|--------|-------------|
+| 1 (highest) | System properties | `-Dproperty=value` |
+| 2 | Environment variables | `PROPERTY_NAME` |
+| 3 | `application.yaml` | YAML config in classpath |
+| 4 | `application.properties` | Properties file in classpath |
+| 5 | `arena.yaml` (custom) | Project-specific config file |
+
+### Usage Pattern
+
+```java
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import jakarta.inject.Inject;
+
+public class ArenaConfig {
+
+    @Inject
+    @ConfigProperty(name = "limits.max-rounds", defaultValue = "5")
+    int maxRounds;
+
+    @Inject
+    @ConfigProperty(name = "limits.max-output-size-kb", defaultValue = "500")
+    int maxOutputSizeKb;
+
+    @Inject
+    @ConfigProperty(name = "execution.max-concurrent", defaultValue = "0")
+    int maxConcurrent;
+
+    @Inject
+    @ConfigProperty(name = "timeouts.agent-timeout-ms", defaultValue = "300000")
+    long agentTimeoutMs;
+}
+```
+
+### YAML Configuration Example
+
+```yaml
+# application.yaml
+limits:
+  max-rounds: 5
+  max-output-size-kb: 500
+
+execution:
+  max-concurrent: 0
+
+timeouts:
+  agent-timeout-ms: 300000
+  round-timeout-ms: 900000
+  grace-period-ms: 5000
+
+agents:
+  claude:
+    command: ["claude", "-p", "@prompt.md"]
+    flags:
+      auto-approve: true
+  codex:
+    command: ["codex", "exec", "@prompt.md"]
+    flags:
+      auto-approve: true
+  gemini:
+    command: ["gemini", "-p", "@prompt.md"]
+    flags:
+      auto-approve: true
+```
+
+### Programmatic Access
+
+For cases where injection is not available (e.g., static contexts):
+
+```java
+import org.eclipse.microprofile.config.ConfigProvider;
+import io.smallrye.config.SmallRyeConfig;
+
+SmallRyeConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class);
+int maxRounds = config.getValue("limits.max-rounds", Integer.class);
+```
+
+### Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| Type-safe injection | `@ConfigProperty` provides compile-time type checking |
+| Default values | Fallback values when config is missing |
+| Multiple sources | Environment variables, system properties, YAML files |
+| Nested YAML support | Complex hierarchical configuration structures |
+| Validation | Integration with Bean Validation for config constraints |
 
 ## Package Structure
 
@@ -137,7 +248,8 @@ ArenaException (exit 1 - general error)
 | Question | Answer |
 |----------|--------|
 | How to parse CLI args? | picocli |
-| How to parse YAML config? | SnakeYAML |
+| How to inject config properties? | SmallRye Config (MicroProfile Config) with `@ConfigProperty` |
+| How to parse YAML config? | SmallRye Config with YAML source (SnakeYAML internally) |
 | How to log? | SLF4J + Logback |
 | How to resolve template placeholders? | String.replace() |
 | How to handle agent stdout/stderr? | Drain to DEBUG logs + capture to files |

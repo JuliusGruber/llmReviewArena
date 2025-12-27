@@ -861,8 +861,26 @@ The following decisions supplement the specification with concrete implementatio
 | Language | Java |
 | Build System | Maven |
 | Minimum Version | Java 21 LTS |
+| Configuration | SmallRye Config (MicroProfile Config) |
 
 **Rationale:** Java 21 LTS provides virtual threads for efficient concurrent agent execution, pattern matching for cleaner code, and long-term support stability.
+
+### Configuration Management
+
+The project uses **SmallRye Config** (MicroProfile Config reference implementation) for type-safe configuration injection:
+
+```java
+@ConfigProperty(name = "limits.max-rounds", defaultValue = "5")
+int maxRounds;
+```
+
+**Key capabilities:**
+- `@ConfigProperty` annotation for type-safe YAML property injection
+- Hierarchical property names (e.g., `limits.max-rounds`, `timeouts.agent-timeout-ms`)
+- Multiple config sources: `application.yaml`, environment variables, system properties
+- Default values when configuration is missing
+
+See [Implementation Decisions](implementation-decisions.md#configuration-with-microprofile-config) for detailed usage patterns and Maven dependencies.
 
 ### task.md Generation
 
