@@ -485,7 +485,7 @@ Write your review to `review.md` using **exactly** this structure:
 - `task.md`
 - No other agent output
 
-**Prompt:** `round-0/prompt.txt`
+**Prompt:** `resources/prompts/round-0.md`
 
 ```
 You are an expert software engineer performing a rigorous code review.
@@ -515,7 +515,7 @@ Write your output to `review.md` following the required structure.
 - All Round-0 reviews merged into `all_reviews.md`
 - Still produces its own improved review
 
-**Prompt:** `round-1/prompt.txt`
+**Prompt:** `resources/prompts/round-1.md`
 
 ```
 This is Round 1 of a multi-round code review arena.
@@ -555,7 +555,7 @@ using the same structure as before.
 - Original code
 - Round-1 `all_reviews.md`
 
-**Prompt:** `round-2/prompt.txt`
+**Prompt:** `resources/prompts/round-2.md`
 
 ```
 This is Round 2.
@@ -588,7 +588,7 @@ Write a refined, high-signal review to `review.md`.
 
 **Purpose:** Produce near-identical, very high-quality reviews.
 
-**Prompt:** `round-3/prompt.txt`
+**Prompt:** `resources/prompts/round-3.md`
 
 ```
 This is the final refinement round.
@@ -615,7 +615,7 @@ Write the final review to `review.md`.
 
 **Purpose:** Produce one canonical review from multiple high-quality finals.
 
-**Prompt:** `final-synth/prompt.txt`
+**Prompt:** `resources/prompts/final-synth.md`
 
 ```
 You are the final synthesizer in a code review arena.
