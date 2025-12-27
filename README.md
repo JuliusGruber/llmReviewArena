@@ -100,13 +100,7 @@ This keeps complexity linear while maximizing cross-pollination.
 │   │   │   └── review.md      # Synthesized improvements
 │   │   └── all_reviews.md     # Combined output (input for round-2)
 │   └── final/
-│       ├── side_by_side.md    # Final reviews aligned by section
-│       ├── issue_matrix.md    # Issue tracking across agents
-│       ├── suggested_patches/ # Extracted diff snippets
-│       ├── questions.md       # Questions for PR author
 │       └── champion_review.md # Synthesized final review
-└── evaluation/
-    └── summary.md
 ```
 
 ## How It Works
