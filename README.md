@@ -2,6 +2,22 @@
 
 A **process-orchestrated multi-agent code review tournament** that pits local CLI agents against each other in iterative rounds of collaborative refinement.
 
+## Quick Start
+
+```bash
+# Review a single commit
+review-arena abc1234
+
+# Review changes between two commits
+review-arena abc1234 def5678
+
+# Review staged changes
+review-arena --staged
+
+# Review with custom round count
+review-arena abc1234 --rounds 3
+```
+
 ## Inspiration
 
 This project is a vibe coding experiment inspired by Jeffrey Emanuel's work on multi-round LLM collaboration:
@@ -19,6 +35,8 @@ The arena orchestrates multiple LLM CLI agents to perform **iterative code revie
 2. **Round 1-N**: Each agent sees all previous reviews and synthesizes improvements
 3. **Final**: A comprehensive, battle-tested review emerges from collaborative refinement
 
+Default: **5 rounds** (configurable via `--rounds` or `max_rounds` in config)
+
 ## The Tournament Model
 
 ```
@@ -32,7 +50,7 @@ Round 1 (Cross-Pollination)
 ├── Each produces: improved review incorporating best ideas
 └── Context reset: fresh process, no conversation inertia
 
-Round N (Final)
+Round N (Final, default N=5)
 └── Reviews refined through fixed number of rounds
 ```
 
@@ -134,7 +152,7 @@ Code review is ideal for this tournament approach because:
 
 ## Configuration
 
-Agents are defined via YAML:
+Configuration file: `arena.yaml`
 
 ```yaml
 agents:
@@ -144,10 +162,87 @@ agents:
     command: ["codex", "exec"]
   gemini:
     command: ["gemini", "-p"]
+
+execution:
+  max_concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
+
+limits:
+  max_output_size_kb: 500    # Maximum size per output file
+  max_rounds: 5              # Maximum tournament rounds (default: 5)
+
+timeouts:
+  agent_timeout_ms: 300000   # Per-agent timeout (default: 5 minutes)
+  round_timeout_ms: 900000   # Per-round timeout (default: 15 minutes)
 ```
+
+## CLI Usage
+
+```bash
+review-arena [options] <ref1> [ref2]
+```
+
+### Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `ref1` | **Yes** | Git reference (commit hash, branch, tag, or HEAD~N) |
+| `ref2` | No | End reference for range comparison |
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--help` | `-h` | Show help and usage information |
+| `--config <file>` | `-c` | Path to config file (default: `arena.yaml`) |
+| `--rounds <n>` | `-r` | Maximum rounds (default: 5) |
+| `--output <dir>` | `-o` | Output directory (default: `.arena`) |
+| `--parallel` | | Force parallel agent execution |
+| `--sequential` | | Force sequential agent execution |
+| `--max-concurrent <n>` | | Limit concurrent agents (0=unlimited, 1=sequential) |
+| `--staged` | | Review staged changes instead of commits |
+
+## Exit Codes
+
+For CI/CD integration and scripting:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success - review completed |
+| 1 | General error |
+| 2 | Invalid arguments / usage error |
+| 3 | Git error (no repository, invalid reference) |
+| 4 | Agent error (CLI not found, execution failed) |
+| 5 | Configuration error (invalid config file) |
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `REVIEW_ARENA_CONFIG` | Default config file path |
+| `REVIEW_ARENA_OUTPUT_DIR` | Default output directory |
+| `REVIEW_ARENA_MAX_ROUNDS` | Default maximum rounds (built-in default: 5) |
+| `REVIEW_ARENA_MAX_CONCURRENT` | Default max concurrent agents |
+
+Precedence (highest to lowest): CLI args → Environment variables → Config file → Built-in defaults
+
+## Error Handling
+
+When an agent fails during a round (crash, timeout, or invalid output):
+
+| Behavior | Description |
+|----------|-------------|
+| **Exclude from current round** | The failed agent's output is not included in `all_reviews.md` |
+| **Exclude from subsequent rounds** | The agent is removed from the tournament entirely |
+| **Log error to console** | Failure details are printed to stderr |
+
+The tournament continues with remaining agents. A single flaky agent does not block the entire review.
 
 ## Future Directions
 
 - Judge agent to evaluate review quality per round
 - Support for additional CLI agents (local models, custom MCP agents)
 - Tournament brackets for large agent pools
+- Subcommand architecture (`review-arena review`, `review-arena status`, `review-arena clean`)
+- PR integration (`review-arena pr 123`)
+- Watch mode for continuous review
+- Interactive mode for real-time feedback
