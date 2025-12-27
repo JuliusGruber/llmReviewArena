@@ -56,23 +56,69 @@ AgentProcess
 
 ### Agent Configuration
 
-Agents are defined via YAML configuration:
+Agents are defined via YAML configuration with explicit flag management:
 
 ```yaml
 agents:
   claude:
     command: ["claude", "-p", "@prompt.txt"]
+    flags:
+      auto_approve: true              # Adds --dangerously-skip-permissions
+      allowed_tools:                  # Adds --allowedTools
+        - Read
+        - Write
+        - Edit
+        - Bash
+        - Glob
+        - Grep
 
   codex:
     command: ["codex", "exec", "@prompt.txt"]
+    flags:
+      auto_approve: true              # Adds --full-auto
 
   gemini:
     command: ["gemini", "-p", "@prompt.txt"]
+    flags:
+      auto_approve: true              # Adds --yolo
 ```
 
 > **Note:** Prompts are passed via file reference (`@prompt.txt`) for robustness with large or complex prompts. The orchestrator writes the prompt to a temporary file before invoking each agent.
 
 > **Note:** Agent working directories are set dynamically per round (see [Arena Filesystem](#arena-filesystem)).
+
+#### Flag Configuration Reference
+
+The `flags` section provides a portable, CLI-agnostic way to configure agent behavior. The orchestrator translates these to CLI-specific flags at runtime:
+
+| Config Flag | Claude CLI | Codex CLI | Gemini CLI |
+|-------------|------------|-----------|------------|
+| `auto_approve: true` | `--dangerously-skip-permissions` | `--full-auto` | `--yolo` |
+| `allowed_tools: [...]` | `--allowedTools <list>` | N/A | N/A |
+
+#### Mandatory vs Optional Flags
+
+| Flag | Required? | Rationale |
+|------|-----------|-----------|
+| `auto_approve` | **Yes** | Agents must run non-interactively without prompts |
+| `allowed_tools` | No | Optional security restriction (Claude only) |
+
+**Default behavior:** If `flags` is omitted, the orchestrator uses safe defaults:
+- `auto_approve: true` (required for non-interactive execution)
+- `allowed_tools`: unrestricted (agent uses all available tools)
+
+#### Direct Flag Passthrough
+
+For advanced use cases, raw CLI flags can be appended directly:
+
+```yaml
+agents:
+  claude:
+    command: ["claude", "-p", "@prompt.txt"]
+    flags:
+      auto_approve: true
+    raw_flags: ["--verbose", "--max-turns", "50"]  # Passed directly to CLI
+```
 
 ### Design Benefits
 
