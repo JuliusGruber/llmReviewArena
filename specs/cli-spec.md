@@ -31,6 +31,7 @@ This triggers the multi-round code review tournament.
 | `--output <dir>` | `-o` | Output directory (default: `.arena`) |
 | `--parallel` | | Force parallel agent execution |
 | `--sequential` | | Force sequential agent execution |
+| `--max-concurrent <n>` | | Limit concurrent agents (0=unlimited, 1=sequential) |
 | `--staged` | | Review staged changes instead of commits |
 
 
@@ -78,6 +79,7 @@ For automation and default configuration:
 | `REVIEW_ARENA_CONFIG` | Default config file path |
 | `REVIEW_ARENA_OUTPUT_DIR` | Default output directory |
 | `REVIEW_ARENA_MAX_ROUNDS` | Default maximum rounds |
+| `REVIEW_ARENA_MAX_CONCURRENT` | Default max concurrent agents |
 
 ## Progress Output
 
