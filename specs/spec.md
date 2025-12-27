@@ -201,13 +201,6 @@ The orchestrator validates agent output after each round:
 | File within size limit | Truncated to limit, warning logged |
 | Agent completes within timeout | Agent killed, excluded from round, warning logged |
 
-**Configuration:**
-
-```yaml
-validation:
-  required_file: "review.md"
-  on_missing: "skip"    # skip = exclude agent from round, abort = stop tournament
-```
 
 The tournament continues with remaining agents. If ALL agents fail validation in a round, the tournament aborts.
 
