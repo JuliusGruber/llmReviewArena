@@ -113,7 +113,7 @@ The arena enforces limits on agent outputs to prevent runaway processes:
 ```yaml
 limits:
   max_output_size_kb: 500    # Maximum size per output file (e.g., review.md)
-  max_rounds: 5              # Maximum tournament rounds before forced termination
+  max_rounds: 5              # Maximum tournament rounds before forced termination (default: 5)
 ```
 
 These are **spec-level limits** that the orchestrator enforces. OS-level resource controls (memory, CPU, disk quotas) are deployment-specific and outside this spec's scope—use containerization or OS process limits for production deployments.
