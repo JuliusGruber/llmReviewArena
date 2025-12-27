@@ -386,10 +386,13 @@ Human picks:
 
 ### 7) Synthesizer Final Step
 
-After the last round, run one more agent process in a dedicated role:
+After the last round, **Claude** runs one more agent process in the dedicated synthesizer role. Claude is always used for this step regardless of which agents participated in the tournament rounds.
 
+- **Agent:** Claude CLI (always)
 - **Input:** The final `all_reviews.md`
 - **Output:** `final/champion_review.md` that merges duplicated comments and produces one clean review (keeping citations to evidence)
+
+**Rationale:** Using a single, consistent agent for synthesis ensures deterministic output format and avoids ambiguity about which agent produces the final deliverable.
 
 ### 8) Key Behaviors (The Tournament Method)
 
