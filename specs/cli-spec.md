@@ -120,7 +120,6 @@ Reviewing: abc1234..def5678 (15 files changed)
 | Invalid git reference | Clear error with suggestion (e.g., "Did you mean 'main'?") |
 | No git repository | Prompt to run from a git repository or specify path |
 | Agent not installed | List missing agents with install instructions |
-| Mid-review crash | Checkpoint saved, can be resumed manually |
 
 ## Integration with Config File
 
