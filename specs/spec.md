@@ -234,32 +234,46 @@ Since agents are local and tool-enabled, the **filesystem becomes the shared com
 The following structure is used for **code review tournaments** (the primary use case for this arena):
 
 ```
-.arena/
-├── task.md                    # Task definition, rubric, and constraints
-├── target/                    # Code under review (checkout, patch, or diff)
-├── rounds/
-│   ├── round-0/
-│   │   ├── claude/
-│   │   │   └── review.md
-│   │   ├── codex/
-│   │   │   └── review.md
-│   │   └── gemini/
-│   │       └── review.md
-│   ├── round-1/
-│   │   └── ...
-│   └── final/
-│       └── champion_review.md # Synthesized final review
-└── evaluation/
-    └── summary.md
+project-root/                    # Agents run here (working directory)
+├── .arena/
+│   ├── task.md                  # Task definition, rubric, git range to review
+│   ├── rounds/
+│   │   ├── round-0/
+│   │   │   ├── claude/
+│   │   │   │   └── review.md
+│   │   │   ├── codex/
+│   │   │   │   └── review.md
+│   │   │   └── gemini/
+│   │   │       └── review.md
+│   │   ├── round-1/
+│   │   │   └── ...
+│   │   └── final/
+│   │       └── champion_review.md # Synthesized final review
+│   └── evaluation/
+│       └── summary.md
+└── <project files>              # Full source tree accessible to agents
 ```
 
 > **Note:** For other tournament types (e.g., code generation), the output file would change accordingly (e.g., `solution.md`). The structure remains the same.
 
 > See [Code Review Tournament Flow](#code-review-tournament-flow) for the complete structure including combined review files and final outputs.
 
+### Agent Working Directory
+
+Agents are spawned with their working directory set to the **project root** (the directory containing `.arena/`). This gives agents full access to:
+
+- The complete source tree
+- Git repository (history, branches, diffs)
+- Build tools, test runners, linters
+- Any project tooling
+
+Agents write their review output to the path specified in the prompt (e.g., `.arena/rounds/round-0/claude/review.md`), but operate from the project root to leverage their full capabilities.
+
+**Why not isolate agents?** The power of tool-enabled CLI agents comes from their ability to explore, run tests, and investigate. Sandboxing them to a subdirectory would severely limit their effectiveness.
+
 ### Agent Capabilities
 
-Each agent operates in its round-specific working directory (e.g., `.arena/rounds/round-0/claude/`) and can:
+Each agent operates from the project root and can:
 
 - **Write actual files** - Create solutions, code, documentation
 - **Run tests** - Execute and validate their work
@@ -276,9 +290,23 @@ The arena implements a **multi-round tournament** for code review, where agents 
 
 | Input | Description |
 |-------|-------------|
-| **Target to review** | Git diff / PR branch / patch file (recommended) + context files (README, ADR, test failures) |
+| **Target to review** | Git reference specifying what to review (see below) |
 | **Review rubric** | Short, explicit criteria: correctness & edge cases, security & privacy, performance, maintainability/design, tests |
 | **Output format contract** | Ensures reviews are comparable |
+
+#### Review Target Specification
+
+The review target is specified as a git reference in `task.md`. Agents use git commands to examine the changes directly:
+
+| Target Type | Example | Description |
+|-------------|---------|-------------|
+| Commit range | `HEAD~3..HEAD` | Review last 3 commits |
+| Branch comparison | `main..feature-x` | Review branch changes |
+| Staged changes | `--staged` | Review currently staged files |
+| Single commit | `abc1234` | Review specific commit |
+| PR reference | `origin/main..HEAD` | Review PR-style diff |
+
+Agents have full repository access and can explore related code, run tests, or investigate context as needed. No separate `target/` directory is required—agents work directly with the git repository.
 
 #### Required Review Output Format
 
@@ -295,40 +323,42 @@ Each review must contain:
 The arena creates a deterministic structure for code review tasks:
 
 ```
-.arena/
-├── task.md                           # Instructions + rubric + links to files/diff
-├── target/                           # Checked-out code or extracted patch
-├── rounds/
-│   ├── round-0/
-│   │   ├── claude/
-│   │   │   └── review.md
-│   │   ├── codex/
-│   │   │   └── review.md
-│   │   ├── gemini/
-│   │   │   └── review.md
-│   │   └── all_reviews.md            # Combined reviews from all agents
-│   ├── round-1/
-│   │   └── ...
-│   └── final/
-│       ├── side_by_side.md
-│       ├── issue_matrix.md
-│       ├── suggested_patches/
-│       ├── questions.md
-│       └── champion_review.md
-└── evaluation/
-    └── summary.md                    # Tournament metrics and analysis
+project-root/                           # Agents run here (working directory)
+├── .arena/
+│   ├── task.md                         # Instructions + rubric + git range to review
+│   ├── rounds/
+│   │   ├── round-0/
+│   │   │   ├── claude/
+│   │   │   │   └── review.md
+│   │   │   ├── codex/
+│   │   │   │   └── review.md
+│   │   │   ├── gemini/
+│   │   │   │   └── review.md
+│   │   │   └── all_reviews.md          # Combined reviews from all agents
+│   │   ├── round-1/
+│   │   │   └── ...
+│   │   └── final/
+│   │       ├── side_by_side.md
+│   │       ├── issue_matrix.md
+│   │       ├── suggested_patches/
+│   │       ├── questions.md
+│   │       └── champion_review.md
+│   └── evaluation/
+│       └── summary.md                  # Tournament metrics and analysis
+└── <project files>                     # Full source tree accessible to agents
 ```
 
 ### 2) Round 0 – Independent Reviews
 
 For each agent (fresh process):
 
-1. Start agent in its own working directory
+1. Start agent in the **project root** directory
 2. Feed it:
-   - The rubric + `task.md`
-   - The diff/path to repo
-   - Strict instruction: "Write review to `review.md`"
-3. Stop the agent process (ephemeral processes = clean state)
+   - The rubric + `task.md` (contains git range to review)
+   - Output path: `.arena/rounds/round-0/<agent>/review.md`
+3. Agent explores code, runs `git diff`, investigates as needed
+4. Agent writes review to specified output path
+5. Stop the agent process (ephemeral processes = clean state)
 
 **Result:** Three independent reviews with no cross-contamination.
 

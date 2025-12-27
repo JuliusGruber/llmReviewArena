@@ -23,10 +23,11 @@
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           WORKSPACE SETUP                                    │
-│  .arena/                                                                     │
-│  ├── task.md              ← rubric + constraints                            │
-│  ├── target/              ← checked-out diff/code                           │
-│  └── rounds/              ← created per round                               │
+│  project-root/            ← agents run here (working directory)             │
+│  ├── .arena/                                                                │
+│  │   ├── task.md          ← rubric + git range to review                    │
+│  │   └── rounds/          ← review outputs per round                        │
+│  └── <project files>      ← full source tree accessible                     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
