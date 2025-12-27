@@ -13,6 +13,21 @@ A **process-orchestrated agent arena** - not an API-orchestrated multi-model sys
 | Fully Terminal-Based | Entire system operates within the terminal |
 | Agents-Only Execution | All work is performed by agents, not direct API calls |
 
+### Abstraction Boundary Clarification
+
+The "No REST / No Model APIs" principle applies to the **arena/orchestrator layer**, not to the CLI agents themselves:
+
+| Layer | Uses APIs? | Responsibility |
+|-------|------------|----------------|
+| **Arena/Orchestrator** | No | Process management, filesystem I/O only |
+| **CLI Agents** (Claude, Codex, Gemini) | Yes (internally) | May call LLM APIs under the hood |
+
+**Key points:**
+- The orchestrator spawns processes and reads/writes files—it never calls model APIs directly
+- CLI agents like Claude Code internally use LLM APIs, but this is **abstracted away** from the arena
+- References to "rate-limited backends" (e.g., in execution settings) refer to the LLM APIs that CLI tools use internally
+- This separation keeps the arena model-agnostic while allowing agents to leverage their full capabilities
+
 ## Supported CLI Agents
 
 The arena orchestrates the following CLI agents as processes:
