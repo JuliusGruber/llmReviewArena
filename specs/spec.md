@@ -315,7 +315,7 @@ For each agent (new fresh process to reset context for strict round isolation):
 
 ### 5) Round 2..N – Iterative Refinement
 
-Repeat until convergence:
+Repeat for a fixed number of rounds:
 
 1. Merge round-(k) reviews into `round-k/all_reviews.md`
 2. Each agent produces an improved review that:
@@ -324,9 +324,7 @@ Repeat until convergence:
    - Tightens prioritization
    - Adds actionable patches/tests
 
-**Stop when:**
-- Reviews converge (mostly same issues), or
-- Fixed round limit reached (e.g., 3–5 rounds)
+**Stop when:** Fixed round limit reached (configurable via `max_rounds`, see [Resource Limits](#resource-limits))
 
 ### 6) Final Output for Human Evaluation
 
