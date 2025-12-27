@@ -396,17 +396,17 @@ The arena implements a **multi-round tournament** for code review, where agents 
 
 #### Review Target Specification
 
-The review target is specified as a git reference in `task.md`. Agents use git commands to examine the changes directly:
+The review target is specified in `task.md` using one of three formats:
 
 | Target Type | Example | Description |
 |-------------|---------|-------------|
-| Commit range | `HEAD~3..HEAD` | Review last 3 commits |
-| Branch comparison | `main..feature-x` | Review branch changes |
+| Single commit | `abc1234` | Review changes in one commit |
+| Commit range | `abc1234..def5678` | Review changes between two commits |
 | Staged changes | `--staged` | Review currently staged files |
-| Single commit | `abc1234` | Review specific commit |
-| PR reference | `origin/main..HEAD` | Review PR-style diff |
 
-Agents have full repository access and can explore related code, run tests, or investigate context as needed. No separate `target/` directory is required—agents work directly with the git repository.
+The orchestrator passes these references directly to agents via prompts. Agents use their own git capabilities to examine the changes—the orchestrator does not perform git operations itself.
+
+Agents have full repository access and can explore related code, run tests, or investigate context as needed.
 
 #### Required Review Output Format
 

@@ -12,14 +12,28 @@ This triggers the multi-round code review tournament.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `ref1` | **Yes** | Git reference (commit hash, branch, tag, or HEAD~N) |
-| `ref2` | No | End reference for range comparison |
+| `ref1` | **Yes** | Git commit hash |
+| `ref2` | No | End commit hash for range comparison |
+
+### Supported Git Reference Formats
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Single commit | `abc1234` | Review changes in one commit |
+| Commit range | `abc1234 def5678` | Review changes between two commits |
+| Staged changes | `--staged` | Review currently staged changes |
 
 ### Behavior
 
-- If only `ref1` is provided: Review the changes introduced in that single commit/ref
-- If both `ref1` and `ref2` are provided: Review the diff between the two references
+- If only `ref1` is provided: Review the changes introduced in that single commit
+- If both `ref1` and `ref2` are provided: Review the diff between the two commits
 - With `--staged`: Review currently staged changes (ignores ref arguments)
+
+### Git Integration
+
+The orchestrator does **not** perform git operations itself. It simply passes the commit hash(es) or `--staged` flag to agents via prompts. Agents use their own git capabilities to inspect the code changes.
+
+This keeps the orchestrator simple and leverages the full power of tool-enabled CLI agents.
 
 ## Options
 
@@ -43,12 +57,6 @@ review-arena abc1234
 
 # Review changes between two commits
 review-arena abc1234 def5678
-
-# Review using branch names
-review-arena main feature-branch
-
-# Review last 3 commits
-review-arena HEAD~3 HEAD
 
 # Review staged changes
 review-arena --staged
