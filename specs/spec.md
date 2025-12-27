@@ -49,7 +49,7 @@ AgentProcess
 ├── name              (claude, codex, gemini)
 ├── command           (shell command to start it)
 ├── working_directory (isolated per agent)
-├── prompt_file       (prompt injection via file reference)
+├── prompt_file       (prompt injection via file reference, e.g., prompt.md)
 ├── stdout            (captured logs + responses)
 ├── lifecycle         (start / stop / restart)
 ```
@@ -61,7 +61,7 @@ Agents are defined via YAML configuration with explicit flag management:
 ```yaml
 agents:
   claude:
-    command: ["claude", "-p", "@prompt.txt"]
+    command: ["claude", "-p", "@prompt.md"]
     flags:
       auto_approve: true              # Adds --dangerously-skip-permissions
       allowed_tools:                  # Adds --allowedTools
@@ -73,17 +73,17 @@ agents:
         - Grep
 
   codex:
-    command: ["codex", "exec", "@prompt.txt"]
+    command: ["codex", "exec", "@prompt.md"]
     flags:
       auto_approve: true              # Adds --full-auto
 
   gemini:
-    command: ["gemini", "-p", "@prompt.txt"]
+    command: ["gemini", "-p", "@prompt.md"]
     flags:
       auto_approve: true              # Adds --yolo
 ```
 
-> **Note:** Prompts are passed via file reference (`@prompt.txt`) for robustness with large or complex prompts. The orchestrator writes the prompt to a temporary file before invoking each agent.
+> **Note:** Prompts are passed via file reference (`@prompt.md`) for robustness with large or complex prompts. The orchestrator writes the prompt to a temporary file before invoking each agent.
 
 > **Note:** Agent working directories are set dynamically per round (see [Arena Filesystem](#arena-filesystem)).
 
@@ -114,7 +114,7 @@ For advanced use cases, raw CLI flags can be appended directly:
 ```yaml
 agents:
   claude:
-    command: ["claude", "-p", "@prompt.txt"]
+    command: ["claude", "-p", "@prompt.md"]
     flags:
       auto_approve: true
     raw_flags: ["--verbose", "--max-turns", "50"]  # Passed directly to CLI
@@ -135,7 +135,7 @@ This abstraction keeps the arena:
 The arena **requires ephemeral agents** - stateless, short-lived processes that are created fresh for each round. This ensures a clean context window every time:
 
 1. **Start** agent process
-2. **Feed** it a prompt (via file reference: `@prompt.txt`)
+2. **Feed** it a prompt (via file reference: `@prompt.md`)
 3. **Let it work** (agent executes autonomously)
 4. **Capture output** (from stdout)
 5. **Kill** process
@@ -893,7 +893,7 @@ The `task.md` file is **fully templated** with placeholders that are substituted
 
 ### Prompt Construction
 
-The prompt sent to agents (`@prompt.txt`) is constructed by **concatenation**:
+The prompt sent to agents (`@prompt.md`) is constructed by **concatenation**:
 
 ```
 [Contents of task.md with placeholders resolved]
@@ -907,8 +907,8 @@ The orchestrator:
 1. Loads `task.md` template and resolves placeholders
 2. Loads the appropriate round prompt (`round-0.md`, `round-1.md`, etc.)
 3. Concatenates them with a separator
-4. Writes to a temporary `prompt.txt` file
-5. Invokes agent with `@prompt.txt` reference
+4. Writes to a temporary `prompt.md` file
+5. Invokes agent with `@prompt.md` reference
 
 ### Directory Creation
 

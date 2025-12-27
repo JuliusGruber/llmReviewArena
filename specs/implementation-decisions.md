@@ -77,7 +77,7 @@ ArenaException (exit 1 - general error)
 | Existing `.arena/` directory | Clear and recreate (fresh start) |
 | Output exceeds `max_output_size_kb` | Warn but keep full content (no truncation) |
 | Non-UTF8 agent output | Replace invalid bytes with `�`, log warning |
-| Temp files (`prompt.txt`) | Keep for debugging (never delete) |
+| Temp files (`prompt.md`) | Keep for debugging (never delete) |
 
 ## Git Integration
 
