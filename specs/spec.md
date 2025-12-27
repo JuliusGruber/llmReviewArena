@@ -46,13 +46,13 @@ Agents are defined via YAML configuration:
 ```yaml
 agents:
   claude:
-    command: ["claude", "chat", "--dangerously-allow-file-access"]
+    command: ["claude", "-p"]
 
   codex:
-    command: ["codex"]
+    command: ["codex", "exec"]
 
   gemini:
-    command: ["gemini", "chat"]
+    command: ["gemini", "-p"]
 ```
 
 > **Note:** Agent working directories are set dynamically per round (see [Arena Filesystem](#arena-filesystem)).

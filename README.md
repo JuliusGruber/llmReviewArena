@@ -139,11 +139,11 @@ Agents are defined via YAML:
 ```yaml
 agents:
   claude:
-    command: ["claude", "chat", "--dangerously-allow-file-access"]
+    command: ["claude", "-p"]
   codex:
-    command: ["codex"]
+    command: ["codex", "exec"]
   gemini:
-    command: ["gemini", "chat"]
+    command: ["gemini", "-p"]
 ```
 
 ## Future Directions
