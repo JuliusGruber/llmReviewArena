@@ -32,8 +32,8 @@ Round 1 (Cross-Pollination)
 ├── Each produces: improved review incorporating best ideas
 └── Context reset: fresh process, no conversation inertia
 
-Round N (Convergence)
-└── Reviews converge toward comprehensive synthesis
+Round N (Final)
+└── Reviews refined through fixed number of rounds
 ```
 
 ## Key Design Principles
@@ -149,6 +149,5 @@ agents:
 ## Future Directions
 
 - Judge agent to evaluate review quality per round
-- Automatic convergence detection
 - Support for additional CLI agents (local models, custom MCP agents)
 - Tournament brackets for large agent pools
