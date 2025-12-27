@@ -26,18 +26,13 @@ This triggers the multi-round code review tournament.
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--help` | `-h` | Show help and usage information |
-| `--version` | `-v` | Show version number |
 | `--config <file>` | `-c` | Path to config file (default: `arena.yaml`) |
-| `--agents <list>` | `-a` | Comma-separated list of agents to use (overrides config) |
 | `--rounds <n>` | `-r` | Maximum rounds (overrides config) |
 | `--output <dir>` | `-o` | Output directory (default: `.arena`) |
 | `--parallel` | | Force parallel agent execution |
 | `--sequential` | | Force sequential agent execution |
-| `--verbose` | | Verbose output with detailed progress |
-| `--quiet` | `-q` | Minimal output (for CI/scripts) |
-| `--dry-run` | | Preview what would happen without executing |
 | `--staged` | | Review staged changes instead of commits |
-| `--resume` | | Resume an interrupted review session |
+
 
 ## Examples
 
@@ -51,23 +46,14 @@ review-arena abc1234 def5678
 # Review using branch names
 review-arena main feature-branch
 
-# Review last 3 commits with specific agents
-review-arena HEAD~3 HEAD --agents claude,gemini
+# Review last 3 commits
+review-arena HEAD~3 HEAD
 
 # Review staged changes
 review-arena --staged
 
-# Custom output directory with verbose logging
-review-arena abc1234 --output ./reviews --verbose
-
-# CI/CD usage (quiet mode, check exit code)
-review-arena abc1234 --quiet && echo "Review complete"
-
-# Preview without executing
-review-arena abc1234 --dry-run
-
-# Resume an interrupted review
-review-arena --resume
+# Custom output directory
+review-arena abc1234 --output ./reviews
 ```
 
 ## Exit Codes
@@ -90,16 +76,12 @@ For automation and default configuration:
 | Variable | Description |
 |----------|-------------|
 | `REVIEW_ARENA_CONFIG` | Default config file path |
-| `REVIEW_ARENA_AGENTS` | Default agents (comma-separated) |
 | `REVIEW_ARENA_OUTPUT_DIR` | Default output directory |
 | `REVIEW_ARENA_MAX_ROUNDS` | Default maximum rounds |
 
 ## Progress Output
 
-When running (non-quiet mode), display progress:
-
 ```
-review-arena v1.0.0
 Reviewing: abc1234..def5678 (15 files changed)
 
 [Round 1/3] Running independent reviews...
@@ -127,7 +109,7 @@ Reviewing: abc1234..def5678 (15 files changed)
 | Invalid git reference | Clear error with suggestion (e.g., "Did you mean 'main'?") |
 | No git repository | Prompt to run from a git repository or specify path |
 | Agent not installed | List missing agents with install instructions |
-| Mid-review crash | Checkpoint saved, suggest `--resume` to continue |
+| Mid-review crash | Checkpoint saved, can be resumed manually |
 
 ## Integration with Config File
 
