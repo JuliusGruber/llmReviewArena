@@ -113,8 +113,24 @@ The arena enforces limits on agent outputs to prevent runaway processes:
 ```yaml
 limits:
   max_output_size_kb: 500    # Maximum size per output file (e.g., review.md)
-  max_rounds: 5              # Maximum tournament rounds before forced termination (default: 5)
+  max_rounds: 5              # Number of cross-pollination rounds after Round 0 (default: 5)
 ```
+
+#### Round Counting (0-indexed)
+
+Rounds are **always 0-indexed**, both internally and in user-facing output:
+
+| Round | Type | Description |
+|-------|------|-------------|
+| Round 0 | Independent | Each agent reviews code independently, no cross-pollination |
+| Round 1-N | Cross-pollination | Agents see all previous reviews and improve |
+
+**`max_rounds` semantics:**
+- `max_rounds: 5` means 5 cross-pollination rounds (Rounds 1-5) after Round 0
+- Total rounds executed = Round 0 + `max_rounds` cross-pollination rounds
+- Example: `max_rounds: 5` → Rounds 0, 1, 2, 3, 4, 5 (6 total rounds)
+
+Progress output uses 0-indexed display: `Round 0/5`, `Round 1/5`, ..., `Round 5/5`
 
 These are **spec-level limits** that the orchestrator enforces. OS-level resource controls (memory, CPU, disk quotas) are deployment-specific and outside this spec's scope—use containerization or OS process limits for production deployments.
 

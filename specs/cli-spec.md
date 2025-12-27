@@ -83,26 +83,35 @@ For automation and default configuration:
 
 ## Progress Output
 
+Progress uses **0-indexed round numbers** (matching internal round numbering):
+
 ```
 Reviewing: abc1234..def5678 (15 files changed)
 
-[Round 1/3] Running independent reviews...
+[Round 0/5] Running independent reviews...
   ✓ claude (12.3s)
   ✓ gemini (8.1s)
   ✓ codex (15.7s)
-[Round 2/3] Synthesizing reviews...
+[Round 1/5] Cross-pollination round 1...
   ✓ claude (18.2s)
   ✓ gemini (14.5s)
   ✓ codex (20.1s)
-[Round 3/3] Final synthesis...
+[Round 2/5] Cross-pollination round 2...
   ✓ claude (10.4s)
   ✓ gemini (9.8s)
   ✓ codex (12.3s)
+...
+[Round 5/5] Final cross-pollination round...
+  ✓ claude (8.1s)
+  ✓ gemini (7.2s)
+  ✓ codex (9.5s)
 
 ✓ Review complete!
   Output: .arena/rounds/final/champion_review.md
   Summary: 3 critical issues, 7 suggestions, 2 questions
 ```
+
+**Format:** `[Round X/N]` where X is the current round (0-indexed) and N is `max_rounds`.
 
 ## Error Handling
 
