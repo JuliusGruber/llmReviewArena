@@ -23,9 +23,9 @@ The arena orchestrates multiple LLM CLI agents to perform **iterative code revie
 
 ```
 Round 0 (Independent Reviews)
-├── Claude CLI → review-claude.md
-├── Codex CLI  → review-codex.md
-└── Gemini CLI → review-gemini.md
+├── Claude CLI → claude/review.md
+├── Codex CLI  → codex/review.md
+└── Gemini CLI → gemini/review.md
 
 Round 1 (Cross-Pollination)
 ├── All agents read: all_reviews.md (combined output)
