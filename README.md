@@ -110,7 +110,7 @@ This keeps complexity linear while maximizing cross-pollination.
 Each round spawns ephemeral agent processes:
 
 ```
-Start → Feed prompt (stdin) → Agent works → Capture output (stdout) → Kill
+Start → Feed prompt (@prompt.txt) → Agent works → Capture output (review.md) → Kill
 ```
 
 ### 2. Round Execution
@@ -151,11 +151,11 @@ Configuration file: `arena.yaml`
 ```yaml
 agents:
   claude:
-    command: ["claude", "-p"]
+    command: ["claude", "-p", "@prompt.txt"]
   codex:
-    command: ["codex", "exec"]
+    command: ["codex", "exec", "@prompt.txt"]
   gemini:
-    command: ["gemini", "-p"]
+    command: ["gemini", "-p", "@prompt.txt"]
 
 execution:
   max_concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
