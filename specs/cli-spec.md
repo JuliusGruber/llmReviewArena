@@ -27,7 +27,7 @@ This triggers the multi-round code review tournament.
 |--------|-------|-------------|
 | `--help` | `-h` | Show help and usage information |
 | `--config <file>` | `-c` | Path to config file (default: `arena.yaml`) |
-| `--rounds <n>` | `-r` | Maximum rounds (overrides config) |
+| `--rounds <n>` | `-r` | Maximum rounds (default: 5, overrides config) |
 | `--output <dir>` | `-o` | Output directory (default: `.arena`) |
 | `--parallel` | | Force parallel agent execution |
 | `--sequential` | | Force sequential agent execution |
@@ -78,7 +78,7 @@ For automation and default configuration:
 |----------|-------------|
 | `REVIEW_ARENA_CONFIG` | Default config file path |
 | `REVIEW_ARENA_OUTPUT_DIR` | Default output directory |
-| `REVIEW_ARENA_MAX_ROUNDS` | Default maximum rounds |
+| `REVIEW_ARENA_MAX_ROUNDS` | Default maximum rounds (built-in default: 5) |
 | `REVIEW_ARENA_MAX_CONCURRENT` | Default max concurrent agents |
 
 ## Progress Output
