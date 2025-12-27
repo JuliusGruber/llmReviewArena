@@ -35,7 +35,7 @@ The arena orchestrates multiple LLM CLI agents to perform **iterative code revie
 2. **Round 1-N**: Each agent sees all previous reviews and synthesizes improvements
 3. **Final**: A comprehensive, battle-tested review emerges from collaborative refinement
 
-Default: **5 rounds** (configurable via `--rounds` or `max_rounds` in config)
+Default: **5 cross-pollination rounds** after Round 0 (6 total rounds, configurable via `--rounds` or `max_rounds` in config)
 
 ## The Tournament Model
 
@@ -100,7 +100,7 @@ This keeps complexity linear while maximizing cross-pollination.
 │   │   │   └── review.md      # Synthesized improvements
 │   │   └── all_reviews.md     # Combined output (input for round-2)
 │   └── final/
-│       └── champion_review.md # Synthesized final review
+│       └── champion_review.md # Synthesized final review (always produced by Claude)
 ```
 
 ## How It Works
@@ -167,6 +167,7 @@ limits:
 timeouts:
   agent_timeout_ms: 300000   # Per-agent timeout (default: 5 minutes)
   round_timeout_ms: 900000   # Per-round timeout (default: 15 minutes)
+  # See specs/spec.md for advanced timeout options (grace_period, per_agent, on_timeout)
 ```
 
 ## CLI Usage
@@ -179,8 +180,8 @@ review-arena [options] <ref1> [ref2]
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `ref1` | **Yes** | Git reference (commit hash, branch, tag, or HEAD~N) |
-| `ref2` | No | End reference for range comparison |
+| `ref1` | **Yes** | Git commit hash |
+| `ref2` | No | End commit hash for range comparison |
 
 ### Options
 

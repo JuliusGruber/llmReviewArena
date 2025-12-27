@@ -399,8 +399,8 @@ The review target is specified in `task.md` using one of three formats:
 | Target Type | Example | Description |
 |-------------|---------|-------------|
 | Single commit | `abc1234` | Review changes in one commit |
-| Commit range | `abc1234..def5678` | Review changes between two commits |
-| Staged changes | `--staged` | Review currently staged files |
+| Commit range | `abc1234 def5678` | Review changes between two commits |
+| Staged changes | `--staged` | Review currently staged changes |
 
 The orchestrator passes these references directly to agents via prompts. Agents use their own git capabilities to examine the changes—the orchestrator does not perform git operations itself.
 
@@ -571,8 +571,10 @@ resources/prompts/
 ├── round-0.md           # Round 0 - Independent review prompt
 ├── round-1.md           # Round 1 - Review of reviews prompt
 ├── round-2.md           # Round 2 - Precision and evidence prompt
-├── round-3.md           # Round 3 - Final convergence prompt (optional)
-└── final-synth.md       # Final synthesizer prompt (optional)
+├── round-3.md           # Round 3 - Refinement prompt
+├── round-4.md           # Round 4 - Consolidation prompt
+├── round-5.md           # Round 5 - Final convergence prompt
+└── final-synth.md       # Final synthesizer prompt
 ```
 
 **Rationale:**
@@ -743,11 +745,54 @@ If multiple reviews mention the same issue:
 Write a refined, high-signal review to `review.md`.
 ```
 
-### Round 3 — Final Convergence (Optional)
+### Round 3 — Refinement
+
+**Purpose:** Tighten prioritization and remove weak claims.
+
+**Prompt:** `resources/prompts/round-3.md`
+
+```
+This is Round 3.
+
+Reviews are converging. Your task is to refine further:
+- Remove any remaining vague or speculative comments
+- Strengthen evidence for each issue
+- Ensure severity levels are calibrated correctly
+- Consolidate duplicate issues into single, authoritative entries
+
+Focus on:
+- Actionable feedback the author can implement immediately
+- Clear file/line references for every issue
+- Realistic fix suggestions
+
+Write a refined review to `review.md`.
+```
+
+### Round 4 — Consolidation
+
+**Purpose:** Merge remaining duplicates and finalize prioritization.
+
+**Prompt:** `resources/prompts/round-4.md`
+
+```
+This is Round 4.
+
+Reviews are nearly converged. Your task:
+- Identify and merge any remaining duplicate issues
+- Finalize severity levels (critical vs medium vs low)
+- Ensure each issue has concrete evidence and a clear fix
+- Remove any low-value nitpicks that distract from real issues
+
+Produce a clean, consolidated review.
+
+Write to `review.md`.
+```
+
+### Round 5 — Final Convergence
 
 **Purpose:** Produce near-identical, very high-quality reviews.
 
-**Prompt:** `resources/prompts/round-3.md`
+**Prompt:** `resources/prompts/round-5.md`
 
 ```
 This is the final refinement round.
@@ -770,7 +815,7 @@ Write the final review to `review.md`.
 
 > At this point, agents typically differ only in wording, not substance.
 
-### Final Synthesizer Round (Optional)
+### Final Synthesizer Round
 
 **Purpose:** Produce one canonical review from multiple high-quality finals.
 
