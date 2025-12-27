@@ -87,12 +87,11 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         FINAL OUTPUT GENERATION                              │
 │                                                                              │
-│  .arena/rounds/final/                                                        │
-│  ├── side_by_side.md       ← Final reviews aligned by section               │
-│  ├── issue_matrix.md       ← Issue tracking (which agent found what)        │
-│  ├── suggested_patches/    ← Extracted diff snippets                        │
-│  ├── questions.md          ← Questions for PR author                        │
-│  └── champion_review.md    ← Synthesized final review (optional)            │
+│  .arena/rounds/                                                              │
+│  ├── round-N/all_reviews.md   ← Combined final reviews from all agents      │
+│  ├── round-N/<agent>/review.md ← Individual agent reviews from final round  │
+│  └── final/                                                                  │
+│      └── champion_review.md   ← Synthesized final review                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼

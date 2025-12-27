@@ -334,8 +334,6 @@ project-root/                    # Agents run here (working directory)
 │   │   │   └── ...
 │   │   └── final/
 │   │       └── champion_review.md # Synthesized final review
-│   └── evaluation/
-│       └── summary.md
 └── <project files>              # Full source tree accessible to agents
 ```
 
@@ -438,13 +436,7 @@ project-root/                           # Agents run here (working directory)
 │   │   ├── round-1/
 │   │   │   └── ...
 │   │   └── final/
-│   │       ├── side_by_side.md
-│   │       ├── issue_matrix.md
-│   │       ├── suggested_patches/
-│   │       ├── questions.md
-│   │       └── champion_review.md
-│   └── evaluation/
-│       └── summary.md                  # Tournament metrics and analysis
+│   │       └── champion_review.md      # Synthesized final review
 └── <project files>                     # Full source tree accessible to agents
 ```
 
@@ -536,20 +528,17 @@ Repeat for a fixed number of rounds:
 
 **Stop when:** Fixed round limit reached (configurable via `max_rounds`, see [Resource Limits](#resource-limits))
 
-### 6) Final Output for Human Evaluation
+### 6) Final Output
 
-Generate an "evaluation pack":
+After all rounds complete, the arena produces:
 
 | File | Purpose |
 |------|---------|
-| `final/side_by_side.md` | Round N reviews, aligned by section |
-| `final/issue_matrix.md` | Issue → which agent flagged it, severity, evidence |
-| `final/suggested_patches/` | Diff snippets extracted from reviews |
-| `final/questions.md` | Questions to ask the PR author |
+| `round-N/all_reviews.md` | Combined final reviews from all agents |
+| `round-N/<agent>/review.md` | Individual agent reviews from final round |
+| `final/champion_review.md` | Synthesized final review (see next step) |
 
-Human picks:
-- The best final review, or
-- A merged "champion review"
+The human reviewer can examine individual agent reviews or the combined file before the synthesizer runs.
 
 ### 7) Synthesizer Final Step
 
