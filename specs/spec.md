@@ -286,6 +286,21 @@ Agents write their review output to the path specified in the prompt (e.g., `.ar
 
 **Why not isolate agents?** The power of tool-enabled CLI agents comes from their ability to explore, run tests, and investigate. Sandboxing them to a subdirectory would severely limit their effectiveness.
 
+### File Access and Paths
+
+Agents access all arena files using **relative paths from the project root**:
+
+| Resource | Path from project root |
+|----------|------------------------|
+| Task definition | `.arena/task.md` |
+| Own output | `.arena/rounds/round-N/<agent>/review.md` |
+| Previous round reviews | `.arena/rounds/round-N/all_reviews.md` |
+| Source code | Direct paths (e.g., `src/main/App.java`) |
+
+**Path format:** Prompts reference files using relative paths. Agents may internally resolve to absolute paths if needed, but all prompt-specified paths are relative to the project root.
+
+**Write access:** Agents can write anywhere within the project. The orchestrator specifies output paths in prompts (e.g., "Write your review to `.arena/rounds/round-1/claude/review.md`"). Agents are trusted to write only to their designated output locations.
+
 ### Agent Capabilities
 
 Each agent operates from the project root and can:
