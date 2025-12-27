@@ -7,6 +7,7 @@
 | Language | Java 21 LTS |
 | Build System | Maven |
 | Process Management | ProcessBuilder |
+| Configuration | SmallRye Config (MicroProfile Config) |
 
 ## Decision
 
