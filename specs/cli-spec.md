@@ -67,7 +67,7 @@ For CI/CD integration and scripting:
 | 1 | General error |
 | 2 | Invalid arguments / usage error |
 | 3 | Git error (no repository, invalid reference) |
-| 4 | Agent error (CLI not found, execution failed) |
+| 4 | Agent error (CLI not found, execution failed, insufficient agents) |
 | 5 | Configuration error (invalid config file) |
 
 ## Environment Variables

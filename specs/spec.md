@@ -233,6 +233,37 @@ When an agent fails during a round (crash, timeout, or invalid output), the orch
 
 The tournament continues with the remaining agents. This ensures a single flaky agent does not block the entire review process.
 
+### Minimum Agent Threshold
+
+The arena requires a minimum number of agents to maintain meaningful cross-pollination:
+
+**Configuration:**
+
+```yaml
+tournament:
+  min_agents: 2    # Minimum agents required (default: 2)
+```
+
+**Behavior:**
+
+| Condition | Action |
+|-----------|--------|
+| Agents drop below `min_agents` | Tournament aborts with exit code 4 |
+| Single agent remains (default threshold) | Tournament aborts—no cross-pollination possible |
+| All agents fail in Round 0 | Tournament aborts with exit code 4 |
+
+**Rationale:** Cross-pollination requires at least 2 agents to be meaningful. A single-agent "tournament" provides no competitive benefit over running that agent directly.
+
+**Example console output:**
+
+```
+[ERROR] Agent 'codex' crashed in round 0: exit code 1
+[ERROR] Agent 'gemini' timed out in round 0 after 300000ms
+[ERROR] Tournament requires at least 2 agents, only 1 remaining. Aborting.
+```
+
+> **Note:** Set `min_agents: 1` to allow single-agent continuation (useful for testing or fallback scenarios), though this disables the cross-pollination benefit.
+
 ## Arena Filesystem
 
 Since agents are local and tool-enabled, the **filesystem becomes the shared communication layer** - not tokens.
