@@ -804,3 +804,99 @@ using the standard review structure.
 | Fresh context each round | New process = clean slate |
 | Convergence over debate | Prompts drive toward agreement, not argument |
 | Filesystem-grounded | Real files, real diffs, real CLI agents |
+
+## Implementation Decisions
+
+The following decisions supplement the specification with concrete implementation choices.
+
+### Technology Stack
+
+| Decision | Choice |
+|----------|--------|
+| Language | Java |
+| Build System | Maven |
+| Minimum Version | Java 21 LTS |
+
+**Rationale:** Java 21 LTS provides virtual threads for efficient concurrent agent execution, pattern matching for cleaner code, and long-term support stability.
+
+### task.md Generation
+
+The `task.md` file is **fully templated** with placeholders that are substituted at runtime:
+
+```markdown
+# Code Review Arena – Task
+
+## Review Target
+{{review_target}}
+
+## Files Changed
+{{file_count}} files changed
+
+## Goal
+...
+```
+
+**Available placeholders:**
+
+| Placeholder | Description |
+|-------------|-------------|
+| `{{review_target}}` | Git range (e.g., `abc1234`, `abc1234..def5678`, or `--staged`) |
+| `{{file_count}}` | Number of files changed |
+| `{{round_number}}` | Current round (0-indexed) |
+| `{{agent_name}}` | Name of the current agent |
+| `{{output_path}}` | Path where agent should write output |
+
+### Prompt Construction
+
+The prompt sent to agents (`@prompt.txt`) is constructed by **concatenation**:
+
+```
+[Contents of task.md with placeholders resolved]
+
+---
+
+[Contents of round-N.md prompt]
+```
+
+The orchestrator:
+1. Loads `task.md` template and resolves placeholders
+2. Loads the appropriate round prompt (`round-0.md`, `round-1.md`, etc.)
+3. Concatenates them with a separator
+4. Writes to a temporary `prompt.txt` file
+5. Invokes agent with `@prompt.txt` reference
+
+### Directory Creation
+
+The **orchestrator pre-creates all directories** before spawning agents:
+
+```
+.arena/
+├── task.md                          # Created and populated by orchestrator
+├── rounds/
+│   ├── round-0/
+│   │   ├── claude/                  # Pre-created by orchestrator
+│   │   ├── codex/                   # Pre-created by orchestrator
+│   │   └── gemini/                  # Pre-created by orchestrator
+│   └── ...
+```
+
+Agents write directly to their designated output path without needing to create directories.
+
+### Synthesizer Requirement
+
+**Claude is required** for the final synthesis step. If Claude CLI is not installed or configured:
+
+- The orchestrator fails with exit code 4 (Agent error)
+- Error message: `"Final synthesis requires Claude CLI. Ensure 'claude' is installed and configured."`
+
+This is a hard requirement, not a soft fallback. The synthesizer role is critical to producing the final `champion_review.md`.
+
+### State Recovery
+
+**No state recovery** - each tournament run starts fresh:
+
+- The orchestrator clears/recreates `.arena/` directory on startup
+- No checkpoint files or resume capability
+- If interrupted, the user must restart the tournament
+
+**Rationale:** Simpler implementation, deterministic behavior, avoids stale state issues. Users can preserve outputs by copying `.arena/` before re-running.

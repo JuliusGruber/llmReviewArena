@@ -1,5 +1,13 @@
 # Java Agent Integration Options
 
+## Technology Stack
+
+| Component | Choice |
+|-----------|--------|
+| Language | Java 21 LTS |
+| Build System | Maven |
+| Process Management | ProcessBuilder |
+
 ## Decision
 
 **Option 1: ProcessBuilder with Headless CLI Modes** was selected as the implementation approach.
