@@ -12,17 +12,35 @@ This aligns with the core spec principles:
 
 ---
 
+## Output Model
+
+The orchestrator uses **filesystem-based communication only**:
+
+| Output Type | Source | Used By Orchestrator |
+|-------------|--------|---------------------|
+| `review.md` file | Agent writes to specified path | **Yes** - authoritative output |
+| Stdout | Process output stream | **No** - ignored (logging only) |
+
+The orchestrator:
+1. Waits for process exit (`process.waitFor()`)
+2. Checks if output file exists and is non-empty
+3. Reads file content for the review
+
+No stdout parsing is required.
+
+---
+
 ## All Evaluated Options
 
 ### Option 1: ProcessBuilder with Headless CLI Modes ✅ **Selected**
 
-All three CLIs support headless/JSON output modes suitable for subprocess orchestration:
+All three CLIs support headless modes suitable for subprocess orchestration:
 
-| CLI | Headless Command | JSON Output |
-|-----|------------------|-------------|
-| **Claude CLI** | `claude -p @prompt.txt` | `--output-format json` |
-| **Codex CLI** | `codex exec @prompt.txt` | `--json` (JSONL stream) |
-| **Gemini CLI** | `gemini -p @prompt.txt` | `--output-format json` |
+| CLI | Headless Command |
+|-----|------------------|
+| **Claude CLI** | `claude -p @prompt.txt` |
+| **Codex CLI** | `codex exec @prompt.txt` |
+| **Gemini CLI** | `gemini -p @prompt.txt` |
 
 > **Note:** Prompts are passed via file reference (`@prompt.txt`) for robustness with large or complex prompts, avoiding shell escaping issues.
 
@@ -34,12 +52,17 @@ Files.writeString(promptFile, prompt);
 
 ProcessBuilder pb = new ProcessBuilder(
     "claude", "-p", "@" + promptFile.toString(),
-    "--output-format", "json",
     "--allowedTools", "Read,Write,Edit"
 );
-pb.directory(new File(".arena/rounds/round-0/claude"));
+pb.directory(projectRoot);
 Process p = pb.start();
-// Read stdout, parse JSON
+
+// Wait for completion, then check output file
+p.waitFor();
+Path reviewFile = Path.of(".arena/rounds/round-0/claude/review.md");
+if (Files.exists(reviewFile) && Files.size(reviewFile) > 0) {
+    String review = Files.readString(reviewFile);
+}
 ```
 
 **Pros:**
@@ -50,7 +73,6 @@ Process p = pb.start();
 
 **Cons:**
 - Must handle process management manually
-- Stdout parsing and error handling required
 
 ---
 
@@ -114,10 +136,8 @@ Use third-party SDK for Claude + ProcessBuilder for others.
 | Feature | Claude CLI | Codex CLI | Gemini CLI |
 |---------|------------|-----------|------------|
 | Non-interactive flag | `-p` / `--print` | `exec` subcommand | `-p` / `--prompt` |
-| JSON output | `--output-format json` | `--json` (JSONL) | `--output-format json` |
 | Auto-approve tools | `--dangerously-skip-permissions` | `--full-auto` | `--yolo` |
 | Session resume | `--resume <id>` | `--threadID <id>` | Not supported |
-| Streaming | `--output-format stream-json` | Native JSONL | `--output-format stream-json` |
 
 ---
 
