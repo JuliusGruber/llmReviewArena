@@ -46,16 +46,16 @@ All three CLIs support headless modes suitable for subprocess orchestration:
 
 | CLI | Headless Command |
 |-----|------------------|
-| **Claude CLI** | `claude -p @prompt.txt` |
-| **Codex CLI** | `codex exec @prompt.txt` |
-| **Gemini CLI** | `gemini -p @prompt.txt` |
+| **Claude CLI** | `claude -p @prompt.md` |
+| **Codex CLI** | `codex exec @prompt.md` |
+| **Gemini CLI** | `gemini -p @prompt.md` |
 
-> **Note:** Prompts are passed via file reference (`@prompt.txt`) for robustness with large or complex prompts, avoiding shell escaping issues.
+> **Note:** Prompts are passed via file reference (`@prompt.md`) for robustness with large or complex prompts, avoiding shell escaping issues.
 
 **Java Implementation Pattern:**
 ```java
 // Write prompt to temporary file for robustness with large/complex prompts
-Path promptFile = workDir.resolve("prompt.txt");
+Path promptFile = workDir.resolve("prompt.md");
 Files.writeString(promptFile, prompt);
 
 ProcessBuilder pb = new ProcessBuilder(
