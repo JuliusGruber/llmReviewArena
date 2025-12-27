@@ -394,13 +394,48 @@ For each agent (fresh process):
 
 ### 3) Build the Combined Submission
 
-To avoid pairwise sharing overhead, assemble a single combined file:
+To avoid pairwise sharing overhead, assemble a single combined file per round.
 
-**`all_reviews.md`** containing:
-- The original task/rubric
-- Review A (Claude)
-- Review B (Codex)
-- Review C (Gemini)
+#### `all_reviews.md` Lifecycle
+
+The orchestrator creates `all_reviews.md` at the **end of each round**:
+
+```
+Round 0 ends → orchestrator creates round-0/all_reviews.md
+Round 1 starts → agents read round-0/all_reviews.md
+Round 1 ends → orchestrator creates round-1/all_reviews.md
+Round 2 starts → agents read round-1/all_reviews.md
+...
+```
+
+| Round | Reads from | Writes to |
+|-------|------------|-----------|
+| Round 0 | (none) | `round-0/all_reviews.md` |
+| Round 1 | `round-0/all_reviews.md` | `round-1/all_reviews.md` |
+| Round N | `round-(N-1)/all_reviews.md` | `round-N/all_reviews.md` |
+
+#### `all_reviews.md` Format
+
+The file contains **only the reviews**, with clear H1 headings to separate each agent's contribution:
+
+```markdown
+# Claude
+
+[Full content of claude/review.md]
+
+# Codex
+
+[Full content of codex/review.md]
+
+# Gemini
+
+[Full content of gemini/review.md]
+```
+
+**Key points:**
+- Each agent's review starts with a prominent H1 heading (`# AgentName`)
+- No additional metadata (task content, round number) is included—agents already have access to `task.md`
+- The heading makes it unambiguous where each agent's review begins and ends
 
 > This matches the scaling trick: put all responses for the round into one markdown file.
 
