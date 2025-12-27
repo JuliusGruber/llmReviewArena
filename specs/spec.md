@@ -207,7 +207,7 @@ The arena enforces time limits on agent processes to prevent indefinite hangs:
 timeouts:
   agent_timeout_ms: 300000      # Per-agent process timeout (default: 5 minutes)
   round_timeout_ms: 900000      # Per-round timeout (default: 15 minutes)
-  grace_period_ms: 5000         # Graceful shutdown window before SIGKILL
+  grace_period_ms: 5000         # Graceful shutdown window before force kill
 
   per_agent:                    # Optional per-agent overrides
     claude: 600000              # 10 minutes (Claude tends to be thorough)
@@ -224,7 +224,7 @@ timeouts:
 
 | Timeout Type | Trigger | Action |
 |--------------|---------|--------|
-| Agent timeout | Single agent exceeds `agent_timeout_ms` | SIGTERM → wait `grace_period_ms` → SIGKILL, exclude from round |
+| Agent timeout | Single agent exceeds `agent_timeout_ms` | Request graceful termination → wait `grace_period_ms` → force kill, exclude from round |
 | Round timeout | Round exceeds `round_timeout_ms` | Kill all running agents, proceed with completed outputs |
 
 **Timeout Actions:**
