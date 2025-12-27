@@ -34,7 +34,7 @@ AgentProcess
 ├── name              (claude, codex, gemini)
 ├── command           (shell command to start it)
 ├── working_directory (isolated per agent)
-├── stdin             (prompt injection)
+├── prompt_file       (prompt injection via file reference)
 ├── stdout            (captured logs + responses)
 ├── lifecycle         (start / stop / restart)
 ```
@@ -46,14 +46,16 @@ Agents are defined via YAML configuration:
 ```yaml
 agents:
   claude:
-    command: ["claude", "-p"]
+    command: ["claude", "-p", "@prompt.txt"]
 
   codex:
-    command: ["codex", "exec"]
+    command: ["codex", "exec", "@prompt.txt"]
 
   gemini:
-    command: ["gemini", "-p"]
+    command: ["gemini", "-p", "@prompt.txt"]
 ```
+
+> **Note:** Prompts are passed via file reference (`@prompt.txt`) for robustness with large or complex prompts. The orchestrator writes the prompt to a temporary file before invoking each agent.
 
 > **Note:** Agent working directories are set dynamically per round (see [Arena Filesystem](#arena-filesystem)).
 
@@ -72,7 +74,7 @@ This abstraction keeps the arena:
 The arena **requires ephemeral agents** - stateless, short-lived processes that are created fresh for each round. This ensures a clean context window every time:
 
 1. **Start** agent process
-2. **Feed** it a prompt (via stdin)
+2. **Feed** it a prompt (via file reference: `@prompt.txt`)
 3. **Let it work** (agent executes autonomously)
 4. **Capture output** (from stdout)
 5. **Kill** process

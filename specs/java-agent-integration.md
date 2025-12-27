@@ -20,14 +20,20 @@ All three CLIs support headless/JSON output modes suitable for subprocess orches
 
 | CLI | Headless Command | JSON Output |
 |-----|------------------|-------------|
-| **Claude CLI** | `claude -p "prompt"` | `--output-format json` |
-| **Codex CLI** | `codex exec "prompt"` | `--json` (JSONL stream) |
-| **Gemini CLI** | `gemini -p "prompt"` | `--output-format json` |
+| **Claude CLI** | `claude -p @prompt.txt` | `--output-format json` |
+| **Codex CLI** | `codex exec @prompt.txt` | `--json` (JSONL stream) |
+| **Gemini CLI** | `gemini -p @prompt.txt` | `--output-format json` |
+
+> **Note:** Prompts are passed via file reference (`@prompt.txt`) for robustness with large or complex prompts, avoiding shell escaping issues.
 
 **Java Implementation Pattern:**
 ```java
+// Write prompt to temporary file for robustness with large/complex prompts
+Path promptFile = workDir.resolve("prompt.txt");
+Files.writeString(promptFile, prompt);
+
 ProcessBuilder pb = new ProcessBuilder(
-    "claude", "-p", prompt,
+    "claude", "-p", "@" + promptFile.toString(),
     "--output-format", "json",
     "--allowedTools", "Read,Write,Edit"
 );
