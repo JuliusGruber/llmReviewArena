@@ -17,7 +17,7 @@ You are given commit hash(es) or a staged flag to review:
 
 Your task:
 - Review the code changes as specified above.
-- Identify concrete issues using the rubric in task.md.
+- Identify concrete issues using the rubric above.
 - Prioritize correctness and real risk over stylistic preferences.
 
 Rules:
@@ -27,4 +27,4 @@ Rules:
 - Do NOT mention other reviewers or models.
 - Write only the final review.
 
-Write your review to `${outputPath}` following the required structure from task.md.
+Write your review to `${outputPath}` following the required structure above.
