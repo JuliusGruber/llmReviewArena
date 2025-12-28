@@ -1,5 +1,8 @@
 package dev.reviewarena.cli;
 
+import dev.reviewarena.agent.AgentExecutor;
+import dev.reviewarena.agent.AgentResult;
+import dev.reviewarena.agent.ReviewAggregator;
 import dev.reviewarena.config.ArenaConfig;
 import dev.reviewarena.config.ConfigLoader;
 import dev.reviewarena.config.ConfigLoader.CliOverrides;
@@ -14,6 +17,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
@@ -208,7 +212,36 @@ public class ReviewArenaCli implements Callable<Integer> {
         log.info("Workspace initialized: {}", arenaDir);
         log.info("Review target: {}", reviewTargetStr);
 
-        // TODO: Start tournament with config
+        // Create executor and aggregator
+        AgentExecutor executor = new AgentExecutor(config, workspaceManager);
+        ReviewAggregator aggregator = new ReviewAggregator(workspaceManager);
+
+        // Execute Round 0
+        Map<String, AgentResult> round0Results = executor.executeRound(0);
+
+        // Check minimum agents threshold
+        long successCount = round0Results.values().stream()
+            .filter(AgentResult::isSuccess)
+            .count();
+
+        if (successCount < config.minAgents()) {
+            log.error("Only {} agents succeeded, minimum {} required. Aborting.",
+                successCount, config.minAgents());
+            return 4; // Agent error exit code
+        }
+
+        // Aggregate Round 0 reviews into all_reviews.md (only if there are successful agents)
+        if (successCount > 0) {
+            Path allReviews = aggregator.aggregateRound(0, round0Results);
+            log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
+                successCount, allReviews);
+        } else {
+            log.info("Round 0 complete: no agents produced reviews");
+        }
+
+        // TODO: Implement rounds 1-N (Milestone 3)
+        // TODO: Implement final synthesis (Milestone 3)
+
         return 0;
     }
 
