@@ -33,7 +33,7 @@ review-arena --staged [options]
 
 | Argument | Type | Required | Description |
 |----------|------|----------|-------------|
-| `ref1` | String | Conditional | Git commit hash (required unless `--staged`) |
+| `ref1` | String | Required unless `--staged` | Git commit hash to review |
 | `ref2` | String | No | End commit hash for range comparison |
 
 ### Options
@@ -122,8 +122,7 @@ public class ReviewArenaCli implements Callable<Integer> {
     @Option(names = {"-c", "--config"},
             paramLabel = "<file>",
             description = "Path to config file (default: ${DEFAULT-VALUE})",
-            defaultValue = "arena.yaml",
-            fallbackValue = "arena.yaml")
+            defaultValue = "${REVIEW_ARENA_CONFIG:-arena.yaml}")
     private Path configFile;
 
     @Option(names = {"-r", "--rounds"},
@@ -191,13 +190,12 @@ public class ReviewArenaCli implements Callable<Integer> {
 
         try {
             // 1. Git validation (delegated to GitService)
+            // Note: Hash format is validated at parse-time by CommitHashConverter
             GitService gitService = new GitService();
 
             if (!staged) {
-                InputValidator.validateHashFormat(ref1);
                 gitService.validateCommitExists(ref1);
                 if (ref2 != null) {
-                    InputValidator.validateHashFormat(ref2);
                     gitService.validateCommitExists(ref2);
                     gitService.validateAncestry(ref1, ref2);
                 }
@@ -208,6 +206,8 @@ public class ReviewArenaCli implements Callable<Integer> {
 
             // 3. Load configuration (SmallRye Config handles merging)
             // CLI values override config file values
+            // See implementation-decisions.md "Configuration with MicroProfile Config" section
+            // for @ConfigProperty usage patterns and programmatic access
 
             // 4. Continue to tournament orchestration...
             if (dryRun) {
@@ -274,6 +274,44 @@ public class ExceptionHandler implements IExecutionExceptionHandler {
         // Unexpected error
         cmd.getErr().println("Error: " + ex.getMessage());
         return 1;
+    }
+}
+```
+
+### ConfigException
+
+`src/main/java/dev/reviewarena/config/ConfigException.java`
+
+```java
+package dev.reviewarena.config;
+
+public class ConfigException extends RuntimeException {
+
+    public ConfigException(String message) {
+        super(message);
+    }
+
+    public ConfigException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+```
+
+### AgentException
+
+`src/main/java/dev/reviewarena/agent/AgentException.java`
+
+```java
+package dev.reviewarena.agent;
+
+public class AgentException extends RuntimeException {
+
+    public AgentException(String message) {
+        super(message);
+    }
+
+    public AgentException(String message, Throwable cause) {
+        super(message, cause);
     }
 }
 ```
@@ -381,10 +419,14 @@ src/main/java/dev/reviewarena/
 │   ├── ReviewArenaCli.java        # Main CLI class with picocli annotations
 │   ├── ExceptionHandler.java      # Maps exceptions to exit codes
 │   └── CommitHashConverter.java   # Validates commit hash format at parse time
-└── git/
-    ├── GitService.java            # JGit operations (from startup-validation-plan)
-    ├── GitValidationException.java
-    └── InputValidator.java
+├── git/
+│   ├── GitService.java            # JGit operations (from startup-validation-plan)
+│   ├── GitValidationException.java
+│   └── InputValidator.java
+├── config/
+│   └── ConfigException.java       # Configuration errors (exit code 5)
+└── agent/
+    └── AgentException.java        # Agent execution errors (exit code 4)
 ```
 
 ## Implementation Steps
