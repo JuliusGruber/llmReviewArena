@@ -68,7 +68,11 @@ public class AgentProcess {
         startTime = Instant.now();
 
         try {
-            ProcessBuilder pb = new ProcessBuilder(command)
+            // On Windows, wrap command with cmd /c to resolve .cmd/.bat files in PATH
+            List<String> effectiveCommand = resolveCommand(command);
+            log.debug("Effective command: {}", effectiveCommand);
+
+            ProcessBuilder pb = new ProcessBuilder(effectiveCommand)
                 .directory(workingDir.toFile());
 
             process = pb.start();
@@ -186,6 +190,29 @@ public class AgentProcess {
 
     private long getDurationMs() {
         return Duration.between(startTime, Instant.now()).toMillis();
+    }
+
+    /**
+     * Resolves command for Windows execution.
+     * On Windows, commands like 'claude' are actually 'claude.cmd' scripts
+     * that require cmd.exe to execute properly.
+     */
+    private List<String> resolveCommand(List<String> command) {
+        if (!isWindows()) {
+            return command;
+        }
+
+        // Wrap with cmd /c to resolve .cmd/.bat files in PATH
+        var result = new java.util.ArrayList<String>();
+        result.add("cmd");
+        result.add("/c");
+        result.addAll(command);
+        return result;
+    }
+
+    private static boolean isWindows() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        return os.contains("win");
     }
 
     // Builder
