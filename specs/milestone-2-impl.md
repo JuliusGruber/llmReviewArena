@@ -9,8 +9,9 @@ Step 3: Mock Agents          ──┘
 Step 4: CommandBuilder       ←── Depends on AgentConfig (exists)
 Step 5: AgentProcess         ←── Depends on Steps 1, 2, 4
 Step 6: AgentExecutor        ←── Depends on Step 5
-Step 7: Integration Tests    ←── Depends on all above
-Step 8: CLI Integration      ←── Wire into ReviewArenaCli
+Step 7: ReviewAggregator     ←── Depends on AgentResult, WorkspaceManager
+Step 8: Integration Tests    ←── Depends on all above
+Step 9: CLI Integration      ←── Wire into ReviewArenaCli
 ```
 
 ---
@@ -608,6 +609,9 @@ public class CommandBuilder {
             };
             if (autoApproveFlag != null && !command.contains(autoApproveFlag)) {
                 command.add(autoApproveFlag);
+            } else if (autoApproveFlag == null) {
+                log.warn("Unknown agent '{}' has auto-approve enabled but no flag translation available. " +
+                         "Agent will run without auto-approve flag.", agentName);
             }
         }
 
@@ -748,17 +752,19 @@ class CommandBuilderTest {
     }
 
     @Test
-    void build_unknownAgent_noFlagTranslation() {
+    void build_unknownAgent_warnsAndContinues() {
         AgentConfig config = new AgentConfig("custom-agent",
             List.of("custom", "@prompt.md"),
             Map.of("auto-approve", true), true);
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
-        // No CLI-specific flags added for unknown agents
+        // No CLI-specific flags added for unknown agents (warning logged)
         assertFalse(command.contains("--dangerously-skip-permissions"));
         assertFalse(command.contains("--full-auto"));
         assertFalse(command.contains("--yolo"));
+        // Command still builds successfully - just warns
+        assertTrue(command.contains("custom"));
     }
 
     @Test
@@ -1049,6 +1055,34 @@ public class AgentProcess {
         }
 
         public AgentProcess build() {
+            // Explicit validation of required fields
+            if (agentName == null || agentName.isBlank()) {
+                throw new IllegalStateException("agentName is required");
+            }
+            if (command == null || command.isEmpty()) {
+                throw new IllegalStateException("command is required");
+            }
+            if (workingDir == null) {
+                throw new IllegalStateException("workingDir is required");
+            }
+            if (outputFile == null) {
+                throw new IllegalStateException("outputFile is required");
+            }
+            if (stdoutLog == null) {
+                throw new IllegalStateException("stdoutLog is required");
+            }
+            if (stderrLog == null) {
+                throw new IllegalStateException("stderrLog is required");
+            }
+            if (outputValidator == null) {
+                throw new IllegalStateException("outputValidator is required");
+            }
+            if (timeoutMs <= 0) {
+                throw new IllegalStateException("timeoutMs must be positive");
+            }
+            if (gracePeriodMs < 0) {
+                throw new IllegalStateException("gracePeriodMs must be non-negative");
+            }
             return new AgentProcess(this);
         }
     }
@@ -1315,6 +1349,46 @@ class AgentProcessTest {
         String stdout = Files.readString(stdoutLog);
         assertTrue(stdout.contains(testOutput) || stdout.contains("Hello"));
     }
+
+    @Test
+    void builder_missingAgentName_throws() {
+        assertThrows(IllegalStateException.class, () ->
+            AgentProcess.builder()
+                .command(List.of("echo", "test"))
+                .workingDir(tempDir)
+                .outputFile(outputFile)
+                .stdoutLog(stdoutLog)
+                .stderrLog(stderrLog)
+                .outputValidator(validator)
+                .build());
+    }
+
+    @Test
+    void builder_missingCommand_throws() {
+        assertThrows(IllegalStateException.class, () ->
+            AgentProcess.builder()
+                .agentName("test")
+                .workingDir(tempDir)
+                .outputFile(outputFile)
+                .stdoutLog(stdoutLog)
+                .stderrLog(stderrLog)
+                .outputValidator(validator)
+                .build());
+    }
+
+    @Test
+    void builder_missingOutputValidator_throws() {
+        assertThrows(IllegalStateException.class, () ->
+            AgentProcess.builder()
+                .agentName("test")
+                .command(List.of("echo", "test"))
+                .workingDir(tempDir)
+                .outputFile(outputFile)
+                .stdoutLog(stdoutLog)
+                .stderrLog(stderrLog)
+                // Missing outputValidator
+                .build());
+    }
 }
 ```
 
@@ -1574,7 +1648,7 @@ class AgentExecutorTest {
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
-        workspace.initialize();
+        workspace.initialize("test-commit", "", "");
 
         AgentExecutor executor = new AgentExecutor(config, workspace);
         Map<String, AgentResult> results = executor.executeRound(0);
@@ -1616,7 +1690,245 @@ class AgentExecutorTest {
 
 ---
 
-## Step 7: Integration Test
+## Step 7: ReviewAggregator
+
+**File**: `src/main/java/dev/reviewarena/agent/ReviewAggregator.java`
+
+```java
+package dev.reviewarena.agent;
+
+import dev.reviewarena.io.WorkspaceManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Aggregates individual agent reviews into a combined all_reviews.md file.
+ *
+ * <p>After each round completes, creates a combined markdown file containing
+ * all agent reviews with clear H1 headings separating each contribution.
+ *
+ * <p>Format:
+ * <pre>
+ * # Claude
+ *
+ * [Full content of claude/review.md]
+ *
+ * # Codex
+ *
+ * [Full content of codex/review.md]
+ * </pre>
+ */
+public class ReviewAggregator {
+
+    private static final Logger log = LoggerFactory.getLogger(ReviewAggregator.class);
+    private static final String ALL_REVIEWS_FILENAME = "all_reviews.md";
+
+    private final WorkspaceManager workspace;
+
+    public ReviewAggregator(WorkspaceManager workspace) {
+        this.workspace = workspace;
+    }
+
+    /**
+     * Aggregates all successful agent reviews from a round into all_reviews.md.
+     *
+     * @param round the round number (0-indexed)
+     * @param results the agent execution results (only successful agents are included)
+     * @return path to the generated all_reviews.md file
+     * @throws AgentException if aggregation fails
+     */
+    public Path aggregateRound(int round, Map<String, AgentResult> results) {
+        Path roundDir = workspace.getRoundDir(round);
+        Path outputFile = roundDir.resolve(ALL_REVIEWS_FILENAME);
+
+        log.info("Aggregating reviews for round {} to {}", round, outputFile);
+
+        // Filter to successful results and sort alphabetically for determinism
+        var successfulResults = results.entrySet().stream()
+            .filter(e -> e.getValue().isSuccess())
+            .sorted(Map.Entry.comparingByKey())
+            .toList();
+
+        if (successfulResults.isEmpty()) {
+            log.warn("No successful reviews to aggregate for round {}", round);
+            throw new AgentException("No successful reviews to aggregate for round " + round);
+        }
+
+        try {
+            StringBuilder combined = new StringBuilder();
+
+            for (var entry : successfulResults) {
+                String agentName = entry.getKey();
+                AgentResult result = entry.getValue();
+
+                // Read the agent's review content
+                String reviewContent = Files.readString(result.outputFile(), StandardCharsets.UTF_8);
+
+                // Add with H1 heading (capitalize first letter)
+                String displayName = capitalize(agentName);
+                combined.append("# ").append(displayName).append("\n\n");
+                combined.append(reviewContent.strip());
+                combined.append("\n\n");
+            }
+
+            Files.writeString(outputFile, combined.toString().strip() + "\n", StandardCharsets.UTF_8);
+
+            log.info("Aggregated {} reviews into {}", successfulResults.size(), outputFile);
+            return outputFile;
+
+        } catch (IOException e) {
+            throw new AgentException("Failed to aggregate reviews for round " + round + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gets the path to all_reviews.md for a specific round.
+     *
+     * @param round the round number
+     * @return path to all_reviews.md
+     */
+    public Path getAllReviewsPath(int round) {
+        return workspace.getRoundDir(round).resolve(ALL_REVIEWS_FILENAME);
+    }
+
+    private String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
+    }
+}
+```
+
+**Test file**: `src/test/java/dev/reviewarena/agent/ReviewAggregatorTest.java`
+
+```java
+package dev.reviewarena.agent;
+
+import dev.reviewarena.config.AgentConfig;
+import dev.reviewarena.config.ArenaConfig;
+import dev.reviewarena.io.WorkspaceManager;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ReviewAggregatorTest {
+
+    @TempDir
+    Path tempDir;
+
+    private WorkspaceManager workspace;
+    private ReviewAggregator aggregator;
+
+    @BeforeEach
+    void setUp() {
+        Map<String, AgentConfig> agents = Map.of(
+            "claude", new AgentConfig("claude", List.of("claude"), Map.of(), true),
+            "codex", new AgentConfig("codex", List.of("codex"), Map.of(), true)
+        );
+        ArenaConfig config = new ArenaConfig(
+            2, 500, 0, 30_000, 90_000, 1_000, 2,
+            Path.of(".arena"), agents
+        );
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("abc123", "", "");
+        aggregator = new ReviewAggregator(workspace);
+    }
+
+    @Test
+    void aggregateRound_combinesSuccessfulReviews() throws IOException {
+        // Create mock review files
+        Path claudeReview = workspace.getAgentDir(0, "claude").resolve("review.md");
+        Path codexReview = workspace.getAgentDir(0, "codex").resolve("review.md");
+        Files.writeString(claudeReview, "# Summary\nClaude's review content.");
+        Files.writeString(codexReview, "# Summary\nCodex's review content.");
+
+        Map<String, AgentResult> results = Map.of(
+            "claude", AgentResult.success("claude", 0, 0, 100, claudeReview),
+            "codex", AgentResult.success("codex", 0, 0, 100, codexReview)
+        );
+
+        Path allReviews = aggregator.aggregateRound(0, results);
+
+        assertTrue(Files.exists(allReviews));
+        String content = Files.readString(allReviews);
+        assertTrue(content.contains("# Claude"));
+        assertTrue(content.contains("Claude's review content"));
+        assertTrue(content.contains("# Codex"));
+        assertTrue(content.contains("Codex's review content"));
+    }
+
+    @Test
+    void aggregateRound_excludesFailedAgents() throws IOException {
+        Path claudeReview = workspace.getAgentDir(0, "claude").resolve("review.md");
+        Files.writeString(claudeReview, "Claude's content.");
+
+        Map<String, AgentResult> results = Map.of(
+            "claude", AgentResult.success("claude", 0, 0, 100, claudeReview),
+            "codex", AgentResult.failed("codex", 0, 1, 100, "crashed")
+        );
+
+        Path allReviews = aggregator.aggregateRound(0, results);
+
+        String content = Files.readString(allReviews);
+        assertTrue(content.contains("# Claude"));
+        assertFalse(content.contains("# Codex"));
+    }
+
+    @Test
+    void aggregateRound_alphabeticalOrder() throws IOException {
+        Path claudeReview = workspace.getAgentDir(0, "claude").resolve("review.md");
+        Path codexReview = workspace.getAgentDir(0, "codex").resolve("review.md");
+        Files.writeString(claudeReview, "Claude content");
+        Files.writeString(codexReview, "Codex content");
+
+        Map<String, AgentResult> results = Map.of(
+            "codex", AgentResult.success("codex", 0, 0, 100, codexReview),
+            "claude", AgentResult.success("claude", 0, 0, 100, claudeReview)
+        );
+
+        String content = Files.readString(aggregator.aggregateRound(0, results));
+
+        // Claude should appear before Codex (alphabetical)
+        int claudeIdx = content.indexOf("# Claude");
+        int codexIdx = content.indexOf("# Codex");
+        assertTrue(claudeIdx < codexIdx, "Claude should appear before Codex");
+    }
+
+    @Test
+    void aggregateRound_noSuccessfulReviews_throws() {
+        Map<String, AgentResult> results = Map.of(
+            "claude", AgentResult.failed("claude", 0, 1, 100, "crashed"),
+            "codex", AgentResult.timeout("codex", 0, 5000)
+        );
+
+        assertThrows(AgentException.class, () -> aggregator.aggregateRound(0, results));
+    }
+
+    @Test
+    void getAllReviewsPath_returnsCorrectPath() {
+        Path expected = workspace.getRoundDir(0).resolve("all_reviews.md");
+        assertEquals(expected, aggregator.getAllReviewsPath(0));
+    }
+}
+```
+
+---
+
+## Step 8: Integration Tests
 
 **File**: `src/test/java/dev/reviewarena/agent/AgentExecutorIT.java`
 
@@ -1679,7 +1991,7 @@ class AgentExecutorIT {
 
         ArenaConfig config = createConfig(agents, 0); // unlimited concurrency
         WorkspaceManager workspace = new WorkspaceManager(tempDir, config);
-        workspace.initialize();
+        workspace.initialize("test-commit", "", "");
 
         // Fix command to include output dir
         // Re-create with proper commands that use workspace paths
@@ -1695,7 +2007,7 @@ class AgentExecutorIT {
         );
         config = createConfig(agents, 0);
         workspace = new WorkspaceManager(tempDir, config);
-        workspace.initialize();
+        workspace.initialize("test-commit", "", "");
 
         AgentExecutor executor = new AgentExecutor(config, workspace);
         Map<String, AgentResult> results = executor.executeRound(0);
@@ -1714,7 +2026,7 @@ class AgentExecutorIT {
 
         ArenaConfig config = createConfig(agents, 1);
         WorkspaceManager workspace = new WorkspaceManager(tempDir, config);
-        workspace.initialize();
+        workspace.initialize("test-commit", "", "");
 
         AgentExecutor executor = new AgentExecutor(config, workspace);
 
@@ -1734,7 +2046,7 @@ class AgentExecutorIT {
 
         ArenaConfig config = createConfig(agents, 1); // Sequential
         WorkspaceManager workspace = new WorkspaceManager(tempDir, config);
-        workspace.initialize();
+        workspace.initialize("test-commit", "", "");
 
         AgentExecutor executor = new AgentExecutor(config, workspace);
 
@@ -1764,11 +2076,11 @@ class AgentExecutorIT {
 
 ---
 
-## Step 8: CLI Integration
+## Step 9: CLI Integration
 
 **Update**: `src/main/java/dev/reviewarena/cli/ReviewArenaCli.java`
 
-Add the agent executor integration after workspace initialization:
+Add the agent executor and review aggregator integration after workspace initialization:
 
 ```java
 // In ReviewArenaCli.call() method, replace the TODO comment:
@@ -1776,13 +2088,16 @@ Add the agent executor integration after workspace initialization:
 // Initialize workspace
 Path projectRoot = Path.of("").toAbsolutePath();
 WorkspaceManager workspaceManager = workspaceManagerFactory.apply(projectRoot, config);
-Path arenaDir = workspaceManager.initialize();
+Path arenaDir = workspaceManager.initialize(commit1, commit2, stagedFlag);
 
 log.info("Workspace initialized: {}", arenaDir);
 log.info("Review target: {}", reviewTargetStr);
 
-// Execute Round 0
+// Create executor and aggregator
 AgentExecutor executor = new AgentExecutor(config, workspaceManager);
+ReviewAggregator aggregator = new ReviewAggregator(workspaceManager);
+
+// Execute Round 0
 Map<String, AgentResult> round0Results = executor.executeRound(0);
 
 // Check minimum agents threshold
@@ -1796,10 +2111,12 @@ if (successCount < config.minAgents()) {
     return 4; // Agent error exit code
 }
 
-log.info("Round 0 complete: {} agents produced reviews", successCount);
+// Aggregate Round 0 reviews into all_reviews.md
+Path allReviews = aggregator.aggregateRound(0, round0Results);
+log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
+    successCount, allReviews);
 
 // TODO: Implement rounds 1-N (Milestone 3)
-// TODO: Implement review aggregation (Milestone 3)
 // TODO: Implement final synthesis (Milestone 3)
 
 return 0;
@@ -1841,8 +2158,9 @@ java -jar target/review-arena-*.jar abc1234
 | 2 | OutputValidator | ~50 | ~60 |
 | 3 | Mock Agents | ~40 (scripts) | - |
 | 4 | CommandBuilder | ~80 | ~100 |
-| 5 | AgentProcess | ~200 | ~150 |
+| 5 | AgentProcess | ~220 | ~180 |
 | 6 | AgentExecutor | ~150 | ~80 |
-| 7 | Integration Tests | - | ~100 |
-| 8 | CLI Integration | ~20 | - |
-| **Total** | | **~600** | **~550** |
+| 7 | ReviewAggregator | ~70 | ~80 |
+| 8 | Integration Tests | - | ~100 |
+| 9 | CLI Integration | ~25 | - |
+| **Total** | | **~695** | **~660** |
