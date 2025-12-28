@@ -143,6 +143,15 @@ public class ReviewArenaCli implements Callable<Integer> {
         String ref2 = (reviewTarget != null && reviewTarget.commitRefs != null)
                       ? reviewTarget.commitRefs.ref2 : null;
 
+        // Resolve execution mode
+        int effectiveConcurrency = resolveExecutionMode();
+
+        // Handle dry-run mode (skip git validation)
+        if (dryRun) {
+            printDryRunSummary(staged, ref1, ref2, effectiveConcurrency);
+            return 0;
+        }
+
         // Validate git repository and commits
         try (GitService gitService = gitServiceFactory.get()) {
             if (ref1 != null) {
@@ -154,15 +163,6 @@ public class ReviewArenaCli implements Callable<Integer> {
             if (ref1 != null && ref2 != null) {
                 gitService.validateAncestry(ref1, ref2);
             }
-        }
-
-        // Resolve execution mode
-        int effectiveConcurrency = resolveExecutionMode();
-
-        // Handle dry-run mode
-        if (dryRun) {
-            printDryRunSummary(staged, ref1, ref2, effectiveConcurrency);
-            return 0;
         }
 
         // TODO: Start tournament
