@@ -85,6 +85,8 @@ agents:
 
 > **Note:** Prompts are passed via file reference (`@prompt.md`) for robustness with large or complex prompts. The orchestrator writes the prompt to a temporary file before invoking each agent.
 
+> **Note:** The `@output` placeholder in commands is replaced with the absolute path to the agent's output file (e.g., `.arena/rounds/round-0/claude/review.md`).
+
 > **Note:** Agent working directories are set dynamically per round (see [Arena Filesystem](#arena-filesystem)).
 
 #### Flag Configuration Reference
@@ -195,8 +197,6 @@ timeouts:
   agent-timeout-ms: 300000      # Per-agent process timeout (default: 5 minutes)
   round-timeout-ms: 900000      # Per-round timeout (default: 15 minutes)
   grace-period-ms: 5000         # Graceful shutdown window before force kill
-  on-timeout: "kill-and-skip"   # kill-and-skip | kill-and-abort
-  preserve-partial-output: false # If true, keep incomplete output with warning
 ```
 
 > **Default Rationale:** 5 minutes allows thorough review of ~1000 LOC diffs.
@@ -208,14 +208,7 @@ timeouts:
 | Agent timeout | Single agent exceeds `agent-timeout-ms` | Request graceful termination → wait `grace-period-ms` → force kill, exclude from round |
 | Round timeout | Round exceeds `round-timeout-ms` | Kill all running agents, proceed with completed outputs |
 
-**Timeout Actions:**
-
-| Action | Behavior |
-|--------|----------|
-| `kill-and-skip` | Terminate agent, exclude from round, continue tournament |
-| `kill-and-abort` | Terminate agent, abort entire tournament |
-
-Partial output from timed-out agents is discarded by default. Set `preserve-partial-output: true` to keep incomplete reviews (marked with a `[TIMEOUT: incomplete]` warning header).
+Partial output from timed-out agents is always discarded. The tournament continues with the remaining agents.
 
 ### Output Validation
 

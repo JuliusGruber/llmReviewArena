@@ -34,7 +34,6 @@ class ConfigLoaderTest {
         assertEquals(ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, config.maxOutputSizeKb());
         assertEquals(ArenaConfig.DEFAULT_MAX_CONCURRENT, config.maxConcurrent());
         assertEquals(ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, config.agentTimeoutMs());
-        assertEquals(ArenaConfig.DEFAULT_ON_TIMEOUT, config.onTimeout());
     }
 
     @Test
@@ -264,8 +263,6 @@ class ConfigLoaderTest {
               agent-timeout-ms: 60000
               round-timeout-ms: 180000
               grace-period-ms: 10000
-              on-timeout: abort
-              preserve-partial-output: true
             """);
 
         ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
@@ -273,8 +270,6 @@ class ConfigLoaderTest {
         assertEquals(60000, config.agentTimeoutMs());
         assertEquals(180000, config.roundTimeoutMs());
         assertEquals(10000, config.gracePeriodMs());
-        assertEquals("abort", config.onTimeout());
-        assertTrue(config.preservePartialOutput());
     }
 
     // ===== Error handling =====

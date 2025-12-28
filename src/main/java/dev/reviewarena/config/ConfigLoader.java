@@ -128,13 +128,6 @@ public class ConfigLoader {
         long gracePeriodMs = config.getOptionalValue("timeouts.grace-period-ms", Long.class)
             .orElse(ArenaConfig.DEFAULT_GRACE_PERIOD_MS);
 
-        // Load timeout behavior
-        String onTimeout = config.getOptionalValue("timeouts.on-timeout", String.class)
-            .orElse(ArenaConfig.DEFAULT_ON_TIMEOUT);
-
-        boolean preservePartialOutput = config.getOptionalValue("timeouts.preserve-partial-output", Boolean.class)
-            .orElse(ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT);
-
         // Load tournament constraints
         int minAgents = config.getOptionalValue("tournament.min-agents", Integer.class)
             .orElse(ArenaConfig.DEFAULT_MIN_AGENTS);
@@ -155,8 +148,6 @@ public class ConfigLoader {
             agentTimeoutMs,
             roundTimeoutMs,
             gracePeriodMs,
-            onTimeout,
-            preservePartialOutput,
             minAgents,
             outputDir,
             agents

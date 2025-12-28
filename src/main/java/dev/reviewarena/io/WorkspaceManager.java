@@ -213,7 +213,8 @@ public class WorkspaceManager {
     private void generateTaskMd(Path arenaDir) throws IOException {
         Path promptsDir = arenaDir.resolve("prompts");
         Files.createDirectories(promptsDir);
-        TemplateContext context = TemplateContext.forTask();
+        // Review target will be set by CLI when it processes arguments
+        TemplateContext context = TemplateContext.forTask("{{review_target}}");
         String content = templateLoader.render(TASK_TEMPLATE, context);
         Files.writeString(promptsDir.resolve("task.md"), content, StandardCharsets.UTF_8);
     }
@@ -223,7 +224,7 @@ public class WorkspaceManager {
         Files.createDirectories(promptsDir);
 
         // Get task.md content to prepend to each round prompt
-        String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask());
+        String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask("{{review_target}}"));
 
         Set<String> agentNames = getEnabledAgentNames();
 
@@ -234,7 +235,7 @@ public class WorkspaceManager {
                 String allReviewsPath = (round == 0) ? null
                         : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
 
-                TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath);
+                TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath, "", "", "");
                 String roundContent = templateLoader.render("round-" + round + ".md", ctx);
 
                 // Combine task + round into a complete standalone prompt

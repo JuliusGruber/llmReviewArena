@@ -19,7 +19,7 @@ class TemplateLoaderTest {
 
     @Test
     void render_taskTemplate_returnsContent() {
-        TemplateContext context = TemplateContext.forTask();
+        TemplateContext context = TemplateContext.forTask("test review target");
 
         String result = templateLoader.render("task.md", context);
 
@@ -30,7 +30,7 @@ class TemplateLoaderTest {
     @Test
     void render_roundZeroTemplate_resolvesPlaceholders() {
         TemplateContext context = TemplateContext.forRound(
-                0, ".arena/rounds/round-0/review.md", null);
+                0, ".arena/rounds/round-0/review.md", null, "", "", "");
 
         String result = templateLoader.render("round-0.md", context);
 
@@ -45,7 +45,8 @@ class TemplateLoaderTest {
         TemplateContext context = TemplateContext.forRound(
                 1,
                 ".arena/rounds/round-1/review.md",
-                ".arena/rounds/round-0/all_reviews.md");
+                ".arena/rounds/round-0/all_reviews.md",
+                "", "", "");
 
         String result = templateLoader.render("round-1.md", context);
 
@@ -59,7 +60,7 @@ class TemplateLoaderTest {
 
     @Test
     void render_missingTemplate_throwsTemplateException() {
-        TemplateContext context = TemplateContext.forTask();
+        TemplateContext context = TemplateContext.forTask("test");
 
         TemplateException exception = assertThrows(TemplateException.class,
                 () -> templateLoader.render("nonexistent.md", context));
@@ -70,11 +71,12 @@ class TemplateLoaderTest {
 
     @Test
     void render_templateContextForTask_hasCorrectValues() {
-        TemplateContext context = TemplateContext.forTask();
+        TemplateContext context = TemplateContext.forTask("my review target");
 
         assertEquals(-1, context.roundNumber());
         assertNull(context.outputPath());
         assertNull(context.allReviewsPath());
+        assertEquals("my review target", context.reviewTarget());
     }
 
     @Test
@@ -82,16 +84,19 @@ class TemplateLoaderTest {
         TemplateContext context = TemplateContext.forRound(
                 2,
                 ".arena/rounds/round-2/review.md",
-                ".arena/rounds/round-1/all_reviews.md");
+                ".arena/rounds/round-1/all_reviews.md",
+                "abc123", "def456", "");
 
         assertEquals(2, context.roundNumber());
         assertEquals(".arena/rounds/round-2/review.md", context.outputPath());
         assertEquals(".arena/rounds/round-1/all_reviews.md", context.allReviewsPath());
+        assertEquals("abc123", context.commit1());
+        assertEquals("def456", context.commit2());
     }
 
     @Test
     void toDataModel_forTaskContext_excludesRoundSpecificFields() {
-        TemplateContext context = TemplateContext.forTask();
+        TemplateContext context = TemplateContext.forTask("test target");
 
         var model = context.toDataModel();
 
@@ -101,6 +106,7 @@ class TemplateLoaderTest {
                 "Should not include null outputPath");
         assertFalse(model.containsKey("allReviewsPath"),
                 "Should not include null allReviewsPath");
+        assertEquals("test target", model.get("reviewTarget"));
     }
 
     @Test
@@ -108,12 +114,16 @@ class TemplateLoaderTest {
         TemplateContext context = TemplateContext.forRound(
                 1,
                 ".arena/rounds/round-1/review.md",
-                ".arena/rounds/round-0/all_reviews.md");
+                ".arena/rounds/round-0/all_reviews.md",
+                "commit1", "commit2", "--staged");
 
         var model = context.toDataModel();
 
         assertEquals(1, model.get("roundNumber"));
         assertEquals(".arena/rounds/round-1/review.md", model.get("outputPath"));
         assertEquals(".arena/rounds/round-0/all_reviews.md", model.get("allReviewsPath"));
+        assertEquals("commit1", model.get("commit1"));
+        assertEquals("commit2", model.get("commit2"));
+        assertEquals("--staged", model.get("stagedFlag"));
     }
 }

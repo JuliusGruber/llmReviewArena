@@ -22,10 +22,6 @@ public record ArenaConfig(
     long roundTimeoutMs,
     long gracePeriodMs,
 
-    // Timeout behavior
-    String onTimeout,              // "kill-and-skip" or "abort"
-    boolean preservePartialOutput,
-
     // Tournament constraints
     int minAgents,
 
@@ -44,8 +40,6 @@ public record ArenaConfig(
     public static final long DEFAULT_AGENT_TIMEOUT_MS = 300_000; // 5 minutes
     public static final long DEFAULT_ROUND_TIMEOUT_MS = 900_000; // 15 minutes
     public static final long DEFAULT_GRACE_PERIOD_MS = 5_000; // 5 seconds
-    public static final String DEFAULT_ON_TIMEOUT = "kill-and-skip";
-    public static final boolean DEFAULT_PRESERVE_PARTIAL_OUTPUT = false;
     public static final int DEFAULT_MIN_AGENTS = 2;
     public static final String DEFAULT_OUTPUT_DIR = ".arena";
 
@@ -71,9 +65,6 @@ public record ArenaConfig(
         if (gracePeriodMs < 0) {
             throw new ConfigException("gracePeriodMs must be non-negative, got: " + gracePeriodMs);
         }
-        if (!onTimeout.equals("kill-and-skip") && !onTimeout.equals("abort")) {
-            throw new ConfigException("onTimeout must be 'kill-and-skip' or 'abort', got: " + onTimeout);
-        }
         if (minAgents < 1) {
             throw new ConfigException("minAgents must be at least 1, got: " + minAgents);
         }
@@ -98,8 +89,6 @@ public record ArenaConfig(
             DEFAULT_AGENT_TIMEOUT_MS,
             DEFAULT_ROUND_TIMEOUT_MS,
             DEFAULT_GRACE_PERIOD_MS,
-            DEFAULT_ON_TIMEOUT,
-            DEFAULT_PRESERVE_PARTIAL_OUTPUT,
             DEFAULT_MIN_AGENTS,
             Path.of(DEFAULT_OUTPUT_DIR),
             Map.of()

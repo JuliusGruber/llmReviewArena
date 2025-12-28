@@ -21,8 +21,6 @@ class ArenaConfigTest {
         assertEquals(ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, config.agentTimeoutMs());
         assertEquals(ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, config.roundTimeoutMs());
         assertEquals(ArenaConfig.DEFAULT_GRACE_PERIOD_MS, config.gracePeriodMs());
-        assertEquals(ArenaConfig.DEFAULT_ON_TIMEOUT, config.onTimeout());
-        assertEquals(ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT, config.preservePartialOutput());
         assertEquals(ArenaConfig.DEFAULT_MIN_AGENTS, config.minAgents());
         assertEquals(Path.of(ArenaConfig.DEFAULT_OUTPUT_DIR), config.outputDir());
         assertTrue(config.agents().isEmpty());
@@ -74,14 +72,6 @@ class ArenaConfigTest {
             () -> createConfigWith(b -> b.gracePeriodMs = -1));
 
         assertTrue(ex.getMessage().contains("gracePeriodMs must be non-negative"));
-    }
-
-    @Test
-    void testValidation_invalidOnTimeout_throws() {
-        ConfigException ex = assertThrows(ConfigException.class,
-            () -> createConfigWith(b -> b.onTimeout = "invalid"));
-
-        assertTrue(ex.getMessage().contains("onTimeout must be 'kill-and-skip' or 'abort'"));
     }
 
     @Test
@@ -145,12 +135,6 @@ class ArenaConfigTest {
         assertEquals(0, config.gracePeriodMs());
     }
 
-    @Test
-    void testValidation_abortOnTimeout_allowed() {
-        ArenaConfig config = createConfigWith(b -> b.onTimeout = "abort");
-        assertEquals("abort", config.onTimeout());
-    }
-
     // Helper to create config with modifications
     private static class ConfigBuilder {
         int maxRounds = ArenaConfig.DEFAULT_MAX_ROUNDS;
@@ -159,8 +143,6 @@ class ArenaConfigTest {
         long agentTimeoutMs = ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS;
         long roundTimeoutMs = ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS;
         long gracePeriodMs = ArenaConfig.DEFAULT_GRACE_PERIOD_MS;
-        String onTimeout = ArenaConfig.DEFAULT_ON_TIMEOUT;
-        boolean preservePartialOutput = ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT;
         int minAgents = ArenaConfig.DEFAULT_MIN_AGENTS;
         Path outputDir = Path.of(ArenaConfig.DEFAULT_OUTPUT_DIR);
         Map<String, AgentConfig> agents = Map.of();
@@ -169,8 +151,7 @@ class ArenaConfigTest {
             return new ArenaConfig(
                 maxRounds, maxOutputSizeKb, maxConcurrent,
                 agentTimeoutMs, roundTimeoutMs, gracePeriodMs,
-                onTimeout, preservePartialOutput, minAgents,
-                outputDir, agents
+                minAgents, outputDir, agents
             );
         }
     }

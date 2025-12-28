@@ -37,8 +37,6 @@ class WorkspaceManagerTest {
             ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
             ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
             ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_ON_TIMEOUT,
-            ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT,
             ArenaConfig.DEFAULT_MIN_AGENTS,
             Path.of(".arena"),
             agents
@@ -252,8 +250,7 @@ class WorkspaceManagerTest {
         ArenaConfig config = new ArenaConfig(
             1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
             ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_ON_TIMEOUT,
-            ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT, ArenaConfig.DEFAULT_MIN_AGENTS,
+            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
             Path.of(".arena"), agents
         );
 
@@ -274,8 +271,7 @@ class WorkspaceManagerTest {
         ArenaConfig config = new ArenaConfig(
             1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
             ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_ON_TIMEOUT,
-            ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT, ArenaConfig.DEFAULT_MIN_AGENTS,
+            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
             Path.of("custom-output"),  // custom output dir
             Map.of("agent1", new AgentConfig("agent1", List.of("cmd"), Map.of(), true))
         );
@@ -341,8 +337,7 @@ class WorkspaceManagerTest {
             0,  // maxRounds = 0 (only round-0)
             ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
             ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_ON_TIMEOUT,
-            ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT, ArenaConfig.DEFAULT_MIN_AGENTS,
+            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
             Path.of(".arena"),
             Map.of("agent1", new AgentConfig("agent1", List.of("cmd"), Map.of(), true))
         );
@@ -365,8 +360,7 @@ class WorkspaceManagerTest {
         ArenaConfig config = new ArenaConfig(
             1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
             ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_ON_TIMEOUT,
-            ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT, ArenaConfig.DEFAULT_MIN_AGENTS,
+            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
             Path.of(".arena"), agents
         );
 

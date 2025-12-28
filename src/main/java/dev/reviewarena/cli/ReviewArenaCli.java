@@ -246,7 +246,6 @@ public class ReviewArenaCli implements Callable<Integer> {
         log.info("  Max rounds: {}", config.maxRounds());
         log.info("  Concurrency: {}", config.maxConcurrent() == 0 ? "unlimited" : config.maxConcurrent());
         log.info("  Agent timeout: {}ms", config.agentTimeoutMs());
-        log.info("  On timeout: {}", config.onTimeout());
         log.info("Agents ({} configured):", config.agents().size());
         config.agents().forEach((name, agent) -> {
             String status = agent.enabled() ? "enabled" : "disabled";

@@ -180,8 +180,8 @@ ArenaException (exit 1 - general error)
 ### Timeout Behavior
 | Decision | Choice |
 |----------|--------|
-| Default timeout action | `kill-and-skip` - terminate agent, exclude from round, continue tournament |
-| Preserve partial output | `false` - discard incomplete output from timed-out agents |
+| Timeout action | Always `kill-and-skip` - terminate agent, exclude from round, continue tournament |
+| Partial output | Always discarded - incomplete output from timed-out agents is never kept |
 | Per-agent timeout overrides | Not supported - all agents use `agent-timeout-ms` |
 
 ### Tournament Constraints
@@ -289,8 +289,8 @@ ArenaException (exit 1 - general error)
 | Package structure? | By layer |
 | Maven groupId? | dev.reviewarena |
 | Launcher scripts? | Unix + Windows |
-| Timeout action? | kill-and-skip (continue tournament) |
-| Preserve partial output? | No (discard on timeout) |
+| Timeout action? | Always kill-and-skip (continue tournament) |
+| Partial output on timeout? | Always discarded |
 | Minimum agents? | 2 (required for cross-pollination) |
 | Per-agent timeout overrides? | No (single timeout for all) |
 | Raw CLI flag passthrough? | No (use structured flags only) |
