@@ -28,8 +28,10 @@ import java.util.stream.Stream;
  * .arena/
  * ├── task.md
  * ├── prompts/
- * │   ├── round-0.md
- * │   ├── round-1.md
+ * │   ├── round-0-claude.md
+ * │   ├── round-0-codex.md
+ * │   ├── round-0-gemini.md
+ * │   ├── round-1-claude.md
  * │   └── ...
  * └── rounds/
  *     ├── round-0/
@@ -184,13 +186,14 @@ public class WorkspaceManager {
     }
 
     /**
-     * Gets the path to a specific round's pre-generated prompt.
+     * Gets the path to a specific round's pre-generated prompt for an agent.
      *
      * @param round the round number (0-indexed)
+     * @param agentName the agent name
      * @return the round prompt path
      */
-    public Path getRoundPromptPath(int round) {
-        return getPromptsDir().resolve("round-" + round + ".md");
+    public Path getRoundPromptPath(int round, String agentName) {
+        return getPromptsDir().resolve("round-" + round + "-" + agentName + ".md");
     }
 
     private void createRoundDirectory(Path roundDir, Set<String> agentNames) throws IOException {
@@ -220,20 +223,24 @@ public class WorkspaceManager {
         // Get task.md content to prepend to each round prompt
         String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask());
 
-        // Generate prompt for each round (0 through maxRounds)
+        Set<String> agentNames = getEnabledAgentNames();
+
+        // Generate prompt for each round and each agent
         for (int round = 0; round <= config.maxRounds(); round++) {
-            String outputPath = ".arena/rounds/round-" + round + "/review.md";
-            String allReviewsPath = (round == 0) ? null
-                    : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
+            for (String agentName : agentNames) {
+                String outputPath = ".arena/rounds/round-" + round + "/" + agentName + "/review.md";
+                String allReviewsPath = (round == 0) ? null
+                        : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
 
-            TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath);
-            String roundContent = templateLoader.render("round-" + round + ".md", ctx);
+                TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath);
+                String roundContent = templateLoader.render("round-" + round + ".md", ctx);
 
-            // Combine task + round into a complete standalone prompt
-            String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
+                // Combine task + round into a complete standalone prompt
+                String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
 
-            Files.writeString(promptsDir.resolve("round-" + round + ".md"),
-                    fullPrompt, StandardCharsets.UTF_8);
+                Files.writeString(promptsDir.resolve("round-" + round + "-" + agentName + ".md"),
+                        fullPrompt, StandardCharsets.UTF_8);
+            }
         }
     }
 

@@ -141,10 +141,12 @@ class WorkspaceManagerTest {
 
         manager.initialize();
 
-        // Should create round-0.md through round-2.md (maxRounds=2)
-        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-0.md")));
-        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-1.md")));
-        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-2.md")));
+        // Should create per-agent prompt files for each round (maxRounds=2)
+        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-0-claude.md")));
+        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-0-codex.md")));
+        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-0-gemini.md")));
+        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-1-claude.md")));
+        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-2-claude.md")));
     }
 
     @Test
@@ -153,7 +155,7 @@ class WorkspaceManagerTest {
 
         manager.initialize();
 
-        String content = Files.readString(tempDir.resolve(".arena/prompts/round-0.md"));
+        String content = Files.readString(tempDir.resolve(".arena/prompts/round-0-claude.md"));
         // Should contain task.md content
         assertTrue(content.contains("Code Review Arena"));
         // Should contain round-0.md content
@@ -166,7 +168,7 @@ class WorkspaceManagerTest {
 
         manager.initialize();
 
-        String content = Files.readString(tempDir.resolve(".arena/prompts/round-1.md"));
+        String content = Files.readString(tempDir.resolve(".arena/prompts/round-1-claude.md"));
         assertTrue(content.contains(".arena/rounds/round-0/all_reviews.md"));
     }
 
@@ -176,11 +178,14 @@ class WorkspaceManagerTest {
 
         manager.initialize();
 
-        String round0 = Files.readString(tempDir.resolve(".arena/prompts/round-0.md"));
-        assertTrue(round0.contains(".arena/rounds/round-0/review.md"));
+        String round0Claude = Files.readString(tempDir.resolve(".arena/prompts/round-0-claude.md"));
+        assertTrue(round0Claude.contains(".arena/rounds/round-0/claude/review.md"));
 
-        String round1 = Files.readString(tempDir.resolve(".arena/prompts/round-1.md"));
-        assertTrue(round1.contains(".arena/rounds/round-1/review.md"));
+        String round0Codex = Files.readString(tempDir.resolve(".arena/prompts/round-0-codex.md"));
+        assertTrue(round0Codex.contains(".arena/rounds/round-0/codex/review.md"));
+
+        String round1Claude = Files.readString(tempDir.resolve(".arena/prompts/round-1-claude.md"));
+        assertTrue(round1Claude.contains(".arena/rounds/round-1/claude/review.md"));
     }
 
     @Test
@@ -194,8 +199,8 @@ class WorkspaceManagerTest {
     void testGetRoundPromptPath_returnsCorrectPath() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        assertEquals(tempDir.resolve(".arena/prompts/round-0.md"), manager.getRoundPromptPath(0));
-        assertEquals(tempDir.resolve(".arena/prompts/round-3.md"), manager.getRoundPromptPath(3));
+        assertEquals(tempDir.resolve(".arena/prompts/round-0-claude.md"), manager.getRoundPromptPath(0, "claude"));
+        assertEquals(tempDir.resolve(".arena/prompts/round-3-gemini.md"), manager.getRoundPromptPath(3, "gemini"));
     }
 
     // ===== Clearing existing directory =====
