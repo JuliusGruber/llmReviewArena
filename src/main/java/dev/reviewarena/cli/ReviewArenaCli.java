@@ -5,6 +5,8 @@ import dev.reviewarena.config.ConfigLoader;
 import dev.reviewarena.config.ConfigLoader.CliOverrides;
 import dev.reviewarena.git.GitService;
 import dev.reviewarena.io.WorkspaceManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
@@ -28,6 +30,8 @@ import java.util.function.Supplier;
     usageHelpAutoWidth = true
 )
 public class ReviewArenaCli implements Callable<Integer> {
+
+    private static final Logger log = LoggerFactory.getLogger(ReviewArenaCli.class);
 
     //==========================================================================
     // Mutually Exclusive: --staged vs positional refs
@@ -197,7 +201,7 @@ public class ReviewArenaCli implements Callable<Integer> {
         WorkspaceManager workspaceManager = workspaceManagerFactory.apply(projectRoot, config);
         Path arenaDir = workspaceManager.initialize(reviewTarget);
 
-        System.out.println("Workspace initialized: " + arenaDir);
+        log.info("Workspace initialized: {}", arenaDir);
 
         // TODO: Start tournament with config
         return 0;
@@ -233,21 +237,19 @@ public class ReviewArenaCli implements Callable<Integer> {
     }
 
     private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaConfig config) {
-        System.out.println("Dry run - would execute:");
-        System.out.println("  Review target: " + (staged ? "--staged" : ref1 + (ref2 != null ? ".." + ref2 : "")));
-        System.out.println("  Config file: " + configFile);
-        System.out.println();
-        System.out.println("Effective configuration:");
-        System.out.println("  Output directory: " + config.outputDir());
-        System.out.println("  Max rounds: " + config.maxRounds());
-        System.out.println("  Concurrency: " + (config.maxConcurrent() == 0 ? "unlimited" : config.maxConcurrent()));
-        System.out.println("  Agent timeout: " + config.agentTimeoutMs() + "ms");
-        System.out.println("  On timeout: " + config.onTimeout());
-        System.out.println();
-        System.out.println("Agents (" + config.agents().size() + " configured):");
+        log.info("Dry run - would execute:");
+        log.info("  Review target: {}", staged ? "--staged" : ref1 + (ref2 != null ? ".." + ref2 : ""));
+        log.info("  Config file: {}", configFile);
+        log.info("Effective configuration:");
+        log.info("  Output directory: {}", config.outputDir());
+        log.info("  Max rounds: {}", config.maxRounds());
+        log.info("  Concurrency: {}", config.maxConcurrent() == 0 ? "unlimited" : config.maxConcurrent());
+        log.info("  Agent timeout: {}ms", config.agentTimeoutMs());
+        log.info("  On timeout: {}", config.onTimeout());
+        log.info("Agents ({} configured):", config.agents().size());
         config.agents().forEach((name, agent) -> {
             String status = agent.enabled() ? "enabled" : "disabled";
-            System.out.println("  - " + name + " (" + status + "): " + String.join(" ", agent.command()));
+            log.info("  - {} ({}): {}", name, status, String.join(" ", agent.command()));
         });
     }
 
