@@ -19,7 +19,7 @@ class TemplateLoaderTest {
 
     @Test
     void render_taskTemplate_returnsContent() {
-        TemplateContext context = TemplateContext.forTask("test review target");
+        TemplateContext context = TemplateContext.forTask();
 
         String result = templateLoader.render("task.md", context);
 
@@ -60,7 +60,7 @@ class TemplateLoaderTest {
 
     @Test
     void render_missingTemplate_throwsTemplateException() {
-        TemplateContext context = TemplateContext.forTask("test");
+        TemplateContext context = TemplateContext.forTask();
 
         TemplateException exception = assertThrows(TemplateException.class,
                 () -> templateLoader.render("nonexistent.md", context));
@@ -71,12 +71,11 @@ class TemplateLoaderTest {
 
     @Test
     void render_templateContextForTask_hasCorrectValues() {
-        TemplateContext context = TemplateContext.forTask("my review target");
+        TemplateContext context = TemplateContext.forTask();
 
         assertEquals(-1, context.roundNumber());
         assertNull(context.outputPath());
         assertNull(context.allReviewsPath());
-        assertEquals("my review target", context.reviewTarget());
     }
 
     @Test
@@ -96,7 +95,7 @@ class TemplateLoaderTest {
 
     @Test
     void toDataModel_forTaskContext_excludesRoundSpecificFields() {
-        TemplateContext context = TemplateContext.forTask("test target");
+        TemplateContext context = TemplateContext.forTask();
 
         var model = context.toDataModel();
 
@@ -106,7 +105,6 @@ class TemplateLoaderTest {
                 "Should not include null outputPath");
         assertFalse(model.containsKey("allReviewsPath"),
                 "Should not include null allReviewsPath");
-        assertEquals("test target", model.get("reviewTarget"));
     }
 
     @Test

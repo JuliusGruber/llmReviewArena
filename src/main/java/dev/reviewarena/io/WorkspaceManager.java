@@ -216,8 +216,7 @@ public class WorkspaceManager {
     private void generateTaskMd(Path arenaDir) throws IOException {
         Path promptsDir = arenaDir.resolve("prompts");
         Files.createDirectories(promptsDir);
-        // Review target will be set by CLI when it processes arguments
-        TemplateContext context = TemplateContext.forTask("{{review_target}}");
+        TemplateContext context = TemplateContext.forTask();
         String content = templateLoader.render(TASK_TEMPLATE, context);
         Files.writeString(promptsDir.resolve("task.md"), content, StandardCharsets.UTF_8);
     }
@@ -228,7 +227,7 @@ public class WorkspaceManager {
         Files.createDirectories(promptsDir);
 
         // Get task.md content to prepend to each round prompt
-        String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask("{{review_target}}"));
+        String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask());
 
         Set<String> agentNames = getEnabledAgentNames();
 

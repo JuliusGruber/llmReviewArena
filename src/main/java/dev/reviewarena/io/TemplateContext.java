@@ -15,7 +15,6 @@ import java.util.Map;
  * @param roundNumber    Current round number (0-indexed), -1 if not applicable
  * @param outputPath     Path where the agent should write its review output
  * @param allReviewsPath Path to the combined reviews from the previous round (null for round 0)
- * @param reviewTarget   Human-readable description of what is being reviewed (for task.md)
  * @param commit1        First commit reference (empty string if using --staged)
  * @param commit2        Second commit reference for ranges (empty string for single commit or --staged)
  * @param stagedFlag     The staged flag value ("--staged" if reviewing staged, empty string otherwise)
@@ -24,7 +23,6 @@ public record TemplateContext(
         int roundNumber,
         String outputPath,
         String allReviewsPath,
-        String reviewTarget,
         String commit1,
         String commit2,
         String stagedFlag
@@ -33,11 +31,10 @@ public record TemplateContext(
     /**
      * Creates a context for task.md generation (workspace setup).
      *
-     * @param reviewTarget human-readable description of what is being reviewed
      * @return a template context for task.md rendering
      */
-    public static TemplateContext forTask(String reviewTarget) {
-        return new TemplateContext(-1, null, null, reviewTarget, "", "", "");
+    public static TemplateContext forTask() {
+        return new TemplateContext(-1, null, null, "", "", "");
     }
 
     /**
@@ -53,7 +50,7 @@ public record TemplateContext(
      */
     public static TemplateContext forRound(int roundNumber, String outputPath, String allReviewsPath,
                                            String commit1, String commit2, String stagedFlag) {
-        return new TemplateContext(roundNumber, outputPath, allReviewsPath, null, commit1, commit2, stagedFlag);
+        return new TemplateContext(roundNumber, outputPath, allReviewsPath, commit1, commit2, stagedFlag);
     }
 
     /**
@@ -75,9 +72,6 @@ public record TemplateContext(
         }
         if (allReviewsPath != null) {
             model.put("allReviewsPath", allReviewsPath);
-        }
-        if (reviewTarget != null) {
-            model.put("reviewTarget", reviewTarget);
         }
         if (commit1 != null) {
             model.put("commit1", commit1);
