@@ -231,6 +231,125 @@ class ReviewArenaCliTest {
 
             assertTrue(cli.isDryRun());
         }
+
+        @Test
+        void dryRunExitsZero() {
+            int exitCode = commandLine.execute("--dry-run", "abc1234");
+
+            assertEquals(0, exitCode);
+        }
+
+        @Test
+        void dryRunPrintsSummaryWithSingleCommit() {
+            var originalOut = System.out;
+            try {
+                var baos = new java.io.ByteArrayOutputStream();
+                System.setOut(new java.io.PrintStream(baos));
+                commandLine.execute("--dry-run", "abc1234");
+
+                String output = baos.toString();
+                assertTrue(output.contains("Dry run - would execute:"));
+                assertTrue(output.contains("Review target: abc1234"));
+                assertTrue(output.contains("Config file: arena.yaml"));
+                assertTrue(output.contains("Output directory: .arena"));
+                assertTrue(output.contains("Max rounds: 5"));
+                assertTrue(output.contains("Concurrency: unlimited"));
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        void dryRunPrintsSummaryWithCommitRange() {
+            var originalOut = System.out;
+            try {
+                var baos = new java.io.ByteArrayOutputStream();
+                System.setOut(new java.io.PrintStream(baos));
+                commandLine.execute("--dry-run", "abc1234", "def5678");
+
+                String output = baos.toString();
+                assertTrue(output.contains("Review target: abc1234..def5678"));
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        void dryRunPrintsSummaryWithStaged() {
+            var originalOut = System.out;
+            try {
+                var baos = new java.io.ByteArrayOutputStream();
+                System.setOut(new java.io.PrintStream(baos));
+                commandLine.execute("--dry-run", "--staged");
+
+                String output = baos.toString();
+                assertTrue(output.contains("Review target: --staged"));
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        void dryRunPrintsSummaryWithCustomConfig() {
+            var originalOut = System.out;
+            try {
+                var baos = new java.io.ByteArrayOutputStream();
+                System.setOut(new java.io.PrintStream(baos));
+                commandLine.execute("--dry-run", "-c", "custom.yaml", "-r", "10", "-o", "output", "abc1234");
+
+                String output = baos.toString();
+                assertTrue(output.contains("Config file: custom.yaml"));
+                assertTrue(output.contains("Output directory: output"));
+                assertTrue(output.contains("Max rounds: 10"));
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        void dryRunPrintsSequentialMode() {
+            var originalOut = System.out;
+            try {
+                var baos = new java.io.ByteArrayOutputStream();
+                System.setOut(new java.io.PrintStream(baos));
+                commandLine.execute("--dry-run", "--sequential", "abc1234");
+
+                String output = baos.toString();
+                assertTrue(output.contains("Concurrency: 1"));
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        void dryRunPrintsMaxConcurrent() {
+            var originalOut = System.out;
+            try {
+                var baos = new java.io.ByteArrayOutputStream();
+                System.setOut(new java.io.PrintStream(baos));
+                commandLine.execute("--dry-run", "--max-concurrent", "4", "abc1234");
+
+                String output = baos.toString();
+                assertTrue(output.contains("Concurrency: 4"));
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        void dryRunPrintsParallelAsUnlimited() {
+            var originalOut = System.out;
+            try {
+                var baos = new java.io.ByteArrayOutputStream();
+                System.setOut(new java.io.PrintStream(baos));
+                commandLine.execute("--dry-run", "--parallel", "abc1234");
+
+                String output = baos.toString();
+                assertTrue(output.contains("Concurrency: unlimited"));
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
     }
 
     @Nested

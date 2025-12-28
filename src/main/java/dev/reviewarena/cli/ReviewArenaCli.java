@@ -120,9 +120,41 @@ public class ReviewArenaCli implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        // Stub implementation - returns 0
-        // Full implementation will be added in subsequent issues
+        // Extract values from ArgGroups for easier access
+        boolean staged = reviewTarget != null && reviewTarget.staged;
+        String ref1 = (reviewTarget != null && reviewTarget.commitRefs != null)
+                      ? reviewTarget.commitRefs.ref1 : null;
+        String ref2 = (reviewTarget != null && reviewTarget.commitRefs != null)
+                      ? reviewTarget.commitRefs.ref2 : null;
+
+        // Resolve execution mode
+        int effectiveConcurrency = resolveExecutionMode();
+
+        // Handle dry-run mode
+        if (dryRun) {
+            printDryRunSummary(staged, ref1, ref2, effectiveConcurrency);
+            return 0;
+        }
+
+        // TODO: Start tournament
         return 0;
+    }
+
+    private int resolveExecutionMode() {
+        if (executionMode != null) {
+            if (executionMode.sequential) return 1;
+            if (executionMode.parallel) return 0;
+        }
+        return maxConcurrent;
+    }
+
+    private void printDryRunSummary(boolean staged, String ref1, String ref2, int concurrency) {
+        System.out.println("Dry run - would execute:");
+        System.out.println("  Review target: " + (staged ? "--staged" : ref1 + (ref2 != null ? ".." + ref2 : "")));
+        System.out.println("  Config file: " + configFile);
+        System.out.println("  Output directory: " + outputDir);
+        System.out.println("  Max rounds: " + maxRounds);
+        System.out.println("  Concurrency: " + (concurrency == 0 ? "unlimited" : concurrency));
     }
 
     //==========================================================================
