@@ -23,19 +23,19 @@ This document outlines the next development priorities based on analysis of rece
 | **CLI + ConfigLoader Integration** | `ReviewArenaCli.call()` uses ConfigLoader | Complete |
 | **Prompt Templates** | `src/main/resources/prompts/*.md` | Complete |
 | **WorkspaceManager** | `WorkspaceManager.java`, `WorkspaceManagerTest.java` | Complete |
+| **TemplateLoader** | `TemplateLoader.java`, `TemplateContext.java`, `TemplateLoaderTest.java` | Complete |
 
 ### Not Implemented ❌
 
 | Component | Planned In | Status |
 |-----------|-----------|--------|
-| **TemplateLoader** | spec.md | Not started |
 | **AgentProcess/Executor** | spec.md | Not started |
 | **Tournament Orchestrator** | spec.md | Not started |
 | **ReviewAggregator** | spec.md | Not started |
 
 ---
 
-## Milestone 1: Git Validation + Configuration + Workspace Setup
+## Milestone 1: Git Validation + Configuration + Workspace Setup ✅ COMPLETE
 
 **Goal:** Complete the foundation layer so the CLI can validate inputs, load configuration, and prepare the workspace before agent execution.
 
@@ -110,7 +110,8 @@ Implements the `.arena/` directory structure from `spec.md`.
 src/main/java/dev/reviewarena/io/
 ├── WorkspaceManager.java    # Creates .arena/ structure ✅
 ├── WorkspaceException.java  # Workspace errors ✅
-├── TemplateLoader.java      # Loads prompt templates (not started)
+├── TemplateLoader.java      # Loads prompt templates ✅
+├── TemplateContext.java     # Template data model ✅
 └── ReviewAggregator.java    # Writes all_reviews.md (not started)
 ```
 
@@ -129,11 +130,11 @@ src/main/java/dev/reviewarena/io/
       │   └── ...
       └── final/
   ```
-- Generate `task.md` from template (placeholder substitution is stubbed)
+- Generate `task.md` from template with placeholder substitution ✅
 
-**TemplateLoader responsibilities:** (not started)
+**TemplateLoader responsibilities:** ✅
 - Load prompt templates from classpath (`resources/prompts/`)
-- Resolve placeholders (`{{review_target}}`, `{{round_number}}`, etc.)
+- Resolve placeholders using Freemarker (`${reviewTarget}`, `${roundNumber}`, etc.)
 - Return constructed prompt content
 
 ### 1.4 Prompt Templates
@@ -208,9 +209,9 @@ src/main/java/dev/reviewarena/tournament/
 | 3 | application.yaml + logback.xml | None | ✅ Done |
 | 4 | Prompt templates | None | ✅ Done |
 | 5 | WorkspaceManager | ArenaConfig | ✅ Done |
-| 6 | TemplateLoader | Prompt templates | ⬅️ Next |
-| 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Partial (GitService + ConfigLoader done) |
-| 8 | AgentProcess + AgentExecutor | WorkspaceManager | Ready |
+| 6 | TemplateLoader | Prompt templates | ✅ Done |
+| 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Done |
+| 8 | AgentProcess + AgentExecutor | WorkspaceManager | ⬅️ Next |
 | 9 | TournamentOrchestrator | AgentExecutor, TemplateLoader | |
 | 10 | ReviewAggregator | TournamentOrchestrator | |
 
@@ -276,7 +277,7 @@ src/main/java/dev/reviewarena/tournament/
 - [x] Invalid commits produce exit code 3
 - [x] `arena.yaml` is loaded and merged with CLI args
 - [x] `.arena/` directory structure is created
-- [ ] `task.md` is generated with placeholders resolved (stubbed - TemplateLoader needed)
+- [x] `task.md` is generated with placeholders resolved
 - [x] All prompt templates exist in resources
 
 ### Milestone 2 Complete When:
