@@ -196,10 +196,14 @@ public class ReviewArenaCli implements Callable<Integer> {
         // Build review target string for display
         String reviewTargetStr = buildReviewTargetString(staged, ref1, ref2);
 
-        // Initialize workspace
+        // Initialize workspace with commit information for templates
+        String commit1 = staged ? "" : (ref1 != null ? ref1 : "");
+        String commit2 = staged ? "" : (ref2 != null ? ref2 : "");
+        String stagedFlagValue = staged ? "--staged" : "";
+
         Path projectRoot = Path.of("").toAbsolutePath();
         WorkspaceManager workspaceManager = workspaceManagerFactory.apply(projectRoot, config);
-        Path arenaDir = workspaceManager.initialize();
+        Path arenaDir = workspaceManager.initialize(commit1, commit2, stagedFlagValue);
 
         log.info("Workspace initialized: {}", arenaDir);
         log.info("Review target: {}", reviewTargetStr);

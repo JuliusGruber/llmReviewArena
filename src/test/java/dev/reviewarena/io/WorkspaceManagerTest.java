@@ -49,7 +49,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsArenaDirectory() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        Path arenaDir = manager.initialize();
+        Path arenaDir = manager.initialize("abc1234", "", "");
 
         assertTrue(Files.isDirectory(arenaDir));
         assertEquals(tempDir.resolve(".arena"), arenaDir);
@@ -59,7 +59,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsRoundsDirectory() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds")));
     }
@@ -68,7 +68,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsRoundDirectories() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         // Should create round-0, round-1, round-2 (maxRounds=2)
         assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/round-0")));
@@ -80,7 +80,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsAgentDirectories() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         // Each round should have agent subdirectories
         for (int round = 0; round <= 2; round++) {
@@ -95,7 +95,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsFinalDirectory() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/final")));
     }
@@ -104,7 +104,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsTaskMd() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         Path taskMd = tempDir.resolve(".arena/prompts/task.md");
         assertTrue(Files.exists(taskMd));
@@ -115,7 +115,7 @@ class WorkspaceManagerTest {
     void testInitialize_taskMdContainsContent() throws IOException {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         String content = Files.readString(tempDir.resolve(".arena/prompts/task.md"));
         assertFalse(content.isBlank());
@@ -128,7 +128,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsPromptsDirectory() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         assertTrue(Files.isDirectory(tempDir.resolve(".arena/prompts")));
     }
@@ -137,7 +137,7 @@ class WorkspaceManagerTest {
     void testInitialize_createsRoundPromptFiles() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         // Should create per-agent prompt files for each round (maxRounds=2)
         assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-0-claude.md")));
@@ -151,7 +151,7 @@ class WorkspaceManagerTest {
     void testInitialize_roundPromptContainsTaskAndRoundContent() throws IOException {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         String content = Files.readString(tempDir.resolve(".arena/prompts/round-0-claude.md"));
         // Should contain task.md content
@@ -164,7 +164,7 @@ class WorkspaceManagerTest {
     void testInitialize_laterRoundPromptsContainAllReviewsPath() throws IOException {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         String content = Files.readString(tempDir.resolve(".arena/prompts/round-1-claude.md"));
         assertTrue(content.contains(".arena/rounds/round-0/all_reviews.md"));
@@ -174,7 +174,7 @@ class WorkspaceManagerTest {
     void testInitialize_roundPromptsContainOutputPath() throws IOException {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         String round0Claude = Files.readString(tempDir.resolve(".arena/prompts/round-0-claude.md"));
         assertTrue(round0Claude.contains(".arena/rounds/round-0/claude/review.md"));
@@ -213,7 +213,7 @@ class WorkspaceManagerTest {
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         // Old file should be gone
         assertFalse(Files.exists(oldFile));
@@ -230,7 +230,7 @@ class WorkspaceManagerTest {
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         // Old nested content should be gone
         assertFalse(Files.exists(tempDir.resolve(".arena/rounds/round-0/old-agent")));
@@ -256,7 +256,7 @@ class WorkspaceManagerTest {
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         Path round0 = tempDir.resolve(".arena/rounds/round-0");
         assertTrue(Files.isDirectory(round0.resolve("claude")));
@@ -278,7 +278,7 @@ class WorkspaceManagerTest {
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
 
-        Path arenaDir = manager.initialize();
+        Path arenaDir = manager.initialize("abc1234", "", "");
 
         assertEquals(tempDir.resolve("custom-output"), arenaDir);
         assertTrue(Files.isDirectory(arenaDir));
@@ -344,7 +344,7 @@ class WorkspaceManagerTest {
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/round-0")));
         assertFalse(Files.exists(tempDir.resolve(".arena/rounds/round-1")));
@@ -366,7 +366,7 @@ class WorkspaceManagerTest {
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
 
-        manager.initialize();
+        manager.initialize("abc1234", "", "");
 
         // Round directories should exist but be empty (no agent subdirs)
         Path round0 = tempDir.resolve(".arena/rounds/round-0");

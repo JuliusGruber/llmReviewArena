@@ -79,10 +79,13 @@ public class WorkspaceManager {
      * Initializes the workspace by clearing any existing .arena/ directory
      * and creating the fresh directory structure.
      *
+     * @param commit1    first commit reference (empty string if using --staged)
+     * @param commit2    second commit reference for ranges (empty string for single commit or --staged)
+     * @param stagedFlag the staged flag value ("--staged" if reviewing staged, empty string otherwise)
      * @return the path to the created .arena/ directory
      * @throws WorkspaceException if directory creation fails
      */
-    public Path initialize() {
+    public Path initialize(String commit1, String commit2, String stagedFlag) {
         Path arenaDir = getArenaDir();
 
         try {
@@ -111,7 +114,7 @@ public class WorkspaceManager {
             generateTaskMd(arenaDir);
 
             // Pre-generate all round prompts
-            generateAllRoundPrompts(arenaDir);
+            generateAllRoundPrompts(arenaDir, commit1, commit2, stagedFlag);
 
             return arenaDir;
         } catch (IOException e) {
@@ -219,7 +222,8 @@ public class WorkspaceManager {
         Files.writeString(promptsDir.resolve("task.md"), content, StandardCharsets.UTF_8);
     }
 
-    private void generateAllRoundPrompts(Path arenaDir) throws IOException {
+    private void generateAllRoundPrompts(Path arenaDir, String commit1, String commit2,
+                                         String stagedFlag) throws IOException {
         Path promptsDir = arenaDir.resolve("prompts");
         Files.createDirectories(promptsDir);
 
@@ -235,7 +239,8 @@ public class WorkspaceManager {
                 String allReviewsPath = (round == 0) ? null
                         : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
 
-                TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath, "", "", "");
+                TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath,
+                        commit1, commit2, stagedFlag);
                 String roundContent = templateLoader.render("round-" + round + ".md", ctx);
 
                 // Combine task + round into a complete standalone prompt
