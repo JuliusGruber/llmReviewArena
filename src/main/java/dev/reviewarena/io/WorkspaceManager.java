@@ -26,8 +26,8 @@ import java.util.stream.Stream;
  * <p>Directory structure created:
  * <pre>
  * .arena/
- * ├── task.md
  * ├── prompts/
+ * │   ├── task.md
  * │   ├── round-0-claude.md
  * │   ├── round-0-codex.md
  * │   ├── round-0-gemini.md
@@ -173,7 +173,7 @@ public class WorkspaceManager {
      * @return the task.md path
      */
     public Path getTaskMdPath() {
-        return getArenaDir().resolve("task.md");
+        return getPromptsDir().resolve("task.md");
     }
 
     /**
@@ -211,9 +211,11 @@ public class WorkspaceManager {
     }
 
     private void generateTaskMd(Path arenaDir) throws IOException {
+        Path promptsDir = arenaDir.resolve("prompts");
+        Files.createDirectories(promptsDir);
         TemplateContext context = TemplateContext.forTask();
         String content = templateLoader.render(TASK_TEMPLATE, context);
-        Files.writeString(arenaDir.resolve("task.md"), content, StandardCharsets.UTF_8);
+        Files.writeString(promptsDir.resolve("task.md"), content, StandardCharsets.UTF_8);
     }
 
     private void generateAllRoundPrompts(Path arenaDir) throws IOException {

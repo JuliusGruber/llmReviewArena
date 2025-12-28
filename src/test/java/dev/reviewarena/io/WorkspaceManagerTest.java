@@ -108,7 +108,7 @@ class WorkspaceManagerTest {
 
         manager.initialize();
 
-        Path taskMd = tempDir.resolve(".arena/task.md");
+        Path taskMd = tempDir.resolve(".arena/prompts/task.md");
         assertTrue(Files.exists(taskMd));
         assertTrue(Files.isRegularFile(taskMd));
     }
@@ -119,7 +119,7 @@ class WorkspaceManagerTest {
 
         manager.initialize();
 
-        String content = Files.readString(tempDir.resolve(".arena/task.md"));
+        String content = Files.readString(tempDir.resolve(".arena/prompts/task.md"));
         assertFalse(content.isBlank());
         assertTrue(content.contains("Code Review Arena"));
     }
@@ -330,7 +330,7 @@ class WorkspaceManagerTest {
     void testGetTaskMdPath_returnsCorrectPath() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 
-        assertEquals(tempDir.resolve(".arena/task.md"), manager.getTaskMdPath());
+        assertEquals(tempDir.resolve(".arena/prompts/task.md"), manager.getTaskMdPath());
     }
 
     // ===== Edge cases =====
