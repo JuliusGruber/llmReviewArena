@@ -21,4 +21,4 @@ If multiple reviews mention the same issue:
 - choose the strongest framing
 - remove duplication
 
-Write a refined, high-signal review.
+Write a refined, high-signal review to `${outputPath}`.

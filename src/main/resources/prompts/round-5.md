@@ -15,4 +15,4 @@ Bias toward:
 - clarity over exhaustiveness
 - decisions the author can act on immediately
 
-Write the final review.
+Write the final review to `${outputPath}`.

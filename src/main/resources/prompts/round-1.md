@@ -21,4 +21,4 @@ Important:
 - Do NOT argue defensively.
 - Act as if you want the best possible review to exist, regardless of authorship.
 
-Write a complete, standalone review using the same structure as before.
+Write a complete, standalone review to `${outputPath}` using the same structure as before.

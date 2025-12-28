@@ -10,4 +10,4 @@ Your task:
 
 Produce a clean, consolidated review.
 
-Write a clean, consolidated review.
+Write your review to `${outputPath}`.

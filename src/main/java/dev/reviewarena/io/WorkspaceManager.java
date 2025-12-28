@@ -222,10 +222,11 @@ public class WorkspaceManager {
 
         // Generate prompt for each round (0 through maxRounds)
         for (int round = 0; round <= config.maxRounds(); round++) {
+            String outputPath = ".arena/rounds/round-" + round + "/review.md";
             String allReviewsPath = (round == 0) ? null
                     : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
 
-            TemplateContext ctx = TemplateContext.forRound(round, allReviewsPath);
+            TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath);
             String roundContent = templateLoader.render("round-" + round + ".md", ctx);
 
             // Combine task + round into a complete standalone prompt

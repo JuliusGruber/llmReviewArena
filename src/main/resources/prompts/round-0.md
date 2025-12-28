@@ -15,4 +15,4 @@ Rules:
 - Do NOT mention other reviewers or models.
 - Write only the final review.
 
-Write your output following the required structure from task.md.
+Write your review to `${outputPath}` following the required structure from task.md.

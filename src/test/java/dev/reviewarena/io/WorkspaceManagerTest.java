@@ -171,6 +171,19 @@ class WorkspaceManagerTest {
     }
 
     @Test
+    void testInitialize_roundPromptsContainOutputPath() throws IOException {
+        WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
+
+        manager.initialize();
+
+        String round0 = Files.readString(tempDir.resolve(".arena/prompts/round-0.md"));
+        assertTrue(round0.contains(".arena/rounds/round-0/review.md"));
+
+        String round1 = Files.readString(tempDir.resolve(".arena/prompts/round-1.md"));
+        assertTrue(round1.contains(".arena/rounds/round-1/review.md"));
+    }
+
+    @Test
     void testGetPromptsDir_returnsCorrectPath() {
         WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
 

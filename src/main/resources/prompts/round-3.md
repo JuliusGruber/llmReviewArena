@@ -13,4 +13,4 @@ Focus on:
 - Clear file/line references for every issue
 - Realistic fix suggestions
 
-Write a refined review.
+Write a refined review to `${outputPath}`.

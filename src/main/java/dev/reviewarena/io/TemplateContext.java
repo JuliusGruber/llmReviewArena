@@ -13,10 +13,12 @@ import java.util.Map;
  * </ul>
  *
  * @param roundNumber    Current round number (0-indexed), -1 if not applicable
+ * @param outputPath     Path where the agent should write its review output
  * @param allReviewsPath Path to the combined reviews from the previous round (null for round 0)
  */
 public record TemplateContext(
         int roundNumber,
+        String outputPath,
         String allReviewsPath
 ) {
 
@@ -26,18 +28,19 @@ public record TemplateContext(
      * @return a template context for task.md rendering
      */
     public static TemplateContext forTask() {
-        return new TemplateContext(-1, null);
+        return new TemplateContext(-1, null, null);
     }
 
     /**
      * Creates a context for round prompt generation.
      *
      * @param roundNumber    current round number (0-indexed)
+     * @param outputPath     path where agent should write its review
      * @param allReviewsPath path to combined reviews from previous round (null for round 0)
      * @return a template context for round prompt rendering
      */
-    public static TemplateContext forRound(int roundNumber, String allReviewsPath) {
-        return new TemplateContext(roundNumber, allReviewsPath);
+    public static TemplateContext forRound(int roundNumber, String outputPath, String allReviewsPath) {
+        return new TemplateContext(roundNumber, outputPath, allReviewsPath);
     }
 
     /**
@@ -53,6 +56,9 @@ public record TemplateContext(
 
         if (roundNumber >= 0) {
             model.put("roundNumber", roundNumber);
+        }
+        if (outputPath != null) {
+            model.put("outputPath", outputPath);
         }
         if (allReviewsPath != null) {
             model.put("allReviewsPath", allReviewsPath);
