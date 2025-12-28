@@ -16,19 +16,22 @@ This document outlines the next development priorities based on analysis of rece
 | **GitService (JGit)** | `GitService.java`, `GitServiceTest.java` | Complete |
 | **InputValidator** | `InputValidator.java`, `InputValidatorTest.java` | Complete |
 | **CLI + GitService Integration** | `ReviewArenaCli.call()` uses GitService | Complete |
+| **ArenaConfig** | `ArenaConfig.java`, `AgentConfig.java` | Complete |
+| **ConfigLoader** | `ConfigLoader.java`, `ConfigLoaderTest.java` | Complete |
+| **application.yaml** | `src/main/resources/application.yaml` | Complete |
+| **logback.xml** | `src/main/resources/logback.xml` | Complete |
+| **CLI + ConfigLoader Integration** | `ReviewArenaCli.call()` uses ConfigLoader | Complete |
+| **Prompt Templates** | `src/main/resources/prompts/*.md` | Complete |
 
 ### Not Implemented ❌
 
 | Component | Planned In | Status |
 |-----------|-----------|--------|
-| **ArenaConfig** | implementation-decisions.md | Not started |
-| **ConfigLoader** | implementation-decisions.md | Not started |
 | **WorkspaceManager** | spec.md | Not started |
-| **Prompt Templates** | spec.md | Not created |
-| **application.yaml** | implementation-decisions.md | Not created |
-| **logback.xml** | implementation-decisions.md | Not created |
+| **TemplateLoader** | spec.md | Not started |
 | **AgentProcess/Executor** | spec.md | Not started |
 | **Tournament Orchestrator** | spec.md | Not started |
+| **ReviewAggregator** | spec.md | Not started |
 
 ---
 
@@ -59,22 +62,23 @@ src/main/java/dev/reviewarena/git/
 
 **Integration point:** ✅ Called from `ReviewArenaCli.call()` before any other work.
 
-### 1.2 Configuration Layer
+### 1.2 Configuration Layer ✅ COMPLETE
 
 Implements SmallRye Config integration from `implementation-decisions.md`.
 
 ```
 src/main/java/dev/reviewarena/config/
-├── ArenaConfig.java         # Record with all config fields (new)
-├── ConfigLoader.java        # SmallRye Config integration (new)
-└── ConfigException.java     # Already exists
+├── ArenaConfig.java         # Record with all config fields ✅
+├── AgentConfig.java         # Agent-specific configuration ✅
+├── ConfigLoader.java        # SmallRye Config integration ✅
+└── ConfigException.java     # Already exists ✅
 
 src/main/resources/
-├── application.yaml         # Default configuration (new)
-└── logback.xml              # Logging configuration (new)
+├── application.yaml         # Default configuration ✅
+└── logback.xml              # Logging configuration ✅
 ```
 
-**ArenaConfig record fields:**
+**ArenaConfig record fields:** ✅
 ```java
 public record ArenaConfig(
     int maxRounds,
@@ -90,11 +94,13 @@ public record ArenaConfig(
 ) {}
 ```
 
-**ConfigLoader responsibilities:**
+**ConfigLoader responsibilities:** ✅
 - Load `arena.yaml` from current directory (if exists)
 - Fall back to `application.yaml` defaults
 - Merge CLI overrides (rounds, output dir, concurrency)
 - Return fully-resolved `ArenaConfig`
+
+**Integration point:** ✅ Called from `ReviewArenaCli.call()` after input validation.
 
 ### 1.3 Workspace Setup
 
@@ -197,12 +203,12 @@ src/main/java/dev/reviewarena/tournament/
 | Order | Component | Dependencies | Status |
 |-------|-----------|--------------|--------|
 | 1 | GitService + InputValidator | None | ✅ Done |
-| 2 | ArenaConfig + ConfigLoader | None | |
-| 3 | application.yaml + logback.xml | None | |
-| 4 | Prompt templates | None | |
-| 5 | WorkspaceManager | ArenaConfig | |
-| 6 | TemplateLoader | Prompt templates | |
-| 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Partial (GitService done) |
+| 2 | ArenaConfig + ConfigLoader | None | ✅ Done |
+| 3 | application.yaml + logback.xml | None | ✅ Done |
+| 4 | Prompt templates | None | ✅ Done |
+| 5 | WorkspaceManager | ArenaConfig | ⬅️ Next |
+| 6 | TemplateLoader | Prompt templates | Ready |
+| 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Partial (GitService + ConfigLoader done) |
 | 8 | AgentProcess + AgentExecutor | WorkspaceManager | |
 | 9 | TournamentOrchestrator | AgentExecutor, TemplateLoader | |
 | 10 | ReviewAggregator | TournamentOrchestrator | |
@@ -228,7 +234,7 @@ src/main/java/dev/reviewarena/tournament/
 - `testHashFormat_valid`
 - `testHashFormat_invalid`
 
-**ConfigLoader tests:**
+**ConfigLoader tests:** ✅ Complete (`ConfigLoaderTest.java`)
 - `testLoadsDefaultConfig`
 - `testLoadsArenaYaml`
 - `testCliOverridesConfig`
@@ -261,10 +267,10 @@ src/main/java/dev/reviewarena/tournament/
 - [x] `review-arena abc1234` validates commit exists
 - [x] `review-arena --staged` validates staged mode
 - [x] Invalid commits produce exit code 3
-- [ ] `arena.yaml` is loaded and merged with CLI args
+- [x] `arena.yaml` is loaded and merged with CLI args
 - [ ] `.arena/` directory structure is created
 - [ ] `task.md` is generated with placeholders resolved
-- [ ] All prompt templates exist in resources
+- [x] All prompt templates exist in resources
 
 ### Milestone 2 Complete When:
 - [ ] Agents spawn as subprocesses
