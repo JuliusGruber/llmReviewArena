@@ -22,12 +22,12 @@ This document outlines the next development priorities based on analysis of rece
 | **logback.xml** | `src/main/resources/logback.xml` | Complete |
 | **CLI + ConfigLoader Integration** | `ReviewArenaCli.call()` uses ConfigLoader | Complete |
 | **Prompt Templates** | `src/main/resources/prompts/*.md` | Complete |
+| **WorkspaceManager** | `WorkspaceManager.java`, `WorkspaceManagerTest.java` | Complete |
 
 ### Not Implemented ❌
 
 | Component | Planned In | Status |
 |-----------|-----------|--------|
-| **WorkspaceManager** | spec.md | Not started |
 | **TemplateLoader** | spec.md | Not started |
 | **AgentProcess/Executor** | spec.md | Not started |
 | **Tournament Orchestrator** | spec.md | Not started |
@@ -102,18 +102,19 @@ public record ArenaConfig(
 
 **Integration point:** ✅ Called from `ReviewArenaCli.call()` after input validation.
 
-### 1.3 Workspace Setup
+### 1.3 Workspace Setup ✅ COMPLETE
 
 Implements the `.arena/` directory structure from `spec.md`.
 
 ```
 src/main/java/dev/reviewarena/io/
-├── WorkspaceManager.java    # Creates .arena/ structure (new)
-├── TemplateLoader.java      # Loads prompt templates (new)
-└── ReviewAggregator.java    # Writes all_reviews.md (new)
+├── WorkspaceManager.java    # Creates .arena/ structure ✅
+├── WorkspaceException.java  # Workspace errors ✅
+├── TemplateLoader.java      # Loads prompt templates (not started)
+└── ReviewAggregator.java    # Writes all_reviews.md (not started)
 ```
 
-**WorkspaceManager responsibilities:**
+**WorkspaceManager responsibilities:** ✅
 - Clear existing `.arena/` directory (fresh start)
 - Create directory structure:
   ```
@@ -128,9 +129,9 @@ src/main/java/dev/reviewarena/io/
       │   └── ...
       └── final/
   ```
-- Generate `task.md` from template with placeholder substitution
+- Generate `task.md` from template (placeholder substitution is stubbed)
 
-**TemplateLoader responsibilities:**
+**TemplateLoader responsibilities:** (not started)
 - Load prompt templates from classpath (`resources/prompts/`)
 - Resolve placeholders (`{{review_target}}`, `{{round_number}}`, etc.)
 - Return constructed prompt content
@@ -206,10 +207,10 @@ src/main/java/dev/reviewarena/tournament/
 | 2 | ArenaConfig + ConfigLoader | None | ✅ Done |
 | 3 | application.yaml + logback.xml | None | ✅ Done |
 | 4 | Prompt templates | None | ✅ Done |
-| 5 | WorkspaceManager | ArenaConfig | ⬅️ Next |
-| 6 | TemplateLoader | Prompt templates | Ready |
+| 5 | WorkspaceManager | ArenaConfig | ✅ Done |
+| 6 | TemplateLoader | Prompt templates | ⬅️ Next |
 | 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Partial (GitService + ConfigLoader done) |
-| 8 | AgentProcess + AgentExecutor | WorkspaceManager | |
+| 8 | AgentProcess + AgentExecutor | WorkspaceManager | Ready |
 | 9 | TournamentOrchestrator | AgentExecutor, TemplateLoader | |
 | 10 | ReviewAggregator | TournamentOrchestrator | |
 
@@ -240,10 +241,16 @@ src/main/java/dev/reviewarena/tournament/
 - `testCliOverridesConfig`
 - `testMissingConfigUsesDefaults`
 
-**WorkspaceManager tests:**
-- `testCreatesDirectoryStructure`
-- `testClearsExistingArenaDir`
-- `testGeneratesTaskMd`
+**WorkspaceManager tests:** ✅ Complete (`WorkspaceManagerTest.java`)
+- `testInitialize_createsArenaDirectory`
+- `testInitialize_createsRoundsDirectory`
+- `testInitialize_createsRoundDirectories`
+- `testInitialize_createsAgentDirectories`
+- `testInitialize_createsFinalDirectory`
+- `testInitialize_createsTaskMd`
+- `testInitialize_clearsExistingArenaDir`
+- `testInitialize_onlyCreatesEnabledAgentDirs`
+- Path helper method tests
 
 ### Milestone 2 Tests
 
@@ -268,8 +275,8 @@ src/main/java/dev/reviewarena/tournament/
 - [x] `review-arena --staged` validates staged mode
 - [x] Invalid commits produce exit code 3
 - [x] `arena.yaml` is loaded and merged with CLI args
-- [ ] `.arena/` directory structure is created
-- [ ] `task.md` is generated with placeholders resolved
+- [x] `.arena/` directory structure is created
+- [ ] `task.md` is generated with placeholders resolved (stubbed - TemplateLoader needed)
 - [x] All prompt templates exist in resources
 
 ### Milestone 2 Complete When:

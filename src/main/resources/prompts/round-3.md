@@ -1,6 +1,8 @@
-This is Round 3.
+This is Round ${roundNumber}.
 
-Reviews are converging. Your task is to refine further:
+Reviews are converging. Previous reviews available at: `${allReviewsPath}`
+
+Your task is to refine further:
 - Remove any remaining vague or speculative comments
 - Strengthen evidence for each issue
 - Ensure severity levels are calibrated correctly
@@ -11,4 +13,4 @@ Focus on:
 - Clear file/line references for every issue
 - Realistic fix suggestions
 
-Write a refined review to `review.md`.
+Write a refined review.

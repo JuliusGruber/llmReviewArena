@@ -1,6 +1,6 @@
-This is Round 2.
+This is Round ${roundNumber}.
 
-You are reviewing an already strong set of reviews.
+You are reviewing an already strong set of reviews from: `${allReviewsPath}`
 
 Your task:
 - Increase precision and usefulness.
@@ -21,4 +21,4 @@ If multiple reviews mention the same issue:
 - choose the strongest framing
 - remove duplication
 
-Write a refined, high-signal review to `review.md`.
+Write a refined, high-signal review.

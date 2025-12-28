@@ -3,13 +3,13 @@ package dev.reviewarena.io;
 import dev.reviewarena.config.ArenaConfig;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -20,12 +20,17 @@ import java.util.stream.Stream;
  *   <li>Clearing existing .arena/ directory (fresh start each run)</li>
  *   <li>Creating the round directory structure with agent subdirectories</li>
  *   <li>Generating task.md from template with placeholder substitution</li>
+ *   <li>Pre-generating all round prompts at initialization time</li>
  * </ul>
  *
  * <p>Directory structure created:
  * <pre>
  * .arena/
  * ├── task.md
+ * ├── prompts/
+ * │   ├── round-0.md
+ * │   ├── round-1.md
+ * │   └── ...
  * └── rounds/
  *     ├── round-0/
  *     │   ├── claude/
@@ -38,10 +43,11 @@ import java.util.stream.Stream;
  */
 public class WorkspaceManager {
 
-    private static final String TASK_TEMPLATE_PATH = "prompts/task.md";
+    private static final String TASK_TEMPLATE = "task.md";
 
     private final Path projectRoot;
     private final ArenaConfig config;
+    private final TemplateLoader templateLoader;
 
     /**
      * Creates a WorkspaceManager for the given project root.
@@ -50,19 +56,31 @@ public class WorkspaceManager {
      * @param config the arena configuration
      */
     public WorkspaceManager(Path projectRoot, ArenaConfig config) {
+        this(projectRoot, config, new TemplateLoader());
+    }
+
+    /**
+     * Creates a WorkspaceManager with a custom TemplateLoader.
+     * Package-private for testing.
+     *
+     * @param projectRoot the project root directory
+     * @param config the arena configuration
+     * @param templateLoader the template loader to use
+     */
+    WorkspaceManager(Path projectRoot, ArenaConfig config, TemplateLoader templateLoader) {
         this.projectRoot = projectRoot.toAbsolutePath().normalize();
         this.config = config;
+        this.templateLoader = templateLoader;
     }
 
     /**
      * Initializes the workspace by clearing any existing .arena/ directory
      * and creating the fresh directory structure.
      *
-     * @param reviewTarget description of what is being reviewed (e.g., "abc1234", "abc1234..def5678", "--staged")
      * @return the path to the created .arena/ directory
      * @throws WorkspaceException if directory creation fails
      */
-    public Path initialize(String reviewTarget) {
+    public Path initialize() {
         Path arenaDir = getArenaDir();
 
         try {
@@ -87,8 +105,11 @@ public class WorkspaceManager {
             Path finalDir = roundsDir.resolve("final");
             Files.createDirectories(finalDir);
 
-            // Generate task.md
-            generateTaskMd(arenaDir, reviewTarget);
+            // Generate task.md using TemplateLoader
+            generateTaskMd(arenaDir);
+
+            // Pre-generate all round prompts
+            generateAllRoundPrompts(arenaDir);
 
             return arenaDir;
         } catch (IOException e) {
@@ -153,6 +174,25 @@ public class WorkspaceManager {
         return getArenaDir().resolve("task.md");
     }
 
+    /**
+     * Gets the path to the prompts directory.
+     *
+     * @return the prompts directory path
+     */
+    public Path getPromptsDir() {
+        return getArenaDir().resolve("prompts");
+    }
+
+    /**
+     * Gets the path to a specific round's pre-generated prompt.
+     *
+     * @param round the round number (0-indexed)
+     * @return the round prompt path
+     */
+    public Path getRoundPromptPath(int round) {
+        return getPromptsDir().resolve("round-" + round + ".md");
+    }
+
     private void createRoundDirectory(Path roundDir, Set<String> agentNames) throws IOException {
         Files.createDirectories(roundDir);
         for (String agentName : agentNames) {
@@ -164,31 +204,36 @@ public class WorkspaceManager {
         return config.agents().entrySet().stream()
                 .filter(entry -> entry.getValue().enabled())
                 .map(java.util.Map.Entry::getKey)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
-    private void generateTaskMd(Path arenaDir, String reviewTarget) throws IOException {
-        String template = loadTemplate();
-        String content = resolveTemplatePlaceholders(template, reviewTarget);
+    private void generateTaskMd(Path arenaDir) throws IOException {
+        TemplateContext context = TemplateContext.forTask();
+        String content = templateLoader.render(TASK_TEMPLATE, context);
         Files.writeString(arenaDir.resolve("task.md"), content, StandardCharsets.UTF_8);
     }
 
-    private String loadTemplate() {
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(TASK_TEMPLATE_PATH)) {
-            if (is == null) {
-                throw new WorkspaceException("Template not found: " + TASK_TEMPLATE_PATH);
-            }
-            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to load template: " + TASK_TEMPLATE_PATH, e);
-        }
-    }
+    private void generateAllRoundPrompts(Path arenaDir) throws IOException {
+        Path promptsDir = arenaDir.resolve("prompts");
+        Files.createDirectories(promptsDir);
 
-    private String resolveTemplatePlaceholders(String template, String reviewTarget) {
-        // For now, we just copy the template as-is since the current task.md
-        // doesn't have placeholders. Future enhancement: add placeholder resolution.
-        // Placeholders like {{review_target}}, {{file_count}} would be resolved here.
-        return template;
+        // Get task.md content to prepend to each round prompt
+        String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask());
+
+        // Generate prompt for each round (0 through maxRounds)
+        for (int round = 0; round <= config.maxRounds(); round++) {
+            String allReviewsPath = (round == 0) ? null
+                    : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
+
+            TemplateContext ctx = TemplateContext.forRound(round, allReviewsPath);
+            String roundContent = templateLoader.render("round-" + round + ".md", ctx);
+
+            // Combine task + round into a complete standalone prompt
+            String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
+
+            Files.writeString(promptsDir.resolve("round-" + round + ".md"),
+                    fullPrompt, StandardCharsets.UTF_8);
+        }
     }
 
     private void deleteRecursively(Path path) throws IOException {

@@ -193,15 +193,16 @@ public class ReviewArenaCli implements Callable<Integer> {
             }
         }
 
-        // Build review target string for display/templates
-        String reviewTarget = buildReviewTargetString(staged, ref1, ref2);
+        // Build review target string for display
+        String reviewTargetStr = buildReviewTargetString(staged, ref1, ref2);
 
         // Initialize workspace
         Path projectRoot = Path.of("").toAbsolutePath();
         WorkspaceManager workspaceManager = workspaceManagerFactory.apply(projectRoot, config);
-        Path arenaDir = workspaceManager.initialize(reviewTarget);
+        Path arenaDir = workspaceManager.initialize();
 
         log.info("Workspace initialized: {}", arenaDir);
+        log.info("Review target: {}", reviewTargetStr);
 
         // TODO: Start tournament with config
         return 0;

@@ -1,8 +1,8 @@
-This is Round 1 of a multi-round code review arena.
+This is Round ${roundNumber} of a multi-round code review arena.
 
 You are given:
 - the original code under review
-- a file containing reviews from other agents (all_reviews.md)
+- a file containing reviews from other agents: `${allReviewsPath}`
 
 Your task:
 1. Read all competing reviews carefully.
@@ -21,5 +21,4 @@ Important:
 - Do NOT argue defensively.
 - Act as if you want the best possible review to exist, regardless of authorship.
 
-Write a complete, standalone review to `review.md`
-using the same structure as before.
+Write a complete, standalone review using the same structure as before.

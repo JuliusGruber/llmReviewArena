@@ -1,6 +1,8 @@
-This is Round 4.
+This is Round ${roundNumber}.
 
-Reviews are nearly converged. Your task:
+Reviews are nearly converged. Previous reviews available at: `${allReviewsPath}`
+
+Your task:
 - Identify and merge any remaining duplicate issues
 - Finalize severity levels (critical vs medium vs low)
 - Ensure each issue has concrete evidence and a clear fix
@@ -8,4 +10,4 @@ Reviews are nearly converged. Your task:
 
 Produce a clean, consolidated review.
 
-Write to `review.md`.
+Write a clean, consolidated review.
