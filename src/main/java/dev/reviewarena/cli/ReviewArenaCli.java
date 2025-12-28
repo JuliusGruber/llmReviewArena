@@ -112,7 +112,9 @@ public class ReviewArenaCli implements Callable<Integer> {
     //==========================================================================
 
     public static void main(String[] args) {
-        int exitCode = new CommandLine(new ReviewArenaCli()).execute(args);
+        int exitCode = new CommandLine(new ReviewArenaCli())
+            .setExecutionExceptionHandler(new ExceptionHandler())
+            .execute(args);
         System.exit(exitCode);
     }
 
