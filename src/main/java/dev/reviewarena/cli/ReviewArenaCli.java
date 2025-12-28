@@ -1,7 +1,9 @@
 package dev.reviewarena.cli;
 
+import dev.reviewarena.config.ArenaConfig;
+import dev.reviewarena.config.ConfigLoader;
+import dev.reviewarena.config.ConfigLoader.CliOverrides;
 import dev.reviewarena.git.GitService;
-import dev.reviewarena.git.GitValidationException;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
@@ -111,16 +113,24 @@ public class ReviewArenaCli implements Callable<Integer> {
     private boolean dryRun;
 
     //==========================================================================
-    // GitService factory (package-private for testing)
+    // Service factories (package-private for testing)
     //==========================================================================
 
     private Supplier<GitService> gitServiceFactory = GitService::new;
+    private ConfigLoader configLoader = new ConfigLoader();
 
     /**
      * Sets a custom GitService factory. Package-private for testing.
      */
     void setGitServiceFactory(Supplier<GitService> factory) {
         this.gitServiceFactory = factory;
+    }
+
+    /**
+     * Sets a custom ConfigLoader. Package-private for testing.
+     */
+    void setConfigLoader(ConfigLoader loader) {
+        this.configLoader = loader;
     }
 
     //==========================================================================
@@ -146,9 +156,13 @@ public class ReviewArenaCli implements Callable<Integer> {
         // Resolve execution mode
         int effectiveConcurrency = resolveExecutionMode();
 
+        // Load configuration with CLI overrides
+        CliOverrides overrides = buildCliOverrides(effectiveConcurrency);
+        ArenaConfig config = configLoader.load(configFile, overrides);
+
         // Handle dry-run mode (skip git validation)
         if (dryRun) {
-            printDryRunSummary(staged, ref1, ref2, effectiveConcurrency);
+            printDryRunSummary(staged, ref1, ref2, config);
             return 0;
         }
 
@@ -165,8 +179,19 @@ public class ReviewArenaCli implements Callable<Integer> {
             }
         }
 
-        // TODO: Start tournament
+        // TODO: Start tournament with config
         return 0;
+    }
+
+    private CliOverrides buildCliOverrides(int effectiveConcurrency) {
+        // Only override if CLI value differs from default
+        Integer roundsOverride = maxRounds != ArenaConfig.DEFAULT_MAX_ROUNDS ? maxRounds : null;
+        Integer concurrentOverride = effectiveConcurrency != ArenaConfig.DEFAULT_MAX_CONCURRENT
+                                     ? effectiveConcurrency : null;
+        Path outputOverride = !outputDir.equals(Path.of(ArenaConfig.DEFAULT_OUTPUT_DIR))
+                              ? outputDir : null;
+
+        return new CliOverrides(roundsOverride, concurrentOverride, outputOverride);
     }
 
     private int resolveExecutionMode() {
@@ -177,13 +202,23 @@ public class ReviewArenaCli implements Callable<Integer> {
         return maxConcurrent;
     }
 
-    private void printDryRunSummary(boolean staged, String ref1, String ref2, int concurrency) {
+    private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaConfig config) {
         System.out.println("Dry run - would execute:");
         System.out.println("  Review target: " + (staged ? "--staged" : ref1 + (ref2 != null ? ".." + ref2 : "")));
         System.out.println("  Config file: " + configFile);
-        System.out.println("  Output directory: " + outputDir);
-        System.out.println("  Max rounds: " + maxRounds);
-        System.out.println("  Concurrency: " + (concurrency == 0 ? "unlimited" : concurrency));
+        System.out.println();
+        System.out.println("Effective configuration:");
+        System.out.println("  Output directory: " + config.outputDir());
+        System.out.println("  Max rounds: " + config.maxRounds());
+        System.out.println("  Concurrency: " + (config.maxConcurrent() == 0 ? "unlimited" : config.maxConcurrent()));
+        System.out.println("  Agent timeout: " + config.agentTimeoutMs() + "ms");
+        System.out.println("  On timeout: " + config.onTimeout());
+        System.out.println();
+        System.out.println("Agents (" + config.agents().size() + " configured):");
+        config.agents().forEach((name, agent) -> {
+            String status = agent.enabled() ? "enabled" : "disabled";
+            System.out.println("  - " + name + " (" + status + "): " + String.join(" ", agent.command()));
+        });
     }
 
     //==========================================================================
