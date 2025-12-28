@@ -1,0 +1,51 @@
+# Review Arena - Default Configuration
+# These values are used when not overridden by arena.yaml or CLI arguments
+
+limits:
+  max-rounds: 5
+  max-output-size-kb: 500
+
+execution:
+  max-concurrent: 0  # 0 = unlimited
+
+timeouts:
+  agent-timeout-ms: 300000    # 5 minutes
+  round-timeout-ms: 900000    # 15 minutes
+  grace-period-ms: 5000       # 5 seconds
+  on-timeout: kill-and-skip
+  preserve-partial-output: false
+
+tournament:
+  min-agents: 2
+
+output:
+  dir: .arena
+
+# Default agents (can be overridden in arena.yaml)
+agents:
+  claude:
+    command:
+      - claude
+      - -p
+      - "@prompt.md"
+    flags:
+      auto-approve: true
+    enabled: true
+
+  codex:
+    command:
+      - codex
+      - exec
+      - "@prompt.md"
+    flags:
+      auto-approve: true
+    enabled: true
+
+  gemini:
+    command:
+      - gemini
+      - -p
+      - "@prompt.md"
+    flags:
+      auto-approve: true
+    enabled: true
