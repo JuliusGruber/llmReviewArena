@@ -13,13 +13,14 @@ This document outlines the next development priorities based on analysis of rece
 | **Dry-run Mode** | Integrated in `ReviewArenaCli.java` | Complete |
 | **CLI Tests** | `CommitHashConverterTest.java`, `ReviewArenaCliTest.java`, `ReviewArenaCliIT.java` | Complete |
 | **Maven Project** | `pom.xml` with all dependencies, fat JAR config | Complete |
+| **GitService (JGit)** | `GitService.java`, `GitServiceTest.java` | Complete |
+| **InputValidator** | `InputValidator.java`, `InputValidatorTest.java` | Complete |
+| **CLI + GitService Integration** | `ReviewArenaCli.call()` uses GitService | Complete |
 
 ### Not Implemented ❌
 
 | Component | Planned In | Status |
 |-----------|-----------|--------|
-| **GitService (JGit)** | startup-validation-plan.md | Not started |
-| **InputValidator** | startup-validation-plan.md | Not started |
 | **ArenaConfig** | implementation-decisions.md | Not started |
 | **ConfigLoader** | implementation-decisions.md | Not started |
 | **WorkspaceManager** | spec.md | Not started |
@@ -35,28 +36,28 @@ This document outlines the next development priorities based on analysis of rece
 
 **Goal:** Complete the foundation layer so the CLI can validate inputs, load configuration, and prepare the workspace before agent execution.
 
-### 1.1 GitService + Startup Validation
+### 1.1 GitService + Startup Validation ✅ COMPLETE
 
 Implements the startup validation flow from `startup-validation-plan.md`.
 
 ```
 src/main/java/dev/reviewarena/git/
-├── GitService.java              # JGit operations (new)
-├── GitValidationException.java  # Already exists
-└── InputValidator.java          # Argument validation (new)
+├── GitService.java              # JGit operations ✅
+├── GitValidationException.java  # Already exists ✅
+└── InputValidator.java          # Argument validation ✅
 ```
 
-**GitService responsibilities:**
+**GitService responsibilities:** ✅
 - Open and validate git repository
 - Validate commit hashes exist (full or abbreviated)
 - Validate ancestry for commit ranges
 
-**InputValidator responsibilities:**
+**InputValidator responsibilities:** ✅
 - Mutual exclusivity check (`--staged` vs commits)
 - Input presence check (at least one required)
 - Hash format validation (7-40 hex chars)
 
-**Integration point:** Called from `ReviewArenaCli.call()` before any other work.
+**Integration point:** ✅ Called from `ReviewArenaCli.call()` before any other work.
 
 ### 1.2 Configuration Layer
 
@@ -193,18 +194,18 @@ src/main/java/dev/reviewarena/tournament/
 
 ## Implementation Order
 
-| Order | Component | Dependencies |
-|-------|-----------|--------------|
-| 1 | GitService + InputValidator | None |
-| 2 | ArenaConfig + ConfigLoader | None |
-| 3 | application.yaml + logback.xml | None |
-| 4 | Prompt templates | None |
-| 5 | WorkspaceManager | ArenaConfig |
-| 6 | TemplateLoader | Prompt templates |
-| 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager |
-| 8 | AgentProcess + AgentExecutor | WorkspaceManager |
-| 9 | TournamentOrchestrator | AgentExecutor, TemplateLoader |
-| 10 | ReviewAggregator | TournamentOrchestrator |
+| Order | Component | Dependencies | Status |
+|-------|-----------|--------------|--------|
+| 1 | GitService + InputValidator | None | ✅ Done |
+| 2 | ArenaConfig + ConfigLoader | None | |
+| 3 | application.yaml + logback.xml | None | |
+| 4 | Prompt templates | None | |
+| 5 | WorkspaceManager | ArenaConfig | |
+| 6 | TemplateLoader | Prompt templates | |
+| 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Partial (GitService done) |
+| 8 | AgentProcess + AgentExecutor | WorkspaceManager | |
+| 9 | TournamentOrchestrator | AgentExecutor, TemplateLoader | |
+| 10 | ReviewAggregator | TournamentOrchestrator | |
 
 ---
 
@@ -212,7 +213,7 @@ src/main/java/dev/reviewarena/tournament/
 
 ### Milestone 1 Tests
 
-**GitService tests:**
+**GitService tests:** ✅ Complete (`GitServiceTest.java`)
 - `testIsInsideGitRepo_success`
 - `testIsInsideGitRepo_notARepo`
 - `testValidateCommitExists_fullHash`
@@ -221,7 +222,7 @@ src/main/java/dev/reviewarena/tournament/
 - `testValidateAncestry_valid`
 - `testValidateAncestry_invalid`
 
-**InputValidator tests:**
+**InputValidator tests:** ✅ Complete (`InputValidatorTest.java`)
 - `testMutualExclusivity_stagedAndCommit_throws`
 - `testMutualExclusivity_stagedOnly_passes`
 - `testHashFormat_valid`
@@ -257,9 +258,9 @@ src/main/java/dev/reviewarena/tournament/
 ## Success Criteria
 
 ### Milestone 1 Complete When:
-- [ ] `review-arena abc1234` validates commit exists
-- [ ] `review-arena --staged` validates staged mode
-- [ ] Invalid commits produce exit code 3
+- [x] `review-arena abc1234` validates commit exists
+- [x] `review-arena --staged` validates staged mode
+- [x] Invalid commits produce exit code 3
 - [ ] `arena.yaml` is loaded and merged with CLI args
 - [ ] `.arena/` directory structure is created
 - [ ] `task.md` is generated with placeholders resolved
