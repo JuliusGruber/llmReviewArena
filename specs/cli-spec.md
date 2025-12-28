@@ -125,9 +125,12 @@ Reviewing: abc1234..def5678 (15 files changed)
 
 | Error | Behavior |
 |-------|----------|
-| Invalid git reference | Clear error with suggestion (e.g., "Did you mean 'main'?") |
-| No git repository | Prompt to run from a git repository or specify path |
-| Agent not installed | List missing agents with install instructions |
+| Invalid git reference | `Error: Commit <hash> not found` |
+| Invalid hash format | `Error: Invalid commit hash format: <ref>` |
+| No git repository | `Error: Not a git repository` |
+| Agent not installed | `Error: Agent '<name>' not found` |
+
+Error messages are minimal and direct. Exit codes provide machine-readable status (see [Exit Codes](#exit-codes)).
 
 ## Integration with Config File
 

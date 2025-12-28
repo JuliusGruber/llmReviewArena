@@ -17,7 +17,7 @@ When the user starts the CLI tool, it must validate:
 | Git interaction | JGit library | Clean Java API, better error handling, no subprocess overhead |
 | Accepted ref types | Commit hashes only | Full (40 char) or abbreviated (7+ char) SHAs. Strict and predictable |
 | `--staged` + commits | Mutually exclusive error | Clear contract, exit code 2 |
-| Validation order | Repo → Mutual excl → Args → Commits | Most granular, fail-fast |
+| Validation order | Repo → Mutual excl → Args → Hash format → Commits → Ancestry | Most granular, fail-fast |
 | Error verbosity | Minimal | Short, direct messages |
 | Code location | `GitService` in `dev.reviewarena.git` | Reusable for future git operations |
 | Two-commit range | Validate ancestry | ref1 must be reachable from ref2 |
@@ -53,6 +53,15 @@ When the user starts the CLI tool, it must validate:
                       ▼
                  ┌────────────────────────┐
                  │ If commits provided:   │
+                 │ Valid hash format?     │
+                 │ (7-40 hex chars)       │
+                 └────────────────────────┘
+                      │            │
+                    YES           NO
+                      │            └──────► Exit 2: "Error: Invalid commit hash format: <ref>"
+                      ▼
+                 ┌────────────────────────┐
+                 │ If commits provided:   │
                  │ Do they exist?         │
                  └────────────────────────┘
                       │            │
@@ -78,8 +87,8 @@ When the user starts the CLI tool, it must validate:
 
 | Code | Meaning | When Used |
 |------|---------|-----------|
-| 2 | Usage error | Missing args, mutual exclusivity violation |
-| 3 | Git error | Not a repo, commit not found, invalid range |
+| 2 | Usage error | Missing args, mutual exclusivity violation, invalid hash format |
+| 3 | Git error | Not a repo, commit not found, invalid ancestry |
 
 ## Implementation Steps
 

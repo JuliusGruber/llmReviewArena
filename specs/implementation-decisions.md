@@ -137,6 +137,7 @@ int maxRounds = config.getValue("limits.max-rounds", Integer.class);
 dev.reviewarena
 ├── cli          # CLI entry point, argument parsing (picocli)
 ├── config       # Configuration loading, YAML parsing, defaults
+├── git          # Git operations (JGit), startup validation
 ├── agent        # AgentProcess, AgentExecutor, process management
 ├── tournament   # Round execution, cross-pollination logic
 ├── io           # File operations, template loading, output writing
@@ -159,7 +160,7 @@ Maps directly to exit codes:
 ```
 ArenaException (exit 1 - general error)
 ├── UsageException (exit 2 - invalid arguments)
-├── GitException (exit 3 - git errors)
+├── GitValidationException (exit 3 - git errors)
 ├── AgentException (exit 4 - agent failures)
 └── ConfigException (exit 5 - config errors)
 ```
@@ -194,8 +195,10 @@ ArenaException (exit 1 - general error)
 
 | Scenario | Behavior |
 |----------|----------|
-| Validate git refs | Yes - basic validation with `git rev-parse` before starting |
+| Git library | JGit - clean Java API, better error handling, no subprocess overhead |
+| Validate git refs | Yes - validate commit hashes exist using JGit before starting |
 | Not in git repository | Error immediately with exit code 3 |
+| Ref types accepted | Commit hashes only (7-40 hex chars) |
 
 ## Agent Output Handling
 
@@ -258,7 +261,7 @@ ArenaException (exit 1 - general error)
 | What if arena.yaml missing? | Warn, use defaults |
 | What if .arena/ exists? | Clear and recreate |
 | What if output too large? | Warn but keep full |
-| Validate git refs? | Yes, basic validation |
+| Validate git refs? | Yes, via JGit (commit hashes only) |
 | Order in all_reviews.md? | Alphabetical |
 | Keep temp files? | Yes, for debugging |
 | Progress output? | Logger only (INFO+) |

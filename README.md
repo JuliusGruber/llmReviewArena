@@ -85,7 +85,6 @@ This keeps complexity linear while maximizing cross-pollination.
 ```
 .arena/
 ├── task.md                    # Task definition, rubric, and constraints
-├── target/                    # Code under review
 ├── rounds/
 │   ├── round-0/
 │   │   ├── claude/
