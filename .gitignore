@@ -12,3 +12,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Arena output
+.arena/
