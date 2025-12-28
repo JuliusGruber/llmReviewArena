@@ -1,5 +1,7 @@
 package dev.reviewarena.cli;
 
+import dev.reviewarena.git.GitService;
+import dev.reviewarena.git.GitValidationException;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
@@ -8,6 +10,7 @@ import picocli.CommandLine.Parameters;
 
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
 /**
  * Main CLI entry point for the Review Arena.
@@ -108,6 +111,19 @@ public class ReviewArenaCli implements Callable<Integer> {
     private boolean dryRun;
 
     //==========================================================================
+    // GitService factory (package-private for testing)
+    //==========================================================================
+
+    private Supplier<GitService> gitServiceFactory = GitService::new;
+
+    /**
+     * Sets a custom GitService factory. Package-private for testing.
+     */
+    void setGitServiceFactory(Supplier<GitService> factory) {
+        this.gitServiceFactory = factory;
+    }
+
+    //==========================================================================
     // Main Entry Point
     //==========================================================================
 
@@ -126,6 +142,19 @@ public class ReviewArenaCli implements Callable<Integer> {
                       ? reviewTarget.commitRefs.ref1 : null;
         String ref2 = (reviewTarget != null && reviewTarget.commitRefs != null)
                       ? reviewTarget.commitRefs.ref2 : null;
+
+        // Validate git repository and commits
+        try (GitService gitService = gitServiceFactory.get()) {
+            if (ref1 != null) {
+                gitService.validateCommitExists(ref1);
+            }
+            if (ref2 != null) {
+                gitService.validateCommitExists(ref2);
+            }
+            if (ref1 != null && ref2 != null) {
+                gitService.validateAncestry(ref1, ref2);
+            }
+        }
 
         // Resolve execution mode
         int effectiveConcurrency = resolveExecutionMode();

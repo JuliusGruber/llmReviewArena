@@ -23,6 +23,8 @@ class ReviewArenaCliTest {
     @BeforeEach
     void setUp() {
         cli = new ReviewArenaCli();
+        // Use mock GitService to avoid needing real git repository/commits
+        cli.setGitServiceFactory(MockGitService::new);
         commandLine = new CommandLine(cli);
     }
 
