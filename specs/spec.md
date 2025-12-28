@@ -858,30 +858,24 @@ See [Implementation Decisions](implementation-decisions.md#configuration-with-mi
 
 ### task.md Generation
 
-The `task.md` file is **fully templated** with placeholders that are substituted at runtime:
+The `task.md` file contains the **global invariants** (rubric, constraints, output contract) and is copied as-is during workspace initialization. It does not contain placeholders—review target information is passed via round-specific prompts.
 
-```markdown
-# Code Review Arena – Task
+### Round Prompt Placeholders
 
-## Review Target
-{{review_target}}
-
-## Files Changed
-{{file_count}} files changed
-
-## Goal
-...
-```
+Round prompts (`round-0.md`, `round-1.md`, etc.) are templated with placeholders that are substituted at prompt generation time:
 
 **Available placeholders:**
 
-| Placeholder | Description |
-|-------------|-------------|
-| `{{review_target}}` | Git range (e.g., `abc1234`, `abc1234..def5678`, or `--staged`) |
-| `{{file_count}}` | Number of files changed |
-| `{{round_number}}` | Current round (0-indexed) |
-| `{{agent_name}}` | Name of the current agent |
-| `{{output_path}}` | Path where agent should write output |
+| Placeholder | Description | Used In |
+|-------------|-------------|---------|
+| `${roundNumber}` | Current round (0-indexed) | Round prompts |
+| `${outputPath}` | Path where agent should write output | Round prompts |
+| `${allReviewsPath}` | Path to combined reviews from previous round (null for round 0) | Round 1+ prompts |
+| `${commit1}` | First commit hash (empty if `--staged`) | Round prompts |
+| `${commit2}` | Second commit hash for ranges (empty for single commit or `--staged`) | Round prompts |
+| `${stagedFlag}` | The staged flag value (`--staged` or empty) | Round prompts |
+
+> **Note:** Placeholders use FreeMarker syntax (`${name}`) and are substituted at prompt generation time.
 
 ### Prompt Construction
 
