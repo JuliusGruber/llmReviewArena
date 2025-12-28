@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Required Reading
+- Always read `specs/spec.md` before implementing features - this is the main project specification
+- Always read `specs/flow-diagram.md` to understand the application flow
+
 ## Shell Environment
 - Running on Windows with bash shell (Git Bash/WSL)
 - Use Unix-style paths and commands, not Windows CMD syntax
