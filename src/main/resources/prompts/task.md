@@ -2,6 +2,9 @@
 
 You are participating in a multi-round code review arena.
 
+## Review Target
+${reviewTarget}
+
 ## Goal
 Produce the highest-quality, most useful code review possible.
 
