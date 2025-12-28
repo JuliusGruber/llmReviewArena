@@ -4,6 +4,7 @@ import dev.reviewarena.config.ArenaConfig;
 import dev.reviewarena.config.ConfigLoader;
 import dev.reviewarena.config.ConfigLoader.CliOverrides;
 import dev.reviewarena.git.GitService;
+import dev.reviewarena.io.WorkspaceManager;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
@@ -118,6 +119,8 @@ public class ReviewArenaCli implements Callable<Integer> {
 
     private Supplier<GitService> gitServiceFactory = GitService::new;
     private ConfigLoader configLoader = new ConfigLoader();
+    private java.util.function.BiFunction<Path, ArenaConfig, WorkspaceManager> workspaceManagerFactory =
+            WorkspaceManager::new;
 
     /**
      * Sets a custom GitService factory. Package-private for testing.
@@ -131,6 +134,13 @@ public class ReviewArenaCli implements Callable<Integer> {
      */
     void setConfigLoader(ConfigLoader loader) {
         this.configLoader = loader;
+    }
+
+    /**
+     * Sets a custom WorkspaceManager factory. Package-private for testing.
+     */
+    void setWorkspaceManagerFactory(java.util.function.BiFunction<Path, ArenaConfig, WorkspaceManager> factory) {
+        this.workspaceManagerFactory = factory;
     }
 
     //==========================================================================
@@ -179,8 +189,28 @@ public class ReviewArenaCli implements Callable<Integer> {
             }
         }
 
+        // Build review target string for display/templates
+        String reviewTarget = buildReviewTargetString(staged, ref1, ref2);
+
+        // Initialize workspace
+        Path projectRoot = Path.of("").toAbsolutePath();
+        WorkspaceManager workspaceManager = workspaceManagerFactory.apply(projectRoot, config);
+        Path arenaDir = workspaceManager.initialize(reviewTarget);
+
+        System.out.println("Workspace initialized: " + arenaDir);
+
         // TODO: Start tournament with config
         return 0;
+    }
+
+    private String buildReviewTargetString(boolean staged, String ref1, String ref2) {
+        if (staged) {
+            return "--staged";
+        } else if (ref2 != null) {
+            return ref1 + ".." + ref2;
+        } else {
+            return ref1;
+        }
     }
 
     private CliOverrides buildCliOverrides(int effectiveConcurrency) {
