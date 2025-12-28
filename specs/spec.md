@@ -63,8 +63,8 @@ agents:
   claude:
     command: ["claude", "-p", "@prompt.md"]
     flags:
-      auto_approve: true              # Adds --dangerously-skip-permissions
-      allowed_tools:                  # Adds --allowedTools
+      auto-approve: true              # Adds --dangerously-skip-permissions
+      allowed-tools:                  # Adds --allowedTools
         - Read
         - Write
         - Edit
@@ -75,12 +75,12 @@ agents:
   codex:
     command: ["codex", "exec", "@prompt.md"]
     flags:
-      auto_approve: true              # Adds --full-auto
+      auto-approve: true              # Adds --full-auto
 
   gemini:
     command: ["gemini", "-p", "@prompt.md"]
     flags:
-      auto_approve: true              # Adds --yolo
+      auto-approve: true              # Adds --yolo
 ```
 
 > **Note:** Prompts are passed via file reference (`@prompt.md`) for robustness with large or complex prompts. The orchestrator writes the prompt to a temporary file before invoking each agent.
@@ -93,32 +93,19 @@ The `flags` section provides a portable, CLI-agnostic way to configure agent beh
 
 | Config Flag | Claude CLI | Codex CLI | Gemini CLI |
 |-------------|------------|-----------|------------|
-| `auto_approve: true` | `--dangerously-skip-permissions` | `--full-auto` | `--yolo` |
-| `allowed_tools: [...]` | `--allowedTools <list>` | N/A | N/A |
+| `auto-approve: true` | `--dangerously-skip-permissions` | `--full-auto` | `--yolo` |
+| `allowed-tools: [...]` | `--allowedTools <list>` | N/A | N/A |
 
 #### Mandatory vs Optional Flags
 
 | Flag | Required? | Rationale |
 |------|-----------|-----------|
-| `auto_approve` | **Yes** | Agents must run non-interactively without prompts |
-| `allowed_tools` | No | Optional security restriction (Claude only) |
+| `auto-approve` | **Yes** | Agents must run non-interactively without prompts |
+| `allowed-tools` | No | Optional security restriction (Claude only) |
 
 **Default behavior:** If `flags` is omitted, the orchestrator uses safe defaults:
-- `auto_approve: true` (required for non-interactive execution)
-- `allowed_tools`: unrestricted (agent uses all available tools)
-
-#### Direct Flag Passthrough
-
-For advanced use cases, raw CLI flags can be appended directly:
-
-```yaml
-agents:
-  claude:
-    command: ["claude", "-p", "@prompt.md"]
-    flags:
-      auto_approve: true
-    raw_flags: ["--verbose", "--max-turns", "50"]  # Passed directly to CLI
-```
+- `auto-approve: true` (required for non-interactive execution)
+- `allowed-tools`: unrestricted (agent uses all available tools)
 
 ### Design Benefits
 
@@ -162,7 +149,7 @@ Results are semantically identical regardless of execution order within a round.
 
 ```yaml
 execution:
-  max_concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
+  max-concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
 ```
 
 > **Note:** Higher concurrency increases resource usage (memory, API rate limits). Use bounded or sequential execution when running agents that share rate-limited backends.
@@ -175,8 +162,8 @@ The arena enforces limits on agent outputs to prevent runaway processes:
 
 ```yaml
 limits:
-  max_output_size_kb: 500    # Maximum size per output file (e.g., review.md)
-  max_rounds: 5              # Number of cross-pollination rounds after Round 0 (default: 5)
+  max-output-size-kb: 500    # Maximum size per output file (e.g., review.md)
+  max-rounds: 5              # Number of cross-pollination rounds after Round 0 (default: 5)
 ```
 
 #### Round Counting (0-indexed)
@@ -188,10 +175,10 @@ Rounds are **always 0-indexed**, both internally and in user-facing output:
 | Round 0 | Independent | Each agent reviews code independently, no cross-pollination |
 | Round 1-N | Cross-pollination | Agents see all previous reviews and improve |
 
-**`max_rounds` semantics:**
-- `max_rounds: 5` means 5 cross-pollination rounds (Rounds 1-5) after Round 0
-- Total rounds executed = Round 0 + `max_rounds` cross-pollination rounds
-- Example: `max_rounds: 5` → Rounds 0, 1, 2, 3, 4, 5 (6 total rounds)
+**`max-rounds` semantics:**
+- `max-rounds: 5` means 5 cross-pollination rounds (Rounds 1-5) after Round 0
+- Total rounds executed = Round 0 + `max-rounds` cross-pollination rounds
+- Example: `max-rounds: 5` → Rounds 0, 1, 2, 3, 4, 5 (6 total rounds)
 
 Progress output uses 0-indexed display: `Round 0/5`, `Round 1/5`, ..., `Round 5/5`
 
@@ -205,36 +192,30 @@ The arena enforces time limits on agent processes to prevent indefinite hangs:
 
 ```yaml
 timeouts:
-  agent_timeout_ms: 300000      # Per-agent process timeout (default: 5 minutes)
-  round_timeout_ms: 900000      # Per-round timeout (default: 15 minutes)
-  grace_period_ms: 5000         # Graceful shutdown window before force kill
-
-  per_agent:                    # Optional per-agent overrides
-    claude: 600000              # 10 minutes (Claude tends to be thorough)
-    codex: 300000
-    gemini: 300000
-
-  on_timeout: "kill_and_skip"   # kill_and_skip | kill_and_abort
-  preserve_partial_output: false # If true, keep incomplete output with warning
+  agent-timeout-ms: 300000      # Per-agent process timeout (default: 5 minutes)
+  round-timeout-ms: 900000      # Per-round timeout (default: 15 minutes)
+  grace-period-ms: 5000         # Graceful shutdown window before force kill
+  on-timeout: "kill-and-skip"   # kill-and-skip | kill-and-abort
+  preserve-partial-output: false # If true, keep incomplete output with warning
 ```
 
-> **Default Rationale:** 5 minutes allows thorough review of ~1000 LOC diffs. Complex reviews may need longer; use `per_agent` overrides as needed.
+> **Default Rationale:** 5 minutes allows thorough review of ~1000 LOC diffs.
 
 **Timeout Behavior:**
 
 | Timeout Type | Trigger | Action |
 |--------------|---------|--------|
-| Agent timeout | Single agent exceeds `agent_timeout_ms` | Request graceful termination → wait `grace_period_ms` → force kill, exclude from round |
-| Round timeout | Round exceeds `round_timeout_ms` | Kill all running agents, proceed with completed outputs |
+| Agent timeout | Single agent exceeds `agent-timeout-ms` | Request graceful termination → wait `grace-period-ms` → force kill, exclude from round |
+| Round timeout | Round exceeds `round-timeout-ms` | Kill all running agents, proceed with completed outputs |
 
 **Timeout Actions:**
 
 | Action | Behavior |
 |--------|----------|
-| `kill_and_skip` | Terminate agent, exclude from round, continue tournament |
-| `kill_and_abort` | Terminate agent, abort entire tournament |
+| `kill-and-skip` | Terminate agent, exclude from round, continue tournament |
+| `kill-and-abort` | Terminate agent, abort entire tournament |
 
-Partial output from timed-out agents is discarded by default. Set `preserve_partial_output: true` to keep incomplete reviews (marked with a `[TIMEOUT: incomplete]` warning header).
+Partial output from timed-out agents is discarded by default. Set `preserve-partial-output: true` to keep incomplete reviews (marked with a `[TIMEOUT: incomplete]` warning header).
 
 ### Output Validation
 
@@ -244,7 +225,7 @@ The orchestrator validates agent output after each round:
 |-------|---------------------|
 | Output file exists (`review.md`) | Agent excluded from round, warning logged |
 | File is non-empty | Agent excluded from round, warning logged |
-| File within size limit | Truncated to limit, warning logged |
+| File exceeds size limit | Warning logged, full content kept (no truncation) |
 | Agent completes within timeout | Agent killed, excluded from round, warning logged |
 
 
@@ -267,7 +248,7 @@ When an agent fails during a round (crash, timeout, or invalid output), the orch
 | Failure | Detection | Logged Message |
 |---------|-----------|----------------|
 | Process crash | Non-zero exit code or unexpected termination | `[ERROR] Agent '<name>' crashed in round <N>: <exit_code/signal>` |
-| Timeout | Exceeds `agent_timeout_ms` | `[ERROR] Agent '<name>' timed out in round <N> after <ms>ms` |
+| Timeout | Exceeds `agent-timeout-ms` | `[ERROR] Agent '<name>' timed out in round <N> after <ms>ms` |
 | Invalid output | Missing or empty `review.md` | `[ERROR] Agent '<name>' produced invalid output in round <N>: <reason>` |
 
 **Example console output:**
@@ -287,14 +268,14 @@ The arena requires a minimum number of agents to maintain meaningful cross-polli
 
 ```yaml
 tournament:
-  min_agents: 2    # Minimum agents required (default: 2)
+  min-agents: 2    # Minimum agents required (default: 2)
 ```
 
 **Behavior:**
 
 | Condition | Action |
 |-----------|--------|
-| Agents drop below `min_agents` | Tournament aborts with exit code 4 |
+| Agents drop below `min-agents` | Tournament aborts with exit code 4 |
 | Single agent remains (default threshold) | Tournament aborts—no cross-pollination possible |
 | All agents fail in Round 0 | Tournament aborts with exit code 4 |
 
@@ -308,7 +289,7 @@ tournament:
 [ERROR] Tournament requires at least 2 agents, only 1 remaining. Aborting.
 ```
 
-> **Note:** Set `min_agents: 1` to allow single-agent continuation (useful for testing or fallback scenarios), though this disables the cross-pollination benefit.
+> **Note:** Set `min-agents: 1` to allow single-agent continuation (useful for testing or fallback scenarios), though this disables the cross-pollination benefit.
 
 ## Arena Filesystem
 
@@ -526,7 +507,7 @@ Repeat for a fixed number of rounds:
    - Tightens prioritization
    - Adds actionable patches/tests
 
-**Stop when:** Fixed round limit reached (configurable via `max_rounds`, see [Resource Limits](#resource-limits))
+**Stop when:** Fixed round limit reached (configurable via `max-rounds`, see [Resource Limits](#resource-limits))
 
 ### 6) Final Output
 

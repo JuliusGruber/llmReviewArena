@@ -169,13 +169,25 @@ ArenaException (exit 1 - general error)
 
 ### Concurrency Model
 - **Virtual threads** for lightweight agent execution
-- **Semaphore** to enforce `max_concurrent` limit
+- **Semaphore** to enforce `max-concurrent` limit
 - Each agent runs in its own virtual thread
 
 ### Process Termination (Timeout Handling)
 1. Call `process.destroy()` (graceful termination request)
-2. Wait `grace_period_ms` (default 5000ms)
+2. Wait `grace-period-ms` (default 5000ms)
 3. Call `process.destroyForcibly()` if still running
+
+### Timeout Behavior
+| Decision | Choice |
+|----------|--------|
+| Default timeout action | `kill-and-skip` - terminate agent, exclude from round, continue tournament |
+| Preserve partial output | `false` - discard incomplete output from timed-out agents |
+| Per-agent timeout overrides | Not supported - all agents use `agent-timeout-ms` |
+
+### Tournament Constraints
+| Decision | Choice |
+|----------|--------|
+| Minimum agents | 2 - tournament aborts if fewer remain (cross-pollination requires 2+) |
 
 ### stdout/stderr Handling
 - **Drain to logs:** Capture in background threads, log at DEBUG level
@@ -260,7 +272,7 @@ ArenaException (exit 1 - general error)
 | How to terminate timed-out agents? | destroy() → wait → destroyForcibly() |
 | What if arena.yaml missing? | Warn, use defaults |
 | What if .arena/ exists? | Clear and recreate |
-| What if output too large? | Warn but keep full |
+| What if output too large? | Warn but keep full (no truncation) |
 | Validate git refs? | Yes, via JGit (commit hashes only) |
 | Order in all_reviews.md? | Alphabetical |
 | Keep temp files? | Yes, for debugging |
@@ -277,3 +289,9 @@ ArenaException (exit 1 - general error)
 | Package structure? | By layer |
 | Maven groupId? | dev.reviewarena |
 | Launcher scripts? | Unix + Windows |
+| Timeout action? | kill-and-skip (continue tournament) |
+| Preserve partial output? | No (discard on timeout) |
+| Minimum agents? | 2 (required for cross-pollination) |
+| Per-agent timeout overrides? | No (single timeout for all) |
+| Raw CLI flag passthrough? | No (use structured flags only) |
+| YAML key naming convention? | kebab-case |

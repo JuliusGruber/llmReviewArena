@@ -119,7 +119,7 @@ Reviewing: abc1234..def5678 (15 files changed)
   Summary: 3 critical issues, 7 suggestions, 2 questions
 ```
 
-**Format:** `[Round X/N]` where X is the current round (0-indexed) and N is `max_rounds`.
+**Format:** `[Round X/N]` where X is the current round (0-indexed) and N is `max-rounds`.
 
 ## Error Handling
 
