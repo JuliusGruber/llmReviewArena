@@ -26,7 +26,7 @@ agents:
     enabled: true
 
 limits:
-  max-rounds: 1
+  max-rounds: 5
 
 tournament:
   min-agents: 1
