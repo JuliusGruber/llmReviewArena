@@ -17,7 +17,14 @@ This document describes the implementation plan for the Final Synthesis step (Mi
 | Implementation decisions | ✅ Updated | Synthesis decisions added |
 | Edge cases | ✅ Documented | See [Edge Cases](#edge-cases) section |
 | Test coverage | ✅ Planned | Unit + integration tests specified |
+| Template file sync | ✅ Fixed | `final-synth.md` now matches spec |
 | **Ready for implementation** | ✅ **YES** | All prerequisites complete |
+
+### Review History
+
+| Date | Reviewer | Changes |
+|------|----------|---------|
+| 2025-12-29 | Claude Opus 4.5 | Fixed critical sync issue: updated `final-synth.md` template to include tournament metadata placeholders. Fixed test method naming inconsistency. Added import note for WorkspaceManager. |
 
 ## Design Decisions (From User Discussion)
 
@@ -254,8 +261,14 @@ public Map<String, Object> toDataModel() {
 
 **File:** `src/main/java/dev/reviewarena/io/WorkspaceManager.java`
 
-**Step 3a: Add constant for synthesis template:**
+**Step 3a: Add constant and import for synthesis template:**
 
+Add the import if not present:
+```java
+import java.util.stream.Collectors;  // For Collectors.joining() in synthesis
+```
+
+Add constant:
 ```java
 private static final String TASK_TEMPLATE = "task.md";
 private static final String SYNTHESIS_TEMPLATE = "final-synth.md";
@@ -532,7 +545,7 @@ The arena starts the tournament without checking if agents are actually runnable
 |------|---------|---------|
 | `TemplateContextTest.java` | `dev.reviewarena.io` | Add tests for `forSynthesis()` |
 | `WorkspaceManagerTest.java` | `dev.reviewarena.io` | Add tests for `generateSynthesisPrompt()` |
-| `AgentExecutorTest.java` | `dev.reviewarena.agent` | Add tests for `executeSynthesis()`, `selectSynthesizerAgent()` |
+| `AgentExecutorTest.java` | `dev.reviewarena.agent` | Add tests for `executeSynthesis()`, `getSynthesizerAgent()`, `validateSynthesizerAvailable()` |
 | `ReviewArenaCliIT.java` | `dev.reviewarena.cli` | Add integration tests for full tournament with synthesis |
 
 ---
@@ -591,7 +604,7 @@ The arena starts the tournament without checking if agents are actually runnable
 
 The feature is complete when:
 
-- [ ] `final-synth.md` template includes tournament metadata placeholders
+- [x] `final-synth.md` template includes tournament metadata placeholders ✅
 - [ ] `TemplateContext.forSynthesis()` creates valid context with metadata
 - [ ] `WorkspaceManager.generateSynthesisPrompt()` writes to `.arena/rounds/final/prompt.md`
 - [ ] `AgentExecutor.getSynthesizerAgent()` returns Claude (required per spec, no fallback)
@@ -608,10 +621,10 @@ The feature is complete when:
 
 ## Implementation Order
 
-1. Update `final-synth.md` template with metadata placeholders
+1. ~~Update `final-synth.md` template with metadata placeholders~~ ✅ **DONE** (2025-12-29)
 2. Update `TemplateContext` with new fields and `forSynthesis()` factory
 3. Add `generateSynthesisPrompt()` and `getChampionReviewPath()` to `WorkspaceManager`
-4. Add `selectSynthesizerAgent()` and `executeSynthesis()` to `AgentExecutor`
+4. Add `getSynthesizerAgent()`, `validateSynthesizerAvailable()`, and `executeSynthesis()` to `AgentExecutor`
 5. Integrate synthesis into `ReviewArenaCli.call()`
 6. Update dry-run output
 7. Write unit tests
