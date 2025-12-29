@@ -277,14 +277,14 @@ public class ReviewArenaCli implements Callable<Integer> {
             // Aggregate this round's reviews
             Path roundAllReviews = aggregator.aggregateRound(round, roundResults);
             log.info("Round {} complete: {} agents succeeded, aggregated to {}",
-                round, activeAgents.size(), roundAllReviews);
+                round, activeAgents.size(), workspaceManager.relativize(roundAllReviews));
 
             lastCompletedRound = round;
         }
 
         // === TOURNAMENT COMPLETE ===
         Path finalAllReviews = workspaceManager.getRoundDir(lastCompletedRound).resolve("all_reviews.md");
-        log.info("Cross-pollination complete! Final reviews: {}", finalAllReviews);
+        log.info("Cross-pollination complete! Final reviews: {}", workspaceManager.relativize(finalAllReviews));
         log.info("Synthesis step not yet implemented (Milestone 4)");
 
         return 0;

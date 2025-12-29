@@ -132,6 +132,16 @@ public class WorkspaceManager {
     }
 
     /**
+     * Converts an absolute path to a relative path from the project root.
+     *
+     * @param absolutePath the absolute path to convert
+     * @return the relative path string
+     */
+    public String relativize(Path absolutePath) {
+        return projectRoot.relativize(absolutePath).toString().replace('\\', '/');
+    }
+
+    /**
      * Gets the path to the rounds directory.
      *
      * @return the rounds directory path

@@ -50,7 +50,7 @@ public class ReviewAggregator {
         Path roundDir = workspace.getRoundDir(round);
         Path outputFile = roundDir.resolve(ALL_REVIEWS_FILENAME);
 
-        log.info("Aggregating reviews for round {} to {}", round, outputFile);
+        log.info("Aggregating reviews for round {} to {}", round, workspace.relativize(outputFile));
 
         // Filter to successful results and sort alphabetically for determinism
         var successfulResults = results.entrySet().stream()
@@ -82,7 +82,7 @@ public class ReviewAggregator {
 
             Files.writeString(outputFile, combined.toString().strip() + "\n", StandardCharsets.UTF_8);
 
-            log.info("Aggregated {} reviews into {}", successfulResults.size(), outputFile);
+            log.info("Aggregated {} reviews into {}", successfulResults.size(), workspace.relativize(outputFile));
             return outputFile;
 
         } catch (IOException e) {
