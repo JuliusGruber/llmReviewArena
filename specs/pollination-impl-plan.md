@@ -386,7 +386,7 @@ return 0;
 
 ---
 
-### Step 5: Update Dry-Run to Show Full Tournament
+### Step 5: Update Dry-Run to Show Full Tournament ✅ DONE
 
 **File:** `ReviewArenaCli.java` (package: `dev.reviewarena.cli`)
 
