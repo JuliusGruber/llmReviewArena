@@ -6,6 +6,8 @@ This document describes the implementation plan for Rounds 1-N cross-pollination
 
 **Feature Location:** `ReviewArenaCli.java:242-243` (currently marked as TODO)
 
+**Note:** Final synthesis (champion_review.md generation) is deferred to Milestone 4.
+
 ## Current State Analysis
 
 ### What's Already Implemented
@@ -24,14 +26,11 @@ This document describes the implementation plan for Rounds 1-N cross-pollination
 
 ### What's Missing
 
-1. **Synthesizer validation** (early, before Round 0)
-2. **Multi-round loop** (rounds 1 through `maxRounds`)
-3. **Failed agent tracking** across rounds
-4. **Dynamic agent filtering** per round (exclude failed agents)
-5. **Minimum threshold check** after each round
-6. **Final synthesis step** (Claude only)
-7. **ProcessType enum** for distinguishing round vs synthesis execution
-8. **Config validation** for `maxRounds >= 1`
+1. **Multi-round loop** (rounds 1 through `maxRounds`)
+2. **Failed agent tracking** across rounds
+3. **Dynamic agent filtering** per round (exclude failed agents)
+4. **Minimum threshold check** after each round
+5. **Config validation** for `maxRounds >= 1`
 
 ## Implementation Design
 
@@ -39,7 +38,6 @@ This document describes the implementation plan for Rounds 1-N cross-pollination
 
 ```
 Startup:
-  Validate Claude is configured and enabled (fail fast)
   Validate maxRounds >= 1
 
 Round 0:
@@ -56,60 +54,24 @@ Round 1:
 
 ...repeat for rounds 2-N...
 
-Final Synthesis:
-  Generate synthesizer prompt (references last completed round)
-  Execute Claude with final-synth.md prompt
-  Output: .arena/rounds/final/champion_review.md
+Done:
+  Log final all_reviews.md location
+  (Synthesis deferred to Milestone 4)
 ```
 
 ### Key Design Decisions
 
-1. **Early validation**: Validate Claude availability BEFORE Round 0 (fail fast)
-2. **Agent filtering approach**: Create `executeRound(int, Set<String>)` overload to execute specific agents
-3. **Failure tracking**: Use `Set<String> activeAgents` and `retainAll()` after each round
-4. **Early termination**: Abort tournament if `activeAgents.size() < minAgents`
-5. **Process type distinction**: Use `ProcessType` enum (ROUND, SYNTHESIS) instead of magic numbers
-6. **Config constraint**: Require `maxRounds >= 1` (no skipping cross-pollination)
-7. **Result filtering**: `ReviewAggregator` internally filters to successful agents only
-8. **Synthesizer prompt**: Use `TemplateContext` for consistency with other prompts
+1. **Agent filtering approach**: Create `executeRound(int, Set<String>)` overload to execute specific agents
+2. **Failure tracking**: Use `Set<String> activeAgents` and `retainAll()` after each round
+3. **Early termination**: Abort tournament if `activeAgents.size() < minAgents`
+4. **Config constraint**: Require `maxRounds >= 1` (no skipping cross-pollination)
+5. **Result filtering**: `ReviewAggregator` internally filters to successful agents only
 
 ---
 
 ## Implementation Steps
 
-### Step 1: Add ProcessType Enum
-
-**File:** `AgentProcess.java` (or new `ProcessType.java`)
-
-Add enum to distinguish execution types:
-
-```java
-/**
- * Distinguishes between tournament round execution and final synthesis.
- */
-public enum ProcessType {
-    /** Regular tournament round (0-N) */
-    ROUND,
-    /** Final synthesis step */
-    SYNTHESIS
-}
-```
-
-Update `AgentProcess.builder()` to use `ProcessType` instead of round number for synthesis:
-
-```java
-// For rounds:
-.processType(ProcessType.ROUND)
-.round(round)
-
-// For synthesis:
-.processType(ProcessType.SYNTHESIS)
-.round(null)  // or omit
-```
-
----
-
-### Step 2: Add Config Validation for maxRounds
+### Step 1: Add Config Validation for maxRounds
 
 **File:** `ConfigLoader.java` or `ArenaConfig.java`
 
@@ -132,7 +94,7 @@ public void validate() {
 
 ---
 
-### Step 3: Add `executeRound` Overload with Agent Filter
+### Step 2: Add `executeRound` Overload with Agent Filter
 
 **File:** `AgentExecutor.java`
 
@@ -170,151 +132,7 @@ public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) 
 
 ---
 
-### Step 4: Add Synthesizer Validation Helper
-
-**File:** `AgentExecutor.java`
-
-Add validation for synthesizer requirement:
-
-```java
-/**
- * Validates that Claude CLI is configured and enabled for synthesis.
- *
- * @throws AgentException if Claude is not available
- */
-public void validateSynthesizerAvailable() {
-    AgentConfig claude = config.agents().get("claude");
-    if (claude == null) {
-        throw new AgentException(
-            "[SYNTHESIS] Final synthesis requires Claude CLI. Add 'claude' to agents configuration.");
-    }
-    if (!claude.enabled()) {
-        throw new AgentException(
-            "[SYNTHESIS] Final synthesis requires Claude CLI. Enable 'claude' in agents configuration.");
-    }
-}
-```
-
----
-
-### Step 5: Add TemplateContext Support for Synthesizer
-
-**File:** `TemplateContext.java`
-
-Add factory method for synthesizer context:
-
-```java
-/**
- * Creates a context for the final synthesizer prompt.
- *
- * @param allReviewsPath path to the final round's all_reviews.md
- * @param outputPath path where champion_review.md should be written
- * @return the template context
- */
-public static TemplateContext forSynthesis(String allReviewsPath, String outputPath) {
-    return new TemplateContext(
-        null,  // roundNumber not applicable
-        outputPath,
-        allReviewsPath,
-        null,  // commit1
-        null,  // commit2
-        null   // stagedFlag
-    );
-}
-```
-
----
-
-### Step 6: Add Workspace Helpers for Synthesizer
-
-**File:** `WorkspaceManager.java`
-
-Add methods to support synthesizer prompt generation:
-
-```java
-/**
- * Gets the path to the synthesizer prompt file.
- */
-public Path getSynthesizerPromptPath() {
-    return getPromptsDir().resolve("final-synth.md");
-}
-
-/**
- * Generates the synthesizer prompt for the final synthesis step.
- * Must be called at runtime after the last round completes.
- *
- * @param lastRound the last completed round number
- * @throws WorkspaceException if prompt generation fails
- */
-public void generateSynthesizerPrompt(int lastRound) {
-    try {
-        Path allReviewsPath = getRoundDir(lastRound).resolve("all_reviews.md");
-        Path outputPath = getFinalDir().resolve("champion_review.md");
-
-        TemplateContext ctx = TemplateContext.forSynthesis(
-            allReviewsPath.toString(),
-            outputPath.toString()
-        );
-
-        String content = templateLoader.render("final-synth.md", ctx);
-        Files.writeString(getSynthesizerPromptPath(), content, StandardCharsets.UTF_8);
-    } catch (IOException e) {
-        throw new WorkspaceException("Failed to generate synthesizer prompt", e);
-    }
-}
-```
-
-**Note:** The synthesizer prompt must be generated at runtime (not during workspace initialization) because we need to know which round was actually the last one.
-
----
-
-### Step 7: Add Final Synthesis Method
-
-**File:** `AgentExecutor.java`
-
-Add method to execute the synthesizer:
-
-```java
-/**
- * Executes the final synthesis step using Claude.
- *
- * @param lastRound the last completed round number
- * @return the synthesis result
- * @throws AgentException if synthesis fails
- */
-public AgentResult executeSynthesis(int lastRound) {
-    AgentConfig claude = config.agents().get("claude");
-    if (claude == null || !claude.enabled()) {
-        throw new AgentException("[SYNTHESIS] Claude is required for final synthesis");
-    }
-
-    Path promptFile = workspace.getSynthesizerPromptPath();
-    Path outputFile = workspace.getFinalDir().resolve("champion_review.md");
-    Path agentDir = workspace.getFinalDir();
-
-    List<String> command = commandBuilder.build(claude, promptFile, outputFile);
-
-    AgentProcess process = AgentProcess.builder()
-        .agentName("claude-synthesizer")
-        .processType(ProcessType.SYNTHESIS)
-        .command(command)
-        .workingDir(workspace.getArenaDir().getParent())
-        .outputFile(outputFile)
-        .promptFile(promptFile)
-        .stdoutLog(agentDir.resolve("synthesis-stdout.log"))
-        .stderrLog(agentDir.resolve("synthesis-stderr.log"))
-        .timeoutMs(config.agentTimeoutMs())
-        .gracePeriodMs(config.gracePeriodMs())
-        .outputValidator(outputValidator)
-        .build();
-
-    return process.execute();
-}
-```
-
----
-
-### Step 8: Ensure ReviewAggregator Filters Failed Results
+### Step 3: Ensure ReviewAggregator Filters Failed Results
 
 **File:** `ReviewAggregator.java`
 
@@ -341,17 +159,13 @@ public Path aggregateRound(int round, Map<String, AgentResult> results) {
 
 ---
 
-### Step 9: Implement Cross-Pollination Loop in CLI
+### Step 4: Implement Cross-Pollination Loop in CLI
 
 **File:** `ReviewArenaCli.java`
 
 Replace the TODO comments (lines 242-243) with the cross-pollination implementation:
 
 ```java
-// === EARLY VALIDATION (before Round 0) ===
-executor.validateSynthesizerAvailable();
-log.info("Synthesizer validation passed: Claude is available");
-
 // === ROUND 0 ===
 Map<String, AgentResult> round0Results = executor.executeRound(0);
 
@@ -402,27 +216,17 @@ for (int round = 1; round <= config.maxRounds(); round++) {
     lastCompletedRound = round;
 }
 
-// === FINAL SYNTHESIS ===
-log.info("Starting final synthesis with Claude");
-
-// Generate synthesizer prompt (needs to reference last completed round)
-workspaceManager.generateSynthesizerPrompt(lastCompletedRound);
-
-AgentResult synthesisResult = executor.executeSynthesis(lastCompletedRound);
-if (!synthesisResult.isSuccess()) {
-    log.error("[SYNTHESIS] Final synthesis failed: {}", synthesisResult.failureReason());
-    return 4;
-}
-
-Path championReview = workspaceManager.getFinalDir().resolve("champion_review.md");
-log.info("Tournament complete! Final review: {}", championReview);
+// === TOURNAMENT COMPLETE ===
+Path finalAllReviews = workspaceManager.getRoundDir(lastCompletedRound).resolve("all_reviews.md");
+log.info("Cross-pollination complete! Final reviews: {}", finalAllReviews);
+log.info("Synthesis step not yet implemented (Milestone 4)");
 
 return 0;
 ```
 
 ---
 
-### Step 10: Update Dry-Run to Show Full Tournament
+### Step 5: Update Dry-Run to Show Full Tournament
 
 **File:** `ReviewArenaCli.java`
 
@@ -446,12 +250,11 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
         log.info("  - {} ({}): {}", name, status, String.join(" ", agent.command()));
     });
     log.info("Tournament flow:");
-    log.info("  1. Validate Claude available for synthesis");
-    log.info("  2. Round 0: Independent reviews (all agents)");
+    log.info("  1. Round 0: Independent reviews (all agents)");
     for (int i = 1; i <= config.maxRounds(); i++) {
-        log.info("  {}. Round {}: Cross-pollination (surviving agents)", i + 2, i);
+        log.info("  {}. Round {}: Cross-pollination (surviving agents)", i + 1, i);
     }
-    log.info("  {}. Final: Synthesis (Claude only)", config.maxRounds() + 3);
+    log.info("  Note: Final synthesis (Milestone 4) not yet implemented");
 }
 ```
 
@@ -461,14 +264,10 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
 
 | File | Changes |
 |------|---------|
-| `ProcessType.java` (new) | Add enum: ROUND, SYNTHESIS |
-| `AgentProcess.java` | Use ProcessType instead of magic round number |
 | `ConfigLoader.java` | Add validation: maxRounds >= 1 |
-| `AgentExecutor.java` | Add `executeRound(int, Set<String>)`, `validateSynthesizerAvailable()`, `executeSynthesis(int)` |
-| `TemplateContext.java` | Add `forSynthesis(String, String)` factory method |
-| `WorkspaceManager.java` | Add `getSynthesizerPromptPath()`, `generateSynthesizerPrompt(int)` |
+| `AgentExecutor.java` | Add `executeRound(int, Set<String>)` overload |
 | `ReviewAggregator.java` | Ensure internal filtering of failed results |
-| `ReviewArenaCli.java` | Replace TODO with cross-pollination loop + synthesis |
+| `ReviewArenaCli.java` | Replace TODO with cross-pollination loop |
 
 ---
 
@@ -476,36 +275,17 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
 
 ### Unit Tests
 
-1. **ProcessType tests:**
-   - `testProcessType_roundAndSynthesisAreDifferent`
-
-2. **ConfigLoader tests:**
+1. **ConfigLoader tests:**
    - `testValidate_maxRoundsZero_throws`
    - `testValidate_maxRoundsOne_passes`
    - `testValidate_maxRoundsFive_passes`
 
-3. **AgentExecutor tests:**
+2. **AgentExecutor tests:**
    - `testExecuteRoundWithAgentFilter_onlyExecutesSpecifiedAgents`
    - `testExecuteRoundWithAgentFilter_ignoresDisabledAgents`
    - `testExecuteRoundWithAgentFilter_logsActiveAgents`
-   - `testValidateSynthesizerAvailable_claudeEnabled_passes`
-   - `testValidateSynthesizerAvailable_claudeDisabled_throws`
-   - `testValidateSynthesizerAvailable_claudeMissing_throws`
-   - `testExecuteSynthesis_success`
-   - `testExecuteSynthesis_claudeNotAvailable_throws`
-   - `testExecuteSynthesis_usesProcessTypeSynthesis`
 
-4. **TemplateContext tests:**
-   - `testForSynthesis_createsValidContext`
-   - `testForSynthesis_containsCorrectPaths`
-
-5. **WorkspaceManager tests:**
-   - `testGetSynthesizerPromptPath_returnsCorrectPath`
-   - `testGenerateSynthesizerPrompt_createsFile`
-   - `testGenerateSynthesizerPrompt_usesTemplateContext`
-   - `testGenerateSynthesizerPrompt_containsCorrectPaths`
-
-6. **ReviewAggregator tests:**
+3. **ReviewAggregator tests:**
    - `testAggregateRound_filtersFailedResults`
    - `testAggregateRound_includesOnlySuccessfulAgents`
 
@@ -515,13 +295,11 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
    - `testFullTournament_allAgentsSucceed_completesAllRounds`
    - `testFullTournament_agentFailsInRound1_excludedFromRound2`
    - `testFullTournament_dropsBelowMinAgents_abortsWithCode4`
-   - `testFullTournament_synthesisCompletes_createsChampionReview`
    - `testFullTournament_logsActiveAgentsEachRound`
 
 2. **Edge cases:**
    - `testTournament_allAgentsFailRound1_abortsImmediately`
-   - `testTournament_claudeNotConfigured_failsBeforeRound0`
-   - `testTournament_maxRoundsOne_executesOneRoundPlusSynthesis`
+   - `testTournament_maxRoundsOne_executesOneRoundOnly`
 
 3. **Config validation:**
    - `testConfig_maxRoundsZero_failsWithConfigException`
@@ -578,11 +356,8 @@ ping -n 999999 127.0.0.1 > nul
 
 | Scenario | Exit Code | Log Prefix | Message |
 |----------|-----------|------------|---------|
-| Success | 0 | - | "Tournament complete!" |
-| Claude not configured | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI..." |
-| Claude disabled | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI..." |
+| Success (all rounds complete) | 0 | - | "Cross-pollination complete!" |
 | Agents drop below minAgents | 4 | [THRESHOLD] | "Only N agents remain active..." |
-| Synthesis fails | 4 | [SYNTHESIS] | "Final synthesis failed: <reason>" |
 | Round execution catastrophic failure | 4 | [ROUND] | "Round execution failed: <reason>" |
 | maxRounds < 1 | 5 | [CONFIG] | "maxRounds must be at least 1..." |
 
@@ -593,13 +368,11 @@ ping -n 999999 127.0.0.1 > nul
 The feature is complete when:
 
 - [ ] Config validation rejects `maxRounds < 1`
-- [ ] Claude availability is validated before Round 0 starts
 - [ ] Cross-pollination rounds 1 through N execute successfully
 - [ ] Progress logs show active agents at each round start
 - [ ] Failed agents are excluded from subsequent rounds
 - [ ] Tournament aborts if active agents < minAgents
-- [ ] Final synthesis executes with Claude after last round
-- [ ] `champion_review.md` is generated in `.arena/rounds/final/`
+- [ ] Final `all_reviews.md` is generated after last round
 - [ ] Dry-run mode displays full tournament flow
 - [ ] All tests pass (unit + integration)
 - [ ] Mock agents work on both Unix and Windows
@@ -609,39 +382,26 @@ The feature is complete when:
 
 ## Implementation Order
 
-1. Add `ProcessType` enum
-2. Update `AgentProcess` to use `ProcessType`
-3. Add config validation for `maxRounds >= 1`
-4. Add `TemplateContext.forSynthesis()` factory method
-5. Add `WorkspaceManager.getSynthesizerPromptPath()`
-6. Add `WorkspaceManager.generateSynthesizerPrompt(int)`
-7. Verify/add `ReviewAggregator` internal filtering
-8. Add `AgentExecutor.executeRound(int, Set<String>)` overload
-9. Add `AgentExecutor.validateSynthesizerAvailable()`
-10. Add `AgentExecutor.executeSynthesis(int)`
-11. Implement cross-pollination loop in `ReviewArenaCli.call()`
-12. Update dry-run output
-13. Create cross-platform mock agent scripts
-14. Write unit tests
-15. Write integration tests
+1. Add config validation for `maxRounds >= 1`
+2. Verify/add `ReviewAggregator` internal filtering
+3. Add `AgentExecutor.executeRound(int, Set<String>)` overload
+4. Implement cross-pollination loop in `ReviewArenaCli.call()`
+5. Update dry-run output
+6. Create cross-platform mock agent scripts
+7. Write unit tests
+8. Write integration tests
 
 ---
 
 ## Notes
 
-### Prompt Pre-generation vs Runtime Generation
+### Prompt Pre-generation
 
 The current implementation pre-generates all round prompts during `WorkspaceManager.initialize()`. This works because:
 
 - Round prompts (0-N) use `${allReviewsPath}` which points to the previous round's `all_reviews.md`
 - The path is deterministic: `.arena/rounds/round-{N-1}/all_reviews.md`
 - Even if an agent fails, the file structure is the same
-
-However, the **synthesizer prompt must be generated at runtime** because:
-
-- It needs to reference the actual last completed round (not necessarily `maxRounds`)
-- If tournament aborts early due to threshold, synthesis doesn't run anyway
-- Using `TemplateContext.forSynthesis()` keeps it consistent with other prompts
 
 ### Agent Failure Semantics
 
@@ -653,16 +413,13 @@ Per spec (`spec.md:236-246`):
 
 This means we maintain a `Set<String> activeAgents` and use `retainAll()` after each round to keep only agents that succeeded in ALL rounds so far.
 
-### Early Validation Rationale
-
-Validating Claude availability before Round 0 ensures:
-- Fast failure if synthesis won't work
-- No wasted compute running rounds that can't complete
-- Clear error message before any agents execute
-
 ### Config Constraint Rationale
 
 Requiring `maxRounds >= 1` ensures:
 - Cross-pollination always happens (the core value proposition)
-- Avoids edge case of Round 0 → Synthesis with no improvement cycle
+- Avoids edge case of Round 0 only with no improvement cycle
 - Simplifies the flow (no special case for maxRounds=0)
+
+### Deferred: Final Synthesis
+
+The final synthesis step (generating `champion_review.md` using Claude) is deferred to **Milestone 4**. This milestone focuses solely on the cross-pollination loop mechanics.

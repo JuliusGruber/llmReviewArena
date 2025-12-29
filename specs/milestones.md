@@ -24,14 +24,16 @@ This document outlines the next development priorities based on analysis of rece
 | **Prompt Templates** | `src/main/resources/prompts/*.md` | Complete |
 | **WorkspaceManager** | `WorkspaceManager.java`, `WorkspaceManagerTest.java` | Complete |
 | **TemplateLoader** | `TemplateLoader.java`, `TemplateContext.java`, `TemplateLoaderTest.java` | Complete |
+| **AgentProcess/Executor** | `AgentProcess.java`, `AgentExecutor.java`, tests | Complete |
+| **ReviewAggregator** | `ReviewAggregator.java`, `ReviewAggregatorTest.java` | Complete |
+| **Round 0 Execution** | Integrated in `ReviewArenaCli.call()` | Complete |
 
 ### Not Implemented ❌
 
 | Component | Planned In | Status |
 |-----------|-----------|--------|
-| **AgentProcess/Executor** | spec.md | Not started |
-| **Tournament Orchestrator** | spec.md | Not started |
-| **ReviewAggregator** | spec.md | Not started |
+| **Cross-Pollination Loop (Rounds 1-N)** | Milestone 3 | Not started |
+| **Final Synthesis** | Milestone 4 | Not started |
 
 ---
 
@@ -112,7 +114,7 @@ src/main/java/dev/reviewarena/io/
 ├── WorkspaceException.java  # Workspace errors ✅
 ├── TemplateLoader.java      # Loads prompt templates ✅
 ├── TemplateContext.java     # Template data model ✅
-└── ReviewAggregator.java    # Writes all_reviews.md (not started)
+└── ReviewAggregator.java    # Writes all_reviews.md ✅
 ```
 
 **WorkspaceManager responsibilities:** ✅
@@ -137,7 +139,7 @@ src/main/java/dev/reviewarena/io/
 - Resolve placeholders using Freemarker (`${reviewTarget}`, `${roundNumber}`, etc.)
 - Return constructed prompt content
 
-### 1.4 Prompt Templates
+### 1.4 Prompt Templates ✅ COMPLETE
 
 Create the prompt templates specified in `spec.md`.
 
@@ -157,46 +159,77 @@ Content is defined in `spec.md` section "Agent Prompt Templates".
 
 ---
 
-## Milestone 2: Agent Process Layer
+## Milestone 2: Agent Process Layer ✅ COMPLETE
 
 **Goal:** Implement the agent execution model with process management.
 
 ```
 src/main/java/dev/reviewarena/agent/
-├── AgentProcess.java        # Process wrapper with lifecycle
-├── AgentExecutor.java       # Runs agents with concurrency control
-├── AgentConfig.java         # Agent-specific configuration
-├── AgentResult.java         # Execution result record
-└── AgentException.java      # Already exists
+├── AgentProcess.java        # Process wrapper with lifecycle ✅
+├── AgentExecutor.java       # Runs agents with concurrency control ✅
+├── CommandBuilder.java      # Builds agent commands ✅
+├── OutputValidator.java     # Validates agent output ✅
+├── AgentResult.java         # Execution result record ✅
+├── ReviewAggregator.java    # Aggregates reviews ✅
+└── AgentException.java      # Already exists ✅
 ```
 
 **Key features:**
-- ProcessBuilder-based agent spawning
-- Virtual threads for lightweight concurrency
-- Semaphore for `max-concurrent` enforcement
-- Timeout handling with graceful termination
-- stdout/stderr capture to log files
+- ProcessBuilder-based agent spawning ✅
+- Virtual threads for lightweight concurrency ✅
+- Semaphore for `max-concurrent` enforcement ✅
+- Timeout handling with graceful termination ✅
+- stdout/stderr capture to log files ✅
+- Round 0 execution integrated into CLI ✅
 
 ---
 
-## Milestone 3: Tournament Orchestrator
+## Milestone 3: Cross-Pollination Rounds ⬅️ CURRENT
 
-**Goal:** Implement the multi-round tournament flow.
+**Goal:** Implement the multi-round tournament flow (rounds 1-N).
 
-```
-src/main/java/dev/reviewarena/tournament/
-├── TournamentOrchestrator.java  # Main orchestration logic
-├── RoundExecutor.java           # Executes a single round
-├── RoundResult.java             # Round outcome record
-└── TournamentResult.java        # Final tournament outcome
-```
+**Plan document:** `specs/pollination-impl-plan.md`
 
 **Key features:**
-- Round 0: Independent reviews (parallel)
-- Rounds 1-N: Cross-pollination with `all_reviews.md`
-- Final synthesizer step (Claude only)
-- Error handling (skip failed agents, abort if below threshold)
-- Progress output via logger
+- Cross-pollination loop (rounds 1 through maxRounds)
+- Failed agent tracking across rounds
+- Dynamic agent filtering per round
+- Minimum threshold check after each round
+- Config validation for maxRounds >= 1
+
+**Files to modify:**
+- `ConfigLoader.java` - Add validation
+- `AgentExecutor.java` - Add filtered executeRound overload
+- `ReviewAggregator.java` - Verify filtering
+- `ReviewArenaCli.java` - Implement loop
+
+---
+
+## Milestone 4: Final Synthesis
+
+**Goal:** Implement the final synthesis step using Claude.
+
+**Key features:**
+- Validate Claude is configured and enabled (fail fast before Round 0)
+- Generate synthesizer prompt at runtime (after last round completes)
+- Execute Claude with `final-synth.md` prompt
+- Output `champion_review.md` to `.arena/rounds/final/`
+- ProcessType enum to distinguish ROUND vs SYNTHESIS execution
+
+**Files to add/modify:**
+- `ProcessType.java` (new) - Enum for ROUND vs SYNTHESIS
+- `AgentProcess.java` - Use ProcessType
+- `TemplateContext.java` - Add `forSynthesis()` factory
+- `WorkspaceManager.java` - Add `getSynthesizerPromptPath()`, `generateSynthesizerPrompt()`
+- `AgentExecutor.java` - Add `validateSynthesizerAvailable()`, `executeSynthesis()`
+- `ReviewArenaCli.java` - Add synthesis step after cross-pollination loop
+
+**Success criteria:**
+- [ ] Claude availability validated before Round 0
+- [ ] Synthesizer prompt generated at runtime
+- [ ] `champion_review.md` created in `.arena/rounds/final/`
+- [ ] Dry-run shows complete tournament flow including synthesis
+- [ ] Exit code 4 with [SYNTHESIS] prefix on synthesis failures
 
 ---
 
@@ -211,9 +244,10 @@ src/main/java/dev/reviewarena/tournament/
 | 5 | WorkspaceManager | ArenaConfig | ✅ Done |
 | 6 | TemplateLoader | Prompt templates | ✅ Done |
 | 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Done |
-| 8 | AgentProcess + AgentExecutor | WorkspaceManager | ⬅️ Next |
-| 9 | TournamentOrchestrator | AgentExecutor, TemplateLoader | |
-| 10 | ReviewAggregator | TournamentOrchestrator | |
+| 8 | AgentProcess + AgentExecutor | WorkspaceManager | ✅ Done |
+| 9 | Round 0 + ReviewAggregator | AgentExecutor | ✅ Done |
+| 10 | Cross-Pollination Rounds 1-N | AgentExecutor, ReviewAggregator | ⬅️ Next |
+| 11 | Final Synthesis | Cross-Pollination complete | Milestone 4 |
 
 ---
 
@@ -253,7 +287,7 @@ src/main/java/dev/reviewarena/tournament/
 - `testInitialize_onlyCreatesEnabledAgentDirs`
 - Path helper method tests
 
-### Milestone 2 Tests
+### Milestone 2 Tests ✅ Complete
 
 **AgentExecutor tests:**
 - Mock agent scripts that write canned `review.md` files
@@ -262,16 +296,23 @@ src/main/java/dev/reviewarena/tournament/
 
 ### Milestone 3 Tests
 
-**TournamentOrchestrator tests:**
+**Cross-pollination tests:** (see `pollination-impl-plan.md`)
 - Full tournament flow with mock agents
-- Error handling (agent failure, threshold)
-- `all_reviews.md` aggregation
+- Agent failure and exclusion
+- Minimum threshold enforcement
+
+### Milestone 4 Tests
+
+**Synthesis tests:**
+- Claude validation before Round 0
+- Synthesizer prompt generation
+- `champion_review.md` creation
 
 ---
 
 ## Success Criteria
 
-### Milestone 1 Complete When:
+### Milestone 1 Complete When: ✅
 - [x] `review-arena abc1234` validates commit exists
 - [x] `review-arena --staged` validates staged mode
 - [x] Invalid commits produce exit code 3
@@ -280,14 +321,22 @@ src/main/java/dev/reviewarena/tournament/
 - [x] `task.md` is generated with placeholders resolved
 - [x] All prompt templates exist in resources
 
-### Milestone 2 Complete When:
-- [ ] Agents spawn as subprocesses
-- [ ] Agent output captured to `review.md`
-- [ ] Timeouts terminate agents gracefully
-- [ ] Concurrency respects `max-concurrent`
+### Milestone 2 Complete When: ✅
+- [x] Agents spawn as subprocesses
+- [x] Agent output captured to `review.md`
+- [x] Timeouts terminate agents gracefully
+- [x] Concurrency respects `max-concurrent`
+- [x] Round 0 executes and produces `all_reviews.md`
 
 ### Milestone 3 Complete When:
-- [ ] Full tournament runs with real CLI agents
-- [ ] Cross-pollination works via `all_reviews.md`
-- [ ] Final `champion_review.md` is generated
+- [ ] Cross-pollination rounds 1-N execute successfully
+- [ ] Failed agents excluded from subsequent rounds
+- [ ] Tournament aborts if below minAgents threshold
+- [ ] Final `all_reviews.md` generated after last round
 - [ ] Progress output shows round status
+
+### Milestone 4 Complete When:
+- [ ] Claude validated before Round 0 starts
+- [ ] Full tournament runs with synthesis step
+- [ ] Final `champion_review.md` is generated
+- [ ] Dry-run shows complete flow including synthesis
