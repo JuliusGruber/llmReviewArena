@@ -94,13 +94,129 @@ if (maxRounds < 1) {
 
 **Note:** `ArenaConfig` is a record that validates in its compact constructor, not via a separate `validate()` method.
 
+**Important:** This change aligns the code with `spec.md` which already states `max-rounds` minimum is 1. The existing code incorrectly allowed 0.
+
+#### Required Test Update
+
+**File:** `ArenaConfigTest.java` (package: `dev.reviewarena.config`)
+
+Update the existing test `testValidation_zeroMaxRounds_allowed` (lines 118-122) which incorrectly expects maxRounds=0 to succeed:
+
+**Before:**
+```java
+@Test
+void testValidation_zeroMaxRounds_allowed() {
+    // 0 rounds means no cross-pollination, just initial round
+    ArenaConfig config = createConfigWith(b -> b.maxRounds = 0);
+    assertEquals(0, config.maxRounds());
+}
+```
+
+**After:**
+```java
+@Test
+void testValidation_zeroMaxRounds_throws() {
+    ConfigException ex = assertThrows(ConfigException.class,
+        () -> createConfigWith(b -> b.maxRounds = 0));
+
+    assertTrue(ex.getMessage().contains("maxRounds must be at least 1"));
+}
+```
+
 ---
 
 ### Step 2: Add `executeRound` Overload with Agent Filter
 
 **File:** `AgentExecutor.java` (package: `dev.reviewarena.agent`)
 
-Add a method that accepts a set of agents to include:
+Refactor to extract shared execution logic and add a filtered overload.
+
+**Step 2a: Extract common execution logic into private method:**
+
+```java
+/**
+ * Executes the given agents for a round.
+ *
+ * @param agents the agents to execute
+ * @param round the round number
+ * @return map of agent name to execution result
+ */
+private Map<String, AgentResult> executeAgents(List<AgentConfig> agents, int round) {
+    // Concurrency control: 0 = unlimited, else use semaphore
+    Semaphore semaphore = config.maxConcurrent() > 0
+        ? new Semaphore(config.maxConcurrent())
+        : null;
+
+    ConcurrentHashMap<String, AgentResult> results = new ConcurrentHashMap<>();
+
+    try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+        List<Future<?>> futures = new ArrayList<>();
+
+        for (AgentConfig agent : agents) {
+            Future<?> future = executor.submit(() -> {
+                if (semaphore != null) {
+                    try {
+                        semaphore.acquire();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+                try {
+                    AgentResult result = executeAgent(agent, round);
+                    results.put(agent.name(), result);
+                    logResult(result);
+                } finally {
+                    if (semaphore != null) {
+                        semaphore.release();
+                    }
+                }
+            });
+            futures.add(future);
+        }
+
+        // Wait for all agents with round timeout
+        waitForAllWithTimeout(futures, config.roundTimeoutMs());
+
+    } catch (Exception e) {
+        log.error("Round {} execution failed: {}", round, e.getMessage());
+        throw new AgentException("Round execution failed: " + e.getMessage(), e);
+    }
+
+    int successes = (int) results.values().stream().filter(AgentResult::isSuccess).count();
+    log.info("Round {} complete: {}/{} agents succeeded", round, successes, agents.size());
+
+    return Map.copyOf(results);
+}
+```
+
+**Step 2b: Refactor existing `executeRound(int)` to use the helper:**
+
+```java
+/**
+ * Executes all enabled agents for a given round.
+ *
+ * @param round the round number (0-indexed)
+ * @return map of agent name to execution result
+ * @throws AgentException if round execution fails catastrophically
+ */
+public Map<String, AgentResult> executeRound(int round) {
+    List<AgentConfig> enabledAgents = getEnabledAgents();
+
+    if (enabledAgents.isEmpty()) {
+        log.warn("No enabled agents to execute for round {}", round);
+        return Map.of();
+    }
+
+    log.info("Starting round {} with {} agents: {}",
+        round, enabledAgents.size(),
+        enabledAgents.stream().map(AgentConfig::name).toList());
+
+    return executeAgents(enabledAgents, round);
+}
+```
+
+**Step 2c: Add new filtered overload:**
 
 ```java
 /**
@@ -109,6 +225,7 @@ Add a method that accepts a set of agents to include:
  * @param round the round number (0-indexed)
  * @param agentNames set of agent names to execute (must be enabled in config)
  * @return map of agent name to execution result
+ * @throws AgentException if round execution fails catastrophically
  */
 public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) {
     List<AgentConfig> agents = config.agents().values().stream()
@@ -126,11 +243,14 @@ public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) 
         round, config.maxRounds(), agents.size(),
         agents.stream().map(AgentConfig::name).toList());
 
-    // ... rest of execution logic (same as existing executeRound)
+    return executeAgents(agents, round);
 }
 ```
 
-**Rationale:** This allows rounds 1-N to exclude agents that failed in previous rounds without modifying the config object.
+**Rationale:** This refactoring:
+1. Eliminates code duplication between the two overloads
+2. Allows rounds 1-N to exclude agents that failed in previous rounds
+3. Keeps all concurrency and timeout logic in one place
 
 ---
 
@@ -148,7 +268,17 @@ No code changes needed - just verify during implementation that this filtering r
 
 **File:** `ReviewArenaCli.java` (package: `dev.reviewarena.cli`)
 
-Replace the TODO comments in the `call()` method with the cross-pollination implementation:
+**Step 4a: Add required import:**
+
+Add to the imports section (near line 21):
+
+```java
+import java.util.HashSet;
+```
+
+**Step 4b: Replace the TODO comments in the `call()` method:**
+
+Replace the existing Round 0 execution code AND the TODO comments with the complete cross-pollination implementation:
 
 ```java
 // === ROUND 0 ===
@@ -180,12 +310,19 @@ for (int round = 1; round <= config.maxRounds(); round++) {
     log.info("Starting round {}/{} with active agents: {}",
         round, config.maxRounds(), activeAgents);
 
+    // Safety check: ensure we have agents to execute (should not happen if threshold checks pass)
+    if (activeAgents.isEmpty()) {
+        log.error("[ROUND] No active agents remaining for round {} (internal error)", round);
+        return 4;
+    }
+
     // Execute round with only active agents
     Map<String, AgentResult> roundResults = executor.executeRound(round, activeAgents);
 
-    // Handle catastrophic round failure (timeout killed all agents, etc.)
+    // Handle round failure (all agents timed out, crashed, or were filtered)
     if (roundResults.isEmpty()) {
-        log.error("[ROUND] Round {} produced no results (timeout or catastrophic failure)", round);
+        log.error("[ROUND] Round {} produced no results. " +
+            "This may indicate all agents timed out or crashed.", round);
         return 4;
     }
 
@@ -195,8 +332,8 @@ for (int round = 1; round <= config.maxRounds(); round++) {
 
     // Check minimum threshold
     if (activeAgents.size() < config.minAgents()) {
-        log.error("[THRESHOLD] Only {} agents remain active, minimum {} required. Aborting tournament.",
-            activeAgents.size(), config.minAgents());
+        log.error("[THRESHOLD] Only {} agents remain active after round {}, minimum {} required. " +
+            "Aborting tournament.", activeAgents.size(), round, config.minAgents());
         return 4;
     }
 
@@ -215,6 +352,8 @@ log.info("Synthesis step not yet implemented (Milestone 4)");
 
 return 0;
 ```
+
+**Note:** The code above replaces the existing Round 0 code (lines 219-240 in current `ReviewArenaCli.java`) and the TODO comments (lines 242-243). The Round 0 handling is enhanced with better logging prefixes for consistency.
 
 ---
 
@@ -280,24 +419,41 @@ Round-level timeout and grace period handling are **already fully implemented**:
 
 ## File Changes Summary
 
+### Production Code
+
 | File | Package | Changes |
 |------|---------|---------|
 | `ArenaConfig.java` | `dev.reviewarena.config` | Change validation: maxRounds >= 1 (was >= 0) |
-| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeRound(int, Set<String>)` overload only |
+| `AgentExecutor.java` | `dev.reviewarena.agent` | Refactor: extract `executeAgents()` helper, add `executeRound(int, Set<String>)` overload |
 | `AgentProcess.java` | `dev.reviewarena.agent` | ✅ No changes - timeout/grace period already implemented |
 | `ReviewAggregator.java` | `dev.reviewarena.agent` | ✅ No changes - verify filtering only |
 | `ReviewArenaCli.java` | `dev.reviewarena.cli` | Replace TODO with cross-pollination loop, add `HashSet` import |
+
+### Test Code
+
+| File | Package | Changes |
+|------|---------|---------|
+| `ArenaConfigTest.java` | `dev.reviewarena.config` | **Update existing:** rename `testValidation_zeroMaxRounds_allowed` → `testValidation_zeroMaxRounds_throws`, change assertion |
+| `AgentExecutorTest.java` | `dev.reviewarena.agent` | Add tests for new `executeRound(int, Set<String>)` overload |
+| `ReviewArenaCliIT.java` | `dev.reviewarena.cli` | **New file:** Integration tests for full tournament flow |
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
+### Existing Test Updates (REQUIRED)
 
-1. **ConfigLoader tests:**
-   - `testValidate_maxRoundsZero_throws`
-   - `testValidate_maxRoundsOne_passes`
-   - `testValidate_maxRoundsFive_passes`
+Before adding new tests, update these existing tests that will break:
+
+1. **ArenaConfigTest.java:**
+   - **Update** `testValidation_zeroMaxRounds_allowed` → rename to `testValidation_zeroMaxRounds_throws`
+   - Change from `assertEquals(0, config.maxRounds())` to `assertThrows(ConfigException.class, ...)`
+
+### New Unit Tests
+
+1. **ArenaConfigTest.java (additions):**
+   - `testValidate_maxRoundsOne_passes` - verify minimum valid value
+   - `testValidate_maxRoundsFive_passes` - verify default value works
 
 2. **AgentExecutor tests:**
    - `testExecuteRoundWithAgentFilter_onlyExecutesSpecifiedAgents`
@@ -389,6 +545,7 @@ ping -n 999999 127.0.0.1 > nul
 
 The feature is complete when:
 
+- [ ] Existing test `testValidation_zeroMaxRounds_allowed` updated to expect failure
 - [ ] Config validation rejects `maxRounds < 1`
 - [ ] Cross-pollination rounds 1 through N execute successfully
 - [ ] Progress logs show active agents at each round start
@@ -398,7 +555,7 @@ The feature is complete when:
 - [ ] Grace period (`gracePeriodMs`) allows clean shutdown before force-kill
 - [ ] Final `all_reviews.md` is generated after last round
 - [ ] Dry-run mode displays full tournament flow (including timeout settings)
-- [ ] All tests pass (unit + integration)
+- [ ] All tests pass (unit + integration) - **no regressions**
 - [ ] Mock agents work on both Unix and Windows
 - [ ] `spec.md` updated if implementation deviates from specification
 
@@ -406,19 +563,29 @@ The feature is complete when:
 
 ## Implementation Order
 
-1. Update config validation for `maxRounds >= 1` (change from >= 0)
-2. Verify `ReviewAggregator` internal filtering ✅ (already implemented)
-3. Add `AgentExecutor.executeRound(int, Set<String>)` overload
-4. Verify existing timeout/grace period ✅ (already implemented in `AgentProcess`)
-5. Implement cross-pollination loop in `ReviewArenaCli.call()`
-6. Update dry-run output (include timeout settings)
-7. Create cross-platform mock agent scripts
-8. Write unit tests
-9. Write integration tests (including timeout scenarios)
+1. **Update existing test** `testValidation_zeroMaxRounds_allowed` → `testValidation_zeroMaxRounds_throws` (prevents build break)
+2. Update config validation for `maxRounds >= 1` (change from >= 0)
+3. Verify `ReviewAggregator` internal filtering ✅ (already implemented)
+4. Refactor `AgentExecutor`: extract `executeAgents()` helper method
+5. Add `AgentExecutor.executeRound(int, Set<String>)` overload
+6. Verify existing timeout/grace period ✅ (already implemented in `AgentProcess`)
+7. Implement cross-pollination loop in `ReviewArenaCli.call()`
+8. Update dry-run output (include timeout settings)
+9. Create cross-platform mock agent scripts
+10. Write new unit tests
+11. Write integration tests (including timeout scenarios)
 
 ---
 
 ## Notes
+
+### Spec Alignment
+
+This implementation plan **fixes a spec violation** in the current code. The spec (`spec.md`, line 169) clearly states:
+
+> `max-rounds: 5` # Number of cross-pollination rounds after Round 0 (default: 5, **minimum: 1**)
+
+However, the current `ArenaConfig.java` validation allows `maxRounds >= 0`, which contradicts the spec. This plan corrects that discrepancy. The existing test `testValidation_zeroMaxRounds_allowed` was also incorrect and must be updated.
 
 ### Prompt Pre-generation
 
