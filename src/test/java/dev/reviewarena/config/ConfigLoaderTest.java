@@ -55,7 +55,7 @@ class ConfigLoaderTest {
         Path arenaYaml = tempDir.resolve("arena.yaml");
         Files.writeString(arenaYaml, """
             limits:
-              max-rounds: 10
+              rounds: 4
               max-output-size-kb: 1000
             execution:
               max-concurrent: 4
@@ -63,7 +63,7 @@ class ConfigLoaderTest {
 
         ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
 
-        assertEquals(10, config.maxRounds());
+        assertEquals(4, config.maxRounds());
         assertEquals(1000, config.maxOutputSizeKb());
         assertEquals(4, config.maxConcurrent());
     }
@@ -83,12 +83,12 @@ class ConfigLoaderTest {
         Path customConfig = tempDir.resolve("custom-config.yaml");
         Files.writeString(customConfig, """
             limits:
-              max-rounds: 7
+              rounds: 3
             """);
 
         ArenaConfig config = loader.load(customConfig, CliOverrides.none());
 
-        assertEquals(7, config.maxRounds());
+        assertEquals(3, config.maxRounds());
     }
 
     // ===== CLI overrides =====
@@ -98,7 +98,7 @@ class ConfigLoaderTest {
         Path arenaYaml = tempDir.resolve("arena.yaml");
         Files.writeString(arenaYaml, """
             limits:
-              max-rounds: 10
+              rounds: 4
             """);
 
         CliOverrides overrides = new CliOverrides(3, null, null);
@@ -141,13 +141,40 @@ class ConfigLoaderTest {
         Path arenaYaml = tempDir.resolve("arena.yaml");
         Files.writeString(arenaYaml, """
             limits:
-              max-rounds: 15
+              rounds: 4
             """);
 
         CliOverrides overrides = CliOverrides.none();
         ArenaConfig config = loader.load(arenaYaml, overrides);
 
-        assertEquals(15, config.maxRounds()); // File value used when CLI is null
+        assertEquals(4, config.maxRounds()); // File value used when CLI is null
+    }
+
+    @Test
+    void testLoad_roundsExceedsFive_cappedAtFive() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            limits:
+              rounds: 15
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        assertEquals(5, config.maxRounds()); // Capped at 5
+    }
+
+    @Test
+    void testLoad_cliRoundsExceedsFive_cappedAtFive() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            limits:
+              rounds: 3
+            """);
+
+        CliOverrides overrides = new CliOverrides(10, null, null);
+        ArenaConfig config = loader.load(arenaYaml, overrides);
+
+        assertEquals(5, config.maxRounds()); // CLI override also capped at 5
     }
 
     // ===== Agent loading =====

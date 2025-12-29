@@ -2,7 +2,7 @@
 # These values are used when not overridden by arena.yaml or CLI arguments
 
 limits:
-  max-rounds: 5
+  rounds: 5  # Maximum allowed is 5 (will be capped if higher)
   max-output-size-kb: 500
 
 execution:

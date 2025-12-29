@@ -124,8 +124,13 @@ public class ConfigLoader {
         // Load limits
         int maxRounds = overrides.maxRounds() != null
             ? overrides.maxRounds()
-            : config.getOptionalValue("limits.max-rounds", Integer.class)
+            : config.getOptionalValue("limits.rounds", Integer.class)
                     .orElse(ArenaConfig.DEFAULT_MAX_ROUNDS);
+
+        // Cap rounds at 5 maximum
+        if (maxRounds > 5) {
+            maxRounds = 5;
+        }
 
         int maxOutputSizeKb = config.getOptionalValue("limits.max-output-size-kb", Integer.class)
             .orElse(ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB);
