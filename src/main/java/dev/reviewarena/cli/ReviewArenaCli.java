@@ -17,7 +17,9 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
@@ -216,31 +218,74 @@ public class ReviewArenaCli implements Callable<Integer> {
         AgentExecutor executor = new AgentExecutor(config, workspaceManager);
         ReviewAggregator aggregator = new ReviewAggregator(workspaceManager);
 
-        // Execute Round 0
+        // === ROUND 0 ===
         Map<String, AgentResult> round0Results = executor.executeRound(0);
 
-        // Check minimum agents threshold
+        // Check minimum agents threshold for Round 0
         long successCount = round0Results.values().stream()
             .filter(AgentResult::isSuccess)
             .count();
 
         if (successCount < config.minAgents()) {
-            log.error("Only {} agents succeeded, minimum {} required. Aborting.",
+            log.error("[THRESHOLD] Only {} agents succeeded in Round 0, minimum {} required. Aborting.",
                 successCount, config.minAgents());
-            return 4; // Agent error exit code
+            return 4;
         }
 
-        // Aggregate Round 0 reviews into all_reviews.md (only if there are successful agents)
-        if (successCount > 0) {
-            Path allReviews = aggregator.aggregateRound(0, round0Results);
-            log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
-                successCount, allReviews);
-        } else {
-            log.info("Round 0 complete: no agents produced reviews");
+        // Aggregate Round 0 reviews
+        Path allReviews = aggregator.aggregateRound(0, round0Results);
+        log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
+            successCount, allReviews);
+
+        // Track active agents (start with all successful from round 0)
+        // Use explicit HashSet for guaranteed mutability (Collectors.toSet() is implementation-dependent)
+        Set<String> activeAgents = new HashSet<>(AgentExecutor.getSuccessfulAgents(round0Results));
+        int lastCompletedRound = 0;
+
+        // === CROSS-POLLINATION ROUNDS (1 through maxRounds) ===
+        for (int round = 1; round <= config.maxRounds(); round++) {
+            log.info("Starting round {}/{} with active agents: {}",
+                round, config.maxRounds(), activeAgents);
+
+            // Safety check: ensure we have agents to execute (should not happen if threshold checks pass)
+            if (activeAgents.isEmpty()) {
+                log.error("[ROUND] No active agents remaining for round {} (internal error)", round);
+                return 4;
+            }
+
+            // Execute round with only active agents
+            Map<String, AgentResult> roundResults = executor.executeRound(round, activeAgents);
+
+            // Handle round failure (all agents timed out, crashed, or were filtered)
+            if (roundResults.isEmpty()) {
+                log.error("[ROUND] Round {} produced no results. " +
+                    "This may indicate all agents timed out or crashed.", round);
+                return 4;
+            }
+
+            // Update active agents: keep only those that succeeded in ALL rounds so far
+            Set<String> successfulThisRound = AgentExecutor.getSuccessfulAgents(roundResults);
+            activeAgents.retainAll(successfulThisRound);
+
+            // Check minimum threshold
+            if (activeAgents.size() < config.minAgents()) {
+                log.error("[THRESHOLD] Only {} agents remain active after round {}, minimum {} required. " +
+                    "Aborting tournament.", activeAgents.size(), round, config.minAgents());
+                return 4;
+            }
+
+            // Aggregate this round's reviews
+            Path roundAllReviews = aggregator.aggregateRound(round, roundResults);
+            log.info("Round {} complete: {} agents succeeded, aggregated to {}",
+                round, activeAgents.size(), roundAllReviews);
+
+            lastCompletedRound = round;
         }
 
-        // TODO: Implement rounds 1-N (Milestone 3)
-        // TODO: Implement final synthesis (Milestone 3)
+        // === TOURNAMENT COMPLETE ===
+        Path finalAllReviews = workspaceManager.getRoundDir(lastCompletedRound).resolve("all_reviews.md");
+        log.info("Cross-pollination complete! Final reviews: {}", finalAllReviews);
+        log.info("Synthesis step not yet implemented (Milestone 4)");
 
         return 0;
     }

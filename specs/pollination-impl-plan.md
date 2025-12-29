@@ -151,7 +151,7 @@ void testValidation_negativeMaxRounds_throws() {
 
 ---
 
-### Step 2: Add `executeRound` Overload with Agent Filter
+### Step 2: Add `executeRound` Overload with Agent Filter ✅ DONE
 
 **File:** `AgentExecutor.java` (package: `dev.reviewarena.agent`)
 
