@@ -100,7 +100,7 @@ if (maxRounds < 1) {
 
 **File:** `ArenaConfigTest.java` (package: `dev.reviewarena.config`)
 
-Update the existing test `testValidation_zeroMaxRounds_allowed` (lines 118-122) which incorrectly expects maxRounds=0 to succeed:
+Update the existing test `testValidation_zeroMaxRounds_allowed` (lines 117-122) which incorrectly expects maxRounds=0 to succeed:
 
 **Before:**
 ```java
@@ -118,6 +118,32 @@ void testValidation_zeroMaxRounds_allowed() {
 void testValidation_zeroMaxRounds_throws() {
     ConfigException ex = assertThrows(ConfigException.class,
         () -> createConfigWith(b -> b.maxRounds = 0));
+
+    assertTrue(ex.getMessage().contains("maxRounds must be at least 1"));
+}
+```
+
+#### Also Update `testValidation_negativeMaxRounds_throws` (lines 30-35)
+
+The existing test expects the old error message. Update the assertion to match the new message:
+
+**Before:**
+```java
+@Test
+void testValidation_negativeMaxRounds_throws() {
+    ConfigException ex = assertThrows(ConfigException.class,
+        () -> createConfigWith(b -> b.maxRounds = -1));
+
+    assertTrue(ex.getMessage().contains("maxRounds must be non-negative"));
+}
+```
+
+**After:**
+```java
+@Test
+void testValidation_negativeMaxRounds_throws() {
+    ConfigException ex = assertThrows(ConfigException.class,
+        () -> createConfigWith(b -> b.maxRounds = -1));
 
     assertTrue(ex.getMessage().contains("maxRounds must be at least 1"));
 }
@@ -208,13 +234,15 @@ public Map<String, AgentResult> executeRound(int round) {
         return Map.of();
     }
 
-    log.info("Starting round {} with {} agents: {}",
-        round, enabledAgents.size(),
+    log.info("Starting round {}/{} with {} agents: {}",
+        round, config.maxRounds(), enabledAgents.size(),
         enabledAgents.stream().map(AgentConfig::name).toList());
 
     return executeAgents(enabledAgents, round);
 }
 ```
+
+**Note:** The log format is updated to show `round/maxRounds` for consistency with the filtered overload.
 
 **Step 2c: Add new filtered overload:**
 
@@ -405,7 +433,7 @@ Round-level timeout and grace period handling are **already fully implemented**:
 |---------|----------|----------------|
 | Round timeout | `AgentExecutor.java:85` | `waitForAllWithTimeout(futures, config.roundTimeoutMs())` |
 | Per-agent timeout | `AgentProcess.java:93` | `process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)` |
-| Grace period | `AgentProcess.java:132-151` | `handleTimeout()` with graceful shutdown |
+| Grace period | `AgentProcess.java:117-154` | `handleTimeout()` with graceful shutdown |
 | Process tree kill | `AgentProcess.java:197-229` | `destroyDescendants()` for Windows child processes |
 
 **Verification checklist (all verified):**
@@ -413,6 +441,8 @@ Round-level timeout and grace period handling are **already fully implemented**:
 - [x] `AgentProcess` receives `config.gracePeriodMs()` via builder — verified at `AgentExecutor.java:115`
 - [x] `AgentProcess.handleTimeout()` implements graceful → force kill sequence — verified at `AgentProcess.java:117-154`
 - [x] Timed-out agents return `AgentResult.timeout()` status — verified at `AgentProcess.java:153`
+
+**Note:** Line numbers are approximate and may shift slightly with code changes. Use method names for reliable navigation.
 
 **No new methods needed.** The existing architecture correctly encapsulates process lifecycle management within `AgentProcess`, which is instantiated per-agent and handles its own timeout/termination
 
@@ -449,6 +479,8 @@ Before adding new tests, update these existing tests that will break:
 1. **ArenaConfigTest.java:**
    - **Update** `testValidation_zeroMaxRounds_allowed` → rename to `testValidation_zeroMaxRounds_throws`
    - Change from `assertEquals(0, config.maxRounds())` to `assertThrows(ConfigException.class, ...)`
+   - **Update** `testValidation_negativeMaxRounds_throws` → change expected message
+   - Change from `"maxRounds must be non-negative"` to `"maxRounds must be at least 1"`
 
 ### New Unit Tests
 
@@ -501,11 +533,16 @@ exit 0
 **Windows (mock-agent-success.bat):**
 ```batch
 @echo off
+setlocal
 set "output_path=%~1"
-echo ## Summary > "%output_path%"
-echo Mock review content >> "%output_path%"
+(
+  echo ## Summary
+  echo Mock review content
+) > "%output_path%"
 exit /b 0
 ```
+
+> **Note:** Using parentheses with redirection avoids trailing space issues with Windows `echo`.
 
 **Unix (mock-agent-fail.sh):**
 ```bash
@@ -549,6 +586,7 @@ ping -n 999999 127.0.0.1 > nul
 The feature is complete when:
 
 - [ ] Existing test `testValidation_zeroMaxRounds_allowed` updated to expect failure
+- [ ] Existing test `testValidation_negativeMaxRounds_throws` updated with new message
 - [ ] Config validation rejects `maxRounds < 1`
 - [ ] Cross-pollination rounds 1 through N execute successfully
 - [ ] Progress logs show active agents at each round start
@@ -566,7 +604,9 @@ The feature is complete when:
 
 ## Implementation Order
 
-1. **Update existing test** `testValidation_zeroMaxRounds_allowed` → `testValidation_zeroMaxRounds_throws` (prevents build break)
+1. **Update existing tests** (prevents build break):
+   - `testValidation_zeroMaxRounds_allowed` → `testValidation_zeroMaxRounds_throws`
+   - `testValidation_negativeMaxRounds_throws` → update expected message
 2. Update config validation for `maxRounds >= 1` (change from >= 0)
 3. Verify `ReviewAggregator` internal filtering ✅ (already implemented)
 4. Refactor `AgentExecutor`: extract `executeAgents()` helper method
