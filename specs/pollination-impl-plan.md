@@ -4,9 +4,9 @@
 
 This document describes the implementation plan for Rounds 1-N cross-pollination feature, where agents see `all_reviews.md` from the previous round and produce improved reviews.
 
-**Feature Location:** `ReviewArenaCli.java:242-243` (currently marked as TODO)
+**Feature Location:** `ReviewArenaCli.call()` method (currently marked as TODO)
 
-**Note:** Final synthesis (champion_review.md generation) is deferred to Milestone 4.
+**Note:** This is **Milestone 3**. Final synthesis (champion_review.md generation) is deferred to Milestone 4.
 
 ## Current State Analysis
 
@@ -14,15 +14,15 @@ This document describes the implementation plan for Rounds 1-N cross-pollination
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Round 0 execution | Complete | `ReviewArenaCli.call()` lines 219-240 |
+| Round 0 execution | Complete | `ReviewArenaCli.call()` method |
 | AgentExecutor | Complete | `executeRound(int round)` works for any round number |
-| ReviewAggregator | Complete | `aggregateRound(int round, results)` works for any round |
+| ReviewAggregator | Complete | `aggregateRound(int round, results)` works for any round; already filters failed results |
 | WorkspaceManager | Complete | Pre-creates all round directories and prompts |
 | Prompt templates | Complete | `round-1.md` through `round-5.md` include `${allReviewsPath}` |
 | Directory structure | Complete | `.arena/rounds/round-N/<agent>/` pre-created |
 | All round prompts | Complete | Pre-generated with correct `allReviewsPath` values |
-| `getFinalDir()` | Complete | `WorkspaceManager.java:168-171` |
-| `getSuccessfulAgents()` | Complete | `AgentExecutor.java:172-177` |
+| `getFinalDir()` | Complete | `WorkspaceManager.getFinalDir()` method |
+| `getSuccessfulAgents()` | Complete | `AgentExecutor.getSuccessfulAgents()` static method |
 
 ### What's Missing
 
@@ -73,7 +73,7 @@ Done:
 
 ### Step 1: Add Config Validation for maxRounds
 
-**File:** `ConfigLoader.java` or `ArenaConfig.java`
+**File:** `ArenaConfig.java` (package: `dev.reviewarena.config`)
 
 Add validation that `maxRounds >= 1`:
 
@@ -96,7 +96,7 @@ public void validate() {
 
 ### Step 2: Add `executeRound` Overload with Agent Filter
 
-**File:** `AgentExecutor.java`
+**File:** `AgentExecutor.java` (package: `dev.reviewarena.agent`)
 
 Add a method that accepts a set of agents to include:
 
@@ -132,38 +132,21 @@ public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) 
 
 ---
 
-### Step 3: Ensure ReviewAggregator Filters Failed Results
+### Step 3: Verify ReviewAggregator Filters Failed Results ✅ ALREADY IMPLEMENTED
 
-**File:** `ReviewAggregator.java`
+**File:** `ReviewAggregator.java` (package: `dev.reviewarena.agent`)
 
-Verify or add filtering to only include successful results:
+**Status:** Already implemented. The `aggregateRound()` method filters to successful results only at lines 55-59.
 
-```java
-/**
- * Aggregates reviews from a round into all_reviews.md.
- * Only includes reviews from agents that succeeded.
- *
- * @param round the round number
- * @param results map of agent name to result (may include failures)
- * @return path to the generated all_reviews.md
- */
-public Path aggregateRound(int round, Map<String, AgentResult> results) {
-    // Filter to successful results only
-    Map<String, AgentResult> successfulResults = results.entrySet().stream()
-        .filter(e -> e.getValue().isSuccess())
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    // ... rest of aggregation logic using successfulResults
-}
-```
+No code changes needed - just verify during implementation that this filtering remains in place.
 
 ---
 
 ### Step 4: Implement Cross-Pollination Loop in CLI
 
-**File:** `ReviewArenaCli.java`
+**File:** `ReviewArenaCli.java` (package: `dev.reviewarena.cli`)
 
-Replace the TODO comments (lines 242-243) with the cross-pollination implementation:
+Replace the TODO comments in the `call()` method with the cross-pollination implementation:
 
 ```java
 // === ROUND 0 ===
@@ -228,9 +211,9 @@ return 0;
 
 ### Step 5: Update Dry-Run to Show Full Tournament
 
-**File:** `ReviewArenaCli.java`
+**File:** `ReviewArenaCli.java` (package: `dev.reviewarena.cli`)
 
-Update `printDryRunSummary()` to include cross-pollination rounds:
+Update `printDryRunSummary()` method to include cross-pollination rounds:
 
 ```java
 private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaConfig config) {
@@ -262,12 +245,12 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
 
 ## File Changes Summary
 
-| File | Changes |
-|------|---------|
-| `ConfigLoader.java` | Add validation: maxRounds >= 1 |
-| `AgentExecutor.java` | Add `executeRound(int, Set<String>)` overload |
-| `ReviewAggregator.java` | Ensure internal filtering of failed results |
-| `ReviewArenaCli.java` | Replace TODO with cross-pollination loop |
+| File | Package | Changes |
+|------|---------|---------|
+| `ArenaConfig.java` | `dev.reviewarena.config` | Change validation: maxRounds >= 1 (was >= 0) |
+| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeRound(int, Set<String>)` overload |
+| `ReviewAggregator.java` | `dev.reviewarena.agent` | ✅ Already done - verify only |
+| `ReviewArenaCli.java` | `dev.reviewarena.cli` | Replace TODO with cross-pollination loop |
 
 ---
 
@@ -320,9 +303,9 @@ exit 0
 **Windows (mock-agent-success.bat):**
 ```batch
 @echo off
-set output_path=%1
-echo ## Summary > %output_path%
-echo Mock review content >> %output_path%
+set "output_path=%~1"
+echo ## Summary > "%output_path%"
+echo Mock review content >> "%output_path%"
 exit /b 0
 ```
 
@@ -382,8 +365,8 @@ The feature is complete when:
 
 ## Implementation Order
 
-1. Add config validation for `maxRounds >= 1`
-2. Verify/add `ReviewAggregator` internal filtering
+1. Update config validation for `maxRounds >= 1` (change from >= 0)
+2. Verify `ReviewAggregator` internal filtering ✅ (already implemented)
 3. Add `AgentExecutor.executeRound(int, Set<String>)` overload
 4. Implement cross-pollination loop in `ReviewArenaCli.call()`
 5. Update dry-run output
@@ -405,7 +388,7 @@ The current implementation pre-generates all round prompts during `WorkspaceMana
 
 ### Agent Failure Semantics
 
-Per spec (`spec.md:236-246`):
+Per spec (`spec.md`, Error Handling section):
 
 > When an agent fails during a round (crash, timeout, or invalid output), the orchestrator uses the **skip** strategy:
 > - **Exclude from current round** - The failed agent's output is not included in `all_reviews.md`
@@ -422,4 +405,4 @@ Requiring `maxRounds >= 1` ensures:
 
 ### Deferred: Final Synthesis
 
-The final synthesis step (generating `champion_review.md` using Claude) is deferred to **Milestone 4**. This milestone focuses solely on the cross-pollination loop mechanics.
+The final synthesis step (generating `champion_review.md` using Claude) is deferred to **Milestone 4**. This document (Milestone 3) focuses solely on the cross-pollination loop mechanics.
