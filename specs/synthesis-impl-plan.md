@@ -13,7 +13,7 @@ This document describes the implementation plan for the Final Synthesis step (Mi
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Agent availability validation | **Deferred** | Create GitHub issue for startup agent validation feature |
-| Fallback behavior | **Use any available agent** | If Claude unavailable, use first enabled agent |
+| Synthesizer agent | **Claude required (no fallback)** | Per spec: "Claude is always used for this step" - fail with exit code 4 if unavailable |
 | Prompt metadata | **Include tournament context** | Include round count and participating agents |
 | Prompt location | **Persisted** | Write to `.arena/rounds/final/prompt.md` for debugging/audit |
 
@@ -75,7 +75,7 @@ Done:
 
 ### Key Design Decisions
 
-1. **Agent selection priority**: Prefer `claude` if enabled, else first enabled agent alphabetically
+1. **Agent selection**: Claude is **required** for synthesis (per spec). Fail with exit code 4 if unavailable.
 2. **Prompt persistence**: Write to `.arena/rounds/final/prompt.md` for audit/debugging
 3. **Tournament metadata**: Include round count and participating agents in prompt
 4. **Failure semantics**: Synthesis failure returns exit code 4 with `[SYNTHESIS]` prefix
@@ -131,7 +131,7 @@ Produce one final review in `${outputPath}` using the standard review structure:
 
 **Step 2a: Update the record to include synthesis-specific fields:**
 
-Add new fields to the record:
+Add new fields to the record. Use boxed `Integer` types for synthesis-specific fields since they are only populated for synthesis contexts (null for round/task contexts):
 
 ```java
 public record TemplateContext(
@@ -141,11 +141,24 @@ public record TemplateContext(
         String commit1,
         String commit2,
         String stagedFlag,
-        // New synthesis-specific fields
+        // New synthesis-specific fields (null for non-synthesis contexts)
         Integer roundCount,
         Integer crossPollinationRounds,
         String participatingAgents
 ) {
+    /**
+     * Compact constructor for validation.
+     */
+    public TemplateContext {
+        // Validate synthesis fields are consistent when both present
+        if (roundCount != null && crossPollinationRounds != null) {
+            if (roundCount != crossPollinationRounds + 1) {
+                throw new IllegalArgumentException(
+                    "roundCount must equal crossPollinationRounds + 1, got roundCount="
+                    + roundCount + ", crossPollinationRounds=" + crossPollinationRounds);
+            }
+        }
+    }
 ```
 
 **Step 2b: Update existing factory methods to pass nulls for new fields:**
@@ -357,41 +370,33 @@ public AgentResult executeSynthesis(String agentName, Path promptPath, Path outp
 }
 
 /**
- * Selects the best agent for synthesis.
- * Prefers "claude" if available and enabled, otherwise first enabled agent alphabetically.
+ * Validates that Claude is available for synthesis.
+ * Per spec: "Claude is always used for this step regardless of which agents participated."
  *
- * @param preferredAgents optional set of agents to prefer (e.g., those that completed tournament)
- * @return the selected agent name
- * @throws AgentException if no enabled agents are available
+ * @throws AgentException if Claude is not configured or not enabled
  */
-public String selectSynthesizerAgent(Set<String> preferredAgents) {
-    // First, try to find "claude" if it's enabled and in preferred set
+public void validateSynthesizerAvailable() {
     AgentConfig claude = config.agents().get("claude");
-    if (claude != null && claude.enabled() &&
-        (preferredAgents == null || preferredAgents.contains("claude"))) {
-        return "claude";
+    if (claude == null) {
+        throw new AgentException(
+            "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml.");
     }
-
-    // Fall back to first enabled agent from preferred set (alphabetically)
-    if (preferredAgents != null && !preferredAgents.isEmpty()) {
-        return preferredAgents.stream()
-            .filter(name -> {
-                AgentConfig agent = config.agents().get(name);
-                return agent != null && agent.enabled();
-            })
-            .sorted()
-            .findFirst()
-            .orElseThrow(() -> new AgentException(
-                "No enabled agents available for synthesis from: " + preferredAgents));
+    if (!claude.enabled()) {
+        throw new AgentException(
+            "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled.");
     }
+}
 
-    // Last resort: any enabled agent
-    return config.agents().values().stream()
-        .filter(AgentConfig::enabled)
-        .map(AgentConfig::name)
-        .sorted()
-        .findFirst()
-        .orElseThrow(() -> new AgentException("No enabled agents available for synthesis"));
+/**
+ * Gets the synthesizer agent name.
+ * Per spec: Claude is always used for synthesis.
+ *
+ * @return "claude" (the only valid synthesizer per spec)
+ * @throws AgentException if Claude is not available
+ */
+public String getSynthesizerAgent() {
+    validateSynthesizerAvailable();
+    return "claude";
 }
 ```
 
@@ -403,20 +408,20 @@ public String selectSynthesizerAgent(Set<String> preferredAgents) {
 
 **Step 5a: Replace the TODO comments with synthesis implementation:**
 
-Replace lines 285-290 (the "TOURNAMENT COMPLETE" section) with:
+Replace the "TOURNAMENT COMPLETE" section (currently lines 285-290) with:
 
 ```java
 // === TOURNAMENT COMPLETE - START SYNTHESIS ===
 Path finalAllReviews = workspaceManager.getRoundDir(lastCompletedRound).resolve("all_reviews.md");
 log.info("Cross-pollination complete! Final reviews: {}", finalAllReviews);
 
-// Select synthesizer agent
+// Validate and get synthesizer agent (Claude required per spec)
 String synthesizerAgent;
 try {
-    synthesizerAgent = executor.selectSynthesizerAgent(activeAgents);
-    log.info("[SYNTHESIS] Selected synthesizer: {}", synthesizerAgent);
-} catch (Exception e) {
-    log.error("[SYNTHESIS] Failed to select synthesizer agent: {}", e.getMessage());
+    synthesizerAgent = executor.getSynthesizerAgent();
+    log.info("[SYNTHESIS] Using synthesizer: {}", synthesizerAgent);
+} catch (AgentException e) {
+    log.error("[SYNTHESIS] {}", e.getMessage());
     return 4;
 }
 
@@ -425,7 +430,7 @@ Path promptPath;
 try {
     promptPath = workspaceManager.generateSynthesisPrompt(lastCompletedRound, activeAgents);
     log.info("[SYNTHESIS] Prompt generated: {}", promptPath);
-} catch (Exception e) {
+} catch (WorkspaceException e) {
     log.error("[SYNTHESIS] Failed to generate synthesis prompt: {}", e.getMessage());
     return 4;
 }
@@ -460,8 +465,8 @@ log.info("  1. Round 0: Independent reviews (all agents)");
 for (int i = 1; i <= config.maxRounds(); i++) {
     log.info("  {}. Round {}: Cross-pollination (surviving agents)", i + 1, i);
 }
-log.info("  {}. Final synthesis: Champion review (single agent)", config.maxRounds() + 2);
-log.info("Synthesis agent: claude (preferred) or first available");
+log.info("  {}. Final synthesis: Champion review (claude)", config.maxRounds() + 2);
+log.info("Synthesis agent: claude (required)");
 ```
 
 ---
@@ -506,7 +511,7 @@ The arena starts the tournament without checking if agents are actually runnable
 | `final-synth.md` | `resources/prompts` | Add tournament metadata placeholders |
 | `TemplateContext.java` | `dev.reviewarena.io` | Add `roundCount`, `crossPollinationRounds`, `participatingAgents` fields; add `forSynthesis()` factory |
 | `WorkspaceManager.java` | `dev.reviewarena.io` | Add `generateSynthesisPrompt()`, `getChampionReviewPath()` |
-| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeSynthesis()`, `selectSynthesizerAgent()` |
+| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeSynthesis()`, `validateSynthesizerAvailable()`, `getSynthesizerAgent()` |
 | `ReviewArenaCli.java` | `dev.reviewarena.cli` | Replace TODO with synthesis logic, update dry-run output |
 
 ### Test Code
@@ -537,10 +542,10 @@ The arena starts the tournament without checking if agents are actually runnable
    - `testGetChampionReviewPath_correctLocation`
 
 3. **AgentExecutorTest.java:**
-   - `testSelectSynthesizerAgent_prefersClaudeWhenAvailable`
-   - `testSelectSynthesizerAgent_fallsBackToFirstEnabled`
-   - `testSelectSynthesizerAgent_respectsPreferredSet`
-   - `testSelectSynthesizerAgent_throwsWhenNoAgentsAvailable`
+   - `testValidateSynthesizerAvailable_claudeConfiguredAndEnabled_succeeds`
+   - `testValidateSynthesizerAvailable_claudeNotConfigured_throwsAgentException`
+   - `testValidateSynthesizerAvailable_claudeDisabled_throwsAgentException`
+   - `testGetSynthesizerAgent_returnsClaude`
    - `testExecuteSynthesis_successfulExecution`
    - `testExecuteSynthesis_logsWithSynthesisPrefix`
 
@@ -549,11 +554,12 @@ The arena starts the tournament without checking if agents are actually runnable
 1. **Full tournament flow:**
    - `testFullTournament_withSynthesis_producesChampionReview`
    - `testFullTournament_synthesisFailure_returnsExitCode4`
-   - `testFullTournament_noClaudeAvailable_usesOtherAgent`
+   - `testFullTournament_claudeNotConfigured_returnsExitCode4`
+   - `testFullTournament_claudeDisabled_returnsExitCode4`
 
 2. **Edge cases:**
-   - `testSynthesis_allAgentsFailed_selectsFromConfig`
-   - `testSynthesis_singleAgentRemaining_usesForSynthesis`
+   - `testSynthesis_singleAgentRemaining_stillUsesClaude`
+   - `testSynthesis_claudeDidNotParticipate_stillUsesClaude`
 
 ---
 
@@ -562,7 +568,8 @@ The arena starts the tournament without checking if agents are actually runnable
 | Scenario | Exit Code | Log Prefix | Message |
 |----------|-----------|------------|---------|
 | Success (synthesis complete) | 0 | - | "Tournament complete! Champion review: ..." |
-| Synthesizer selection failed | 4 | [SYNTHESIS] | "Failed to select synthesizer agent: ..." |
+| Claude not configured | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml." |
+| Claude disabled | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled." |
 | Synthesis prompt generation failed | 4 | [SYNTHESIS] | "Failed to generate synthesis prompt: ..." |
 | Synthesis execution failed | 4 | [SYNTHESIS] | "Synthesis failed: <reason>" |
 
@@ -575,7 +582,7 @@ The feature is complete when:
 - [ ] `final-synth.md` template includes tournament metadata placeholders
 - [ ] `TemplateContext.forSynthesis()` creates valid context with metadata
 - [ ] `WorkspaceManager.generateSynthesisPrompt()` writes to `.arena/rounds/final/prompt.md`
-- [ ] `AgentExecutor.selectSynthesizerAgent()` prefers Claude, falls back to other agents
+- [ ] `AgentExecutor.getSynthesizerAgent()` returns Claude (required per spec, no fallback)
 - [ ] `AgentExecutor.executeSynthesis()` executes synthesizer and produces output
 - [ ] `ReviewArenaCli` integrates synthesis after cross-pollination
 - [ ] `champion_review.md` is written to `.arena/rounds/final/`
@@ -612,15 +619,16 @@ Writing the synthesis prompt to `.arena/rounds/final/prompt.md` provides:
 
 ### Synthesizer Selection Logic
 
-The selection priority is:
-1. **Claude** if enabled and in the set of agents that completed all rounds
-2. **First alphabetically** from agents that completed all rounds
-3. **Any enabled agent** as last resort
+Per the spec, **Claude is required** for the synthesis step:
 
-This ensures:
-- Claude's synthesis quality is preferred when available
-- Agents that participated in the tournament have context advantage
-- Tournament never fails due to lack of synthesizer
+> "After the last round, **Claude** runs one more agent process in the dedicated synthesizer role. Claude is always used for this step regardless of which agents participated in the tournament rounds."
+
+**Behavior:**
+- If Claude is configured and enabled → use Claude for synthesis
+- If Claude is not configured → fail with exit code 4
+- If Claude is configured but disabled → fail with exit code 4
+
+**Rationale:** Using a single, consistent agent for synthesis ensures deterministic output format and avoids ambiguity about which agent produces the final deliverable. Claude's synthesis quality is explicitly preferred by the spec.
 
 ### No ProcessType Enum Needed
 
