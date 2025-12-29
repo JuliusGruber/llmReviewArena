@@ -73,26 +73,26 @@ Done:
 
 ## Implementation Steps
 
-### Step 1: Add Config Validation for maxRounds
+### Step 1: Update Config Validation for maxRounds
 
 **File:** `ArenaConfig.java` (package: `dev.reviewarena.config`)
 
-Add validation that `maxRounds >= 1`:
+Modify the existing compact constructor validation. Change line 50-51 from:
 
 ```java
-/**
- * Validates configuration constraints.
- *
- * @throws ConfigException if constraints are violated
- */
-public void validate() {
-    if (maxRounds < 1) {
-        throw new ConfigException(
-            "maxRounds must be at least 1 (cross-pollination requires at least one round). " +
-            "Got: " + maxRounds);
-    }
-}
+if (maxRounds < 0) {
+    throw new ConfigException("maxRounds must be non-negative, got: " + maxRounds);
 ```
+
+To:
+
+```java
+if (maxRounds < 1) {
+    throw new ConfigException(
+        "maxRounds must be at least 1 (cross-pollination requires at least one round). Got: " + maxRounds);
+```
+
+**Note:** `ArenaConfig` is a record that validates in its compact constructor, not via a separate `validate()` method.
 
 ---
 
@@ -171,7 +171,8 @@ log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
     successCount, allReviews);
 
 // Track active agents (start with all successful from round 0)
-Set<String> activeAgents = AgentExecutor.getSuccessfulAgents(round0Results);
+// Use explicit HashSet for guaranteed mutability (Collectors.toSet() is implementation-dependent)
+Set<String> activeAgents = new HashSet<>(AgentExecutor.getSuccessfulAgents(round0Results));
 int lastCompletedRound = 0;
 
 // === CROSS-POLLINATION ROUNDS (1 through maxRounds) ===
@@ -181,6 +182,12 @@ for (int round = 1; round <= config.maxRounds(); round++) {
 
     // Execute round with only active agents
     Map<String, AgentResult> roundResults = executor.executeRound(round, activeAgents);
+
+    // Handle catastrophic round failure (timeout killed all agents, etc.)
+    if (roundResults.isEmpty()) {
+        log.error("[ROUND] Round {} produced no results (timeout or catastrophic failure)", round);
+        return 4;
+    }
 
     // Update active agents: keep only those that succeeded in ALL rounds so far
     Set<String> successfulThisRound = AgentExecutor.getSuccessfulAgents(roundResults);
@@ -248,69 +255,26 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
 
 ---
 
-### Step 6: Implement Round-Level Timeout and Grace Period
+### Step 6: Verify Existing Timeout Implementation ✅ ALREADY IMPLEMENTED
 
-**File:** `AgentExecutor.java` (package: `dev.reviewarena.agent`)
+**Status:** No code changes needed - verify only.
 
-Add round-level timeout enforcement to `executeRound()` methods:
+Round-level timeout and grace period handling are **already fully implemented**:
 
-```java
-/**
- * Executes agents for a round with timeout enforcement.
- *
- * @param round the round number
- * @param agentNames agents to execute (null = all enabled)
- * @return map of agent name to result
- */
-public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) {
-    long roundStart = System.currentTimeMillis();
-    long roundDeadline = roundStart + config.roundTimeoutMs();
+| Feature | Location | Implementation |
+|---------|----------|----------------|
+| Round timeout | `AgentExecutor.java:85` | `waitForAllWithTimeout(futures, config.roundTimeoutMs())` |
+| Per-agent timeout | `AgentProcess.java:93` | `process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)` |
+| Grace period | `AgentProcess.java:132-151` | `handleTimeout()` with graceful shutdown |
+| Process tree kill | `AgentProcess.java:197-229` | `destroyDescendants()` for Windows child processes |
 
-    // ... agent execution with CompletableFuture ...
+**Verification checklist:**
+- [ ] Confirm `AgentExecutor.waitForAllWithTimeout()` uses `config.roundTimeoutMs()`
+- [ ] Confirm `AgentProcess` receives `config.gracePeriodMs()` via builder
+- [ ] Confirm `AgentProcess.handleTimeout()` implements graceful → force kill sequence
+- [ ] Confirm timed-out agents return `AgentResult.timeout()` status
 
-    // Wait for completion with round-level timeout
-    long remainingMs = roundDeadline - System.currentTimeMillis();
-    if (remainingMs <= 0) {
-        log.warn("[ROUND] Round {} exceeded timeout of {}ms, killing remaining agents",
-            round, config.roundTimeoutMs());
-        killRunningAgents(runningProcesses);
-        // Return partial results
-    }
-
-    return results;
-}
-
-/**
- * Terminates agents with grace period before force kill.
- */
-private void killRunningAgents(List<AgentProcess> processes) {
-    for (AgentProcess process : processes) {
-        // Request graceful termination
-        process.terminate();
-    }
-
-    // Wait grace period
-    try {
-        Thread.sleep(config.gracePeriodMs());
-    } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-    }
-
-    // Force kill any remaining
-    for (AgentProcess process : processes) {
-        if (process.isAlive()) {
-            log.warn("[AGENT] Force-killing agent after grace period: {}", process.getName());
-            process.forceKill();
-        }
-    }
-}
-```
-
-**Key behaviors:**
-- Round timeout checked during `CompletableFuture.allOf().get(remainingMs, MILLISECONDS)`
-- Grace period (`gracePeriodMs`) allows agents to clean up before force-kill
-- Partial results from completed agents are preserved
-- Timed-out agents marked as failed and excluded from subsequent rounds
+**No new methods needed.** The existing architecture correctly encapsulates process lifecycle management within `AgentProcess`, which is instantiated per-agent and handles its own timeout/termination
 
 ---
 
@@ -319,10 +283,10 @@ private void killRunningAgents(List<AgentProcess> processes) {
 | File | Package | Changes |
 |------|---------|---------|
 | `ArenaConfig.java` | `dev.reviewarena.config` | Change validation: maxRounds >= 1 (was >= 0) |
-| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeRound(int, Set<String>)` overload, round-level timeout, grace period handling |
-| `AgentProcess.java` | `dev.reviewarena.agent` | Add `terminate()`, `forceKill()`, `isAlive()` methods if not present |
-| `ReviewAggregator.java` | `dev.reviewarena.agent` | ✅ Already done - verify only |
-| `ReviewArenaCli.java` | `dev.reviewarena.cli` | Replace TODO with cross-pollination loop |
+| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeRound(int, Set<String>)` overload only |
+| `AgentProcess.java` | `dev.reviewarena.agent` | ✅ No changes - timeout/grace period already implemented |
+| `ReviewAggregator.java` | `dev.reviewarena.agent` | ✅ No changes - verify filtering only |
+| `ReviewArenaCli.java` | `dev.reviewarena.cli` | Replace TODO with cross-pollination loop, add `HashSet` import |
 
 ---
 
@@ -445,7 +409,7 @@ The feature is complete when:
 1. Update config validation for `maxRounds >= 1` (change from >= 0)
 2. Verify `ReviewAggregator` internal filtering ✅ (already implemented)
 3. Add `AgentExecutor.executeRound(int, Set<String>)` overload
-4. Implement round-level timeout and grace period in `AgentExecutor`
+4. Verify existing timeout/grace period ✅ (already implemented in `AgentProcess`)
 5. Implement cross-pollination loop in `ReviewArenaCli.call()`
 6. Update dry-run output (include timeout settings)
 7. Create cross-platform mock agent scripts
