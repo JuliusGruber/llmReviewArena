@@ -243,9 +243,6 @@ public class ReviewArenaCli implements Callable<Integer> {
 
         // === CROSS-POLLINATION ROUNDS (1 through maxRounds) ===
         for (int round = 1; round <= config.maxRounds(); round++) {
-            log.info("Starting round {}/{} with agents: {}",
-                round, config.maxRounds(), allAgents);
-
             // Execute round with all agents (agents participate even if they failed in previous rounds)
             Map<String, AgentResult> roundResults = executor.executeRound(round, allAgents);
 
