@@ -585,20 +585,20 @@ ping -n 999999 127.0.0.1 > nul
 
 The feature is complete when:
 
-- [ ] Existing test `testValidation_zeroMaxRounds_allowed` updated to expect failure
-- [ ] Existing test `testValidation_negativeMaxRounds_throws` updated with new message
-- [ ] Config validation rejects `maxRounds < 1`
-- [ ] Cross-pollination rounds 1 through N execute successfully
-- [ ] Progress logs show active agents at each round start
-- [ ] Failed agents are excluded from subsequent rounds
-- [ ] Tournament aborts if active agents < minAgents
-- [ ] Round-level timeout (`roundTimeoutMs`) kills remaining agents when exceeded
-- [ ] Grace period (`gracePeriodMs`) allows clean shutdown before force-kill
-- [ ] Final `all_reviews.md` is generated after last round
-- [ ] Dry-run mode displays full tournament flow (including timeout settings)
-- [ ] All tests pass (unit + integration) - **no regressions**
-- [ ] Mock agents work on both Unix and Windows
-- [ ] `spec.md` updated if implementation deviates from specification
+- [x] Existing test `testValidation_zeroMaxRounds_allowed` updated to expect failure
+- [x] Existing test `testValidation_negativeMaxRounds_throws` updated with new message
+- [x] Config validation rejects `maxRounds < 1`
+- [x] Cross-pollination rounds 1 through N execute successfully
+- [x] Progress logs show active agents at each round start
+- [x] Failed agents are excluded from subsequent rounds
+- [x] Tournament aborts if active agents < minAgents
+- [x] Round-level timeout (`roundTimeoutMs`) kills remaining agents when exceeded
+- [x] Grace period (`gracePeriodMs`) allows clean shutdown before force-kill
+- [x] Final `all_reviews.md` is generated after last round
+- [x] Dry-run mode displays full tournament flow (including timeout settings)
+- [x] All tests pass (unit + integration) - **no regressions**
+- [ ] Mock agents work on both Unix and Windows (deferred - not blocking for core functionality)
+- [x] `spec.md` updated if implementation deviates from specification (no deviations)
 
 ---
 
