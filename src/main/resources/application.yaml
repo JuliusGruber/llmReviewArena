@@ -39,13 +39,13 @@ agents:
       - "@prompt.md"
     flags:
       auto-approve: true
-    enabled: true
+    enabled: false  # Disabled: Codex CLI requires TTY (raw mode stdin)
 
   gemini:
     command:
-      - gemini
-      - -p
-      - "@prompt.md"
+      - bash
+      - -c
+      - cat @prompt.md | gemini --yolo
     flags:
-      auto-approve: true
+      auto-approve: false  # Already included in command string
     enabled: true

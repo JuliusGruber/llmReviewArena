@@ -121,7 +121,7 @@ public class AgentProcess {
                 // Step 3: Force kill
                 log.warn("Agent '{}' did not terminate gracefully, force killing", agentName);
                 process.destroyForcibly();
-                process.waitFor(1000, TimeUnit.MILLISECONDS);
+                process.waitFor(gracePeriodMs, TimeUnit.MILLISECONDS);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -59,13 +59,32 @@ public class CommandBuilder {
         for (int i = 0; i < command.size(); i++) {
             String arg = command.get(i);
             if (arg.contains(PROMPT_PLACEHOLDER)) {
-                arg = arg.replace(PROMPT_PLACEHOLDER, promptPath);
+                // Use forward slashes for shell compatibility (bash on Windows)
+                String safePath = isShellCommand(command) ? toForwardSlashes(promptPath) : promptPath;
+                arg = arg.replace(PROMPT_PLACEHOLDER, safePath);
             }
             if (arg.contains(OUTPUT_PLACEHOLDER)) {
-                arg = arg.replace(OUTPUT_PLACEHOLDER, outputPath);
+                String safePath = isShellCommand(command) ? toForwardSlashes(outputPath) : outputPath;
+                arg = arg.replace(OUTPUT_PLACEHOLDER, safePath);
             }
             command.set(i, arg);
         }
+    }
+
+    /**
+     * Checks if the command is a shell command (bash, sh, cmd).
+     */
+    private boolean isShellCommand(List<String> command) {
+        if (command.isEmpty()) return false;
+        String first = command.get(0).toLowerCase();
+        return first.equals("bash") || first.equals("sh") || first.contains("bash") || first.contains("sh");
+    }
+
+    /**
+     * Converts Windows backslashes to forward slashes for shell compatibility.
+     */
+    private String toForwardSlashes(String path) {
+        return path.replace('\\', '/');
     }
 
     private void addTranslatedFlags(List<String> command, AgentConfig config) {
