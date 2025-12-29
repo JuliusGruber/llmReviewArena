@@ -288,7 +288,7 @@ class ReviewArenaCliTest {
                 assertTrue(output.contains("Review target: abc1234"));
                 assertTrue(output.contains("Config file: arena.yaml"));
                 assertTrue(output.contains("Output directory: .arena"));
-                assertTrue(output.contains("Max rounds: 5"));
+                assertTrue(output.contains("Cross-pollination rounds: 5"));
                 assertTrue(output.contains("Concurrency: unlimited"));
             } finally {
                 System.setOut(originalOut);
@@ -336,7 +336,7 @@ class ReviewArenaCliTest {
                 String output = baos.toString();
                 assertTrue(output.contains("Config file: custom.yaml"));
                 assertTrue(output.contains("Output directory: output"));
-                assertTrue(output.contains("Max rounds: 10"));
+                assertTrue(output.contains("Cross-pollination rounds: 10"));
             } finally {
                 System.setOut(originalOut);
             }

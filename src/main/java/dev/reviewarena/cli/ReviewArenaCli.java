@@ -325,14 +325,25 @@ public class ReviewArenaCli implements Callable<Integer> {
         log.info("  Config file: {}", configFile);
         log.info("Effective configuration:");
         log.info("  Output directory: {}", config.outputDir());
-        log.info("  Max rounds: {}", config.maxRounds());
+        log.info("  Cross-pollination rounds: {}", config.maxRounds());
+        log.info("  Total rounds: {} (Round 0 + {} cross-pollination)",
+            config.maxRounds() + 1, config.maxRounds());
         log.info("  Concurrency: {}", config.maxConcurrent() == 0 ? "unlimited" : config.maxConcurrent());
         log.info("  Agent timeout: {}ms", config.agentTimeoutMs());
+        log.info("  Round timeout: {}ms", config.roundTimeoutMs());
+        log.info("  Grace period: {}ms", config.gracePeriodMs());
+        log.info("  Minimum agents: {}", config.minAgents());
         log.info("Agents ({} configured):", config.agents().size());
         config.agents().forEach((name, agent) -> {
             String status = agent.enabled() ? "enabled" : "disabled";
             log.info("  - {} ({}): {}", name, status, String.join(" ", agent.command()));
         });
+        log.info("Tournament flow:");
+        log.info("  1. Round 0: Independent reviews (all agents)");
+        for (int i = 1; i <= config.maxRounds(); i++) {
+            log.info("  {}. Round {}: Cross-pollination (surviving agents)", i + 1, i);
+        }
+        log.info("  Note: Final synthesis (Milestone 4) not yet implemented");
     }
 
     //==========================================================================
