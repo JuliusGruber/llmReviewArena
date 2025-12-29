@@ -235,7 +235,7 @@ public class ReviewArenaCli implements Callable<Integer> {
         // Aggregate Round 0 reviews
         Path allReviews = aggregator.aggregateRound(0, round0Results);
         log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
-            successCount, allReviews);
+            successCount, projectRoot.relativize(allReviews));
 
         // Track all enabled agents - agents participate in every round even if they failed previously
         Set<String> allAgents = new HashSet<>(round0Results.keySet());
