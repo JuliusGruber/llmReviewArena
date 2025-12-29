@@ -44,9 +44,15 @@ public class AgentExecutor {
             return Map.of();
         }
 
-        log.info("Starting round {}/{} with {} agents: {}",
-            round, config.maxRounds(), enabledAgents.size(),
-            enabledAgents.stream().map(AgentConfig::name).toList());
+        if (round == 0) {
+            log.info("Starting initial round with {} agents: {}",
+                enabledAgents.size(),
+                enabledAgents.stream().map(AgentConfig::name).toList());
+        } else {
+            log.info("Starting round {}/{} with {} agents: {}",
+                round, config.maxRounds(), enabledAgents.size(),
+                enabledAgents.stream().map(AgentConfig::name).toList());
+        }
 
         return executeAgents(enabledAgents, round);
     }
@@ -71,9 +77,15 @@ public class AgentExecutor {
             return Map.of();
         }
 
-        log.info("Starting round {}/{} with {} agents: {}",
-            round, config.maxRounds(), agents.size(),
-            agents.stream().map(AgentConfig::name).toList());
+        if (round == 0) {
+            log.info("Starting initial round with {} agents: {}",
+                agents.size(),
+                agents.stream().map(AgentConfig::name).toList());
+        } else {
+            log.info("Starting round {}/{} with {} agents: {}",
+                round, config.maxRounds(), agents.size(),
+                agents.stream().map(AgentConfig::name).toList());
+        }
 
         return executeAgents(agents, round);
     }
