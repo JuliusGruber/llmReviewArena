@@ -29,6 +29,24 @@ public class ConfigLoader {
 
     private static final String DEFAULT_CONFIG_FILE = "arena.yaml";
 
+    private final Path baseDir;
+
+    /**
+     * Creates a ConfigLoader using the current working directory as base.
+     */
+    public ConfigLoader() {
+        this(Path.of("."));
+    }
+
+    /**
+     * Creates a ConfigLoader with a specified base directory.
+     *
+     * @param baseDir the base directory for resolving config files
+     */
+    public ConfigLoader(Path baseDir) {
+        this.baseDir = baseDir;
+    }
+
     /**
      * CLI overrides that take highest precedence.
      */
@@ -62,7 +80,7 @@ public class ConfigLoader {
      * Loads configuration with default path and no overrides.
      */
     public ArenaConfig load() {
-        return load(null, CliOverrides.none());
+        return load(baseDir.resolve(DEFAULT_CONFIG_FILE), CliOverrides.none());
     }
 
     private SmallRyeConfig buildConfig(Path arenaYamlPath) {

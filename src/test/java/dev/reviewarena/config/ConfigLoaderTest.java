@@ -20,7 +20,7 @@ class ConfigLoaderTest {
 
     @BeforeEach
     void setUp() {
-        loader = new ConfigLoader();
+        loader = new ConfigLoader(tempDir);
     }
 
     // ===== Loading from defaults =====
@@ -287,7 +287,7 @@ class ConfigLoaderTest {
     @Test
     void testLoad_defaultMethod_usesDefaults() {
         // The no-arg load() should work and use defaults
-        // (will look for arena.yaml in cwd which likely doesn't exist in test)
+        // (looks for arena.yaml in baseDir which is tempDir - empty)
         ArenaConfig config = loader.load();
 
         assertNotNull(config);
