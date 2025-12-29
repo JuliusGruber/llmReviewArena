@@ -1,0 +1,32 @@
+# Local arena configuration to enable all agents
+agents:
+  claude:
+    command:
+      - claude
+      - -p
+    flags:
+      auto-approve: true
+    enabled: true
+
+  codex:
+    command:
+      - python
+      - src/main/resources/codex-wrapper.py
+      - "@prompt.md"
+      - "@output"
+    flags:
+      auto-approve: true
+    enabled: true
+
+  gemini:
+    command:
+      - gemini
+    flags:
+      auto-approve: true
+    enabled: true
+
+limits:
+  max-rounds: 0
+
+tournament:
+  min-agents: 1
