@@ -240,7 +240,9 @@ public class WorkspaceManager {
 
                 TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath,
                         commit1, commit2, stagedFlag);
-                String roundContent = templateLoader.render("round-" + round + ".md", ctx);
+                // Use round-5.md template for rounds > 5 (final convergence template is reusable)
+                int templateRound = Math.min(round, 5);
+                String roundContent = templateLoader.render("round-" + templateRound + ".md", ctx);
 
                 // Combine task + round into a complete standalone prompt
                 String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;

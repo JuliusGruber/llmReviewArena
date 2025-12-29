@@ -375,4 +375,69 @@ class WorkspaceManagerTest {
         // No subdirectories for disabled agents
         assertFalse(Files.exists(round0.resolve("agent1")));
     }
+
+    // ===== Rounds beyond 5 use round-5 template =====
+
+    @Test
+    void testInitialize_roundsBeyond5_usesRound5Template() throws IOException {
+        // Create config with maxRounds > 5
+        Map<String, AgentConfig> agents = Map.of(
+            "claude", new AgentConfig("claude", List.of("claude"), Map.of(), true)
+        );
+
+        ArenaConfig config = new ArenaConfig(
+            7, // maxRounds = 7 (rounds 0-7, with 6 and 7 using round-5 template)
+            ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
+            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
+            Path.of(".arena"), agents
+        );
+
+        WorkspaceManager manager = new WorkspaceManager(tempDir, config);
+
+        manager.initialize("abc1234", "", "");
+
+        // Verify round-6 and round-7 prompts are created
+        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-6-claude.md")));
+        assertTrue(Files.exists(tempDir.resolve(".arena/prompts/round-7-claude.md")));
+
+        // Verify round-6 contains "final refinement" from round-5 template
+        // but with correct round number in the context variables
+        String round6Content = Files.readString(tempDir.resolve(".arena/prompts/round-6-claude.md"));
+        assertTrue(round6Content.contains("final refinement round"));
+        assertTrue(round6Content.contains("Round 6")); // roundNumber variable should show 6
+        assertTrue(round6Content.contains(".arena/rounds/round-6/claude/review.md")); // correct output path
+
+        // Verify round-7 also works
+        String round7Content = Files.readString(tempDir.resolve(".arena/prompts/round-7-claude.md"));
+        assertTrue(round7Content.contains("final refinement round"));
+        assertTrue(round7Content.contains("Round 7"));
+    }
+
+    @Test
+    void testInitialize_roundsBeyond5_createsCorrectDirectories() {
+        Map<String, AgentConfig> agents = Map.of(
+            "claude", new AgentConfig("claude", List.of("claude"), Map.of(), true)
+        );
+
+        ArenaConfig config = new ArenaConfig(
+            8, // maxRounds = 8
+            ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
+            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
+            Path.of(".arena"), agents
+        );
+
+        WorkspaceManager manager = new WorkspaceManager(tempDir, config);
+
+        manager.initialize("abc1234", "", "");
+
+        // Verify all round directories are created
+        for (int round = 0; round <= 8; round++) {
+            assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/round-" + round)),
+                "Round " + round + " directory should exist");
+            assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/round-" + round + "/claude")),
+                "Round " + round + " claude directory should exist");
+        }
+    }
 }
