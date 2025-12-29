@@ -196,10 +196,13 @@ src/main/java/dev/reviewarena/agent/
 - Dynamic agent filtering per round
 - Minimum threshold check after each round
 - Config validation for maxRounds >= 1
+- Round-level timeout enforcement (`roundTimeoutMs`)
+- Grace period handling before force-kill (`gracePeriodMs`)
 
 **Files to modify:**
 - `ConfigLoader.java` - Add validation
-- `AgentExecutor.java` - Add filtered executeRound overload
+- `AgentExecutor.java` - Add filtered executeRound overload, round-level timeout, grace period
+- `AgentProcess.java` - Add terminate/forceKill methods if needed
 - `ReviewAggregator.java` - Verify filtering
 - `ReviewArenaCli.java` - Implement loop
 
@@ -332,8 +335,10 @@ src/main/java/dev/reviewarena/agent/
 - [ ] Cross-pollination rounds 1-N execute successfully
 - [ ] Failed agents excluded from subsequent rounds
 - [ ] Tournament aborts if below minAgents threshold
+- [ ] Round-level timeout kills remaining agents when exceeded
+- [ ] Grace period allows clean shutdown before force-kill
 - [ ] Final `all_reviews.md` generated after last round
-- [ ] Progress output shows round status
+- [ ] Progress output shows round status (including timeout settings in dry-run)
 
 ### Milestone 4 Complete When:
 - [ ] Claude validated before Round 0 starts

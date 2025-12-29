@@ -165,8 +165,10 @@ The arena enforces limits on agent outputs to prevent runaway processes:
 ```yaml
 limits:
   max-output-size-kb: 500    # Maximum size per output file (e.g., review.md)
-  max-rounds: 5              # Number of cross-pollination rounds after Round 0 (default: 5)
+  max-rounds: 5              # Number of cross-pollination rounds after Round 0 (default: 5, minimum: 1)
 ```
+
+**Constraint:** `max-rounds` must be at least 1. Cross-pollination is the core value proposition of the arena—running only Round 0 with no improvement cycle provides no tournament benefit over running a single agent directly. The orchestrator rejects `max-rounds: 0` with exit code 5 (config error).
 
 #### Round Counting (0-indexed)
 

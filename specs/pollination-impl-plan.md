@@ -31,6 +31,8 @@ This document describes the implementation plan for Rounds 1-N cross-pollination
 3. **Dynamic agent filtering** per round (exclude failed agents)
 4. **Minimum threshold check** after each round
 5. **Config validation** for `maxRounds >= 1`
+6. **Round-level timeout** enforcement (`roundTimeoutMs`)
+7. **Grace period** handling before force-kill (`gracePeriodMs`)
 
 ## Implementation Design
 
@@ -222,10 +224,13 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
     log.info("  Config file: {}", configFile);
     log.info("Effective configuration:");
     log.info("  Output directory: {}", config.outputDir());
-    log.info("  Max rounds: {} (Round 0 + {} cross-pollination rounds)",
+    log.info("  Cross-pollination rounds: {}", config.maxRounds());
+    log.info("  Total rounds: {} (Round 0 + {} cross-pollination)",
         config.maxRounds() + 1, config.maxRounds());
     log.info("  Concurrency: {}", config.maxConcurrent() == 0 ? "unlimited" : config.maxConcurrent());
     log.info("  Agent timeout: {}ms", config.agentTimeoutMs());
+    log.info("  Round timeout: {}ms", config.roundTimeoutMs());
+    log.info("  Grace period: {}ms", config.gracePeriodMs());
     log.info("  Minimum agents: {}", config.minAgents());
     log.info("Agents ({} configured):", config.agents().size());
     config.agents().forEach((name, agent) -> {
@@ -243,12 +248,79 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
 
 ---
 
+### Step 6: Implement Round-Level Timeout and Grace Period
+
+**File:** `AgentExecutor.java` (package: `dev.reviewarena.agent`)
+
+Add round-level timeout enforcement to `executeRound()` methods:
+
+```java
+/**
+ * Executes agents for a round with timeout enforcement.
+ *
+ * @param round the round number
+ * @param agentNames agents to execute (null = all enabled)
+ * @return map of agent name to result
+ */
+public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) {
+    long roundStart = System.currentTimeMillis();
+    long roundDeadline = roundStart + config.roundTimeoutMs();
+
+    // ... agent execution with CompletableFuture ...
+
+    // Wait for completion with round-level timeout
+    long remainingMs = roundDeadline - System.currentTimeMillis();
+    if (remainingMs <= 0) {
+        log.warn("[ROUND] Round {} exceeded timeout of {}ms, killing remaining agents",
+            round, config.roundTimeoutMs());
+        killRunningAgents(runningProcesses);
+        // Return partial results
+    }
+
+    return results;
+}
+
+/**
+ * Terminates agents with grace period before force kill.
+ */
+private void killRunningAgents(List<AgentProcess> processes) {
+    for (AgentProcess process : processes) {
+        // Request graceful termination
+        process.terminate();
+    }
+
+    // Wait grace period
+    try {
+        Thread.sleep(config.gracePeriodMs());
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    }
+
+    // Force kill any remaining
+    for (AgentProcess process : processes) {
+        if (process.isAlive()) {
+            log.warn("[AGENT] Force-killing agent after grace period: {}", process.getName());
+            process.forceKill();
+        }
+    }
+}
+```
+
+**Key behaviors:**
+- Round timeout checked during `CompletableFuture.allOf().get(remainingMs, MILLISECONDS)`
+- Grace period (`gracePeriodMs`) allows agents to clean up before force-kill
+- Partial results from completed agents are preserved
+- Timed-out agents marked as failed and excluded from subsequent rounds
+
+---
+
 ## File Changes Summary
 
 | File | Package | Changes |
 |------|---------|---------|
 | `ArenaConfig.java` | `dev.reviewarena.config` | Change validation: maxRounds >= 1 (was >= 0) |
-| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeRound(int, Set<String>)` overload |
+| `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeRound(int, Set<String>)` overload, round-level timeout, grace period handling |
+| `AgentProcess.java` | `dev.reviewarena.agent` | Add `terminate()`, `forceKill()`, `isAlive()` methods if not present |
 | `ReviewAggregator.java` | `dev.reviewarena.agent` | ✅ Already done - verify only |
 | `ReviewArenaCli.java` | `dev.reviewarena.cli` | Replace TODO with cross-pollination loop |
 
@@ -282,7 +354,10 @@ private void printDryRunSummary(boolean staged, String ref1, String ref2, ArenaC
 
 2. **Edge cases:**
    - `testTournament_allAgentsFailRound1_abortsImmediately`
+   - `testTournament_allAgentsFailRound3_abortsCorrectly`
    - `testTournament_maxRoundsOne_executesOneRoundOnly`
+   - `testTournament_roundTimeout_killsRemainingAgents`
+   - `testTournament_gracePeriod_allowsCleanShutdown`
 
 3. **Config validation:**
    - `testConfig_maxRoundsZero_failsWithConfigException`
@@ -355,8 +430,10 @@ The feature is complete when:
 - [ ] Progress logs show active agents at each round start
 - [ ] Failed agents are excluded from subsequent rounds
 - [ ] Tournament aborts if active agents < minAgents
+- [ ] Round-level timeout (`roundTimeoutMs`) kills remaining agents when exceeded
+- [ ] Grace period (`gracePeriodMs`) allows clean shutdown before force-kill
 - [ ] Final `all_reviews.md` is generated after last round
-- [ ] Dry-run mode displays full tournament flow
+- [ ] Dry-run mode displays full tournament flow (including timeout settings)
 - [ ] All tests pass (unit + integration)
 - [ ] Mock agents work on both Unix and Windows
 - [ ] `spec.md` updated if implementation deviates from specification
@@ -368,11 +445,12 @@ The feature is complete when:
 1. Update config validation for `maxRounds >= 1` (change from >= 0)
 2. Verify `ReviewAggregator` internal filtering ✅ (already implemented)
 3. Add `AgentExecutor.executeRound(int, Set<String>)` overload
-4. Implement cross-pollination loop in `ReviewArenaCli.call()`
-5. Update dry-run output
-6. Create cross-platform mock agent scripts
-7. Write unit tests
-8. Write integration tests
+4. Implement round-level timeout and grace period in `AgentExecutor`
+5. Implement cross-pollination loop in `ReviewArenaCli.call()`
+6. Update dry-run output (include timeout settings)
+7. Create cross-platform mock agent scripts
+8. Write unit tests
+9. Write integration tests (including timeout scenarios)
 
 ---
 
