@@ -230,13 +230,15 @@ The tournament continues with remaining agents. If ALL agents fail validation in
 
 ### Error Handling
 
-When an agent fails during a round (crash, timeout, or invalid output), the orchestrator uses the **skip** strategy:
+When an agent fails during a round (crash, timeout, or invalid output), the orchestrator uses the **retry** strategy:
 
 | Behavior | Description |
 |----------|-------------|
 | **Exclude from current round** | The failed agent's output is not included in `all_reviews.md` |
-| **Exclude from subsequent rounds** | The agent is removed from the tournament entirely |
+| **Retry in subsequent rounds** | The agent still participates in all subsequent rounds |
 | **Log error to console** | Failure details are printed to stderr for visibility |
+
+**Rationale:** Transient failures (API timeouts, rate limits) should not permanently disqualify an agent. This maintains review diversity across all rounds and is more resilient to flaky external LLM APIs.
 
 **Failure Types:**
 
@@ -250,10 +252,10 @@ When an agent fails during a round (crash, timeout, or invalid output), the orch
 
 ```
 [ERROR] Agent 'codex' crashed in round 1: exit code 1
-[INFO] Excluding 'codex' from remaining rounds. Continuing with: claude, gemini
+[INFO] Starting round 2/5 with agents: [claude, codex, gemini]
 ```
 
-The tournament continues with the remaining agents. This ensures a single flaky agent does not block the entire review process.
+The tournament continues with all agents in subsequent rounds. This ensures transient failures do not permanently exclude an agent from the review process.
 
 ### Minimum Agent Threshold
 

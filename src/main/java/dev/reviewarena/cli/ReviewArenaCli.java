@@ -237,24 +237,17 @@ public class ReviewArenaCli implements Callable<Integer> {
         log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
             successCount, allReviews);
 
-        // Track active agents (start with all successful from round 0)
-        // Use explicit HashSet for guaranteed mutability (Collectors.toSet() is implementation-dependent)
-        Set<String> activeAgents = new HashSet<>(AgentExecutor.getSuccessfulAgents(round0Results));
+        // Track all enabled agents - agents participate in every round even if they failed previously
+        Set<String> allAgents = new HashSet<>(round0Results.keySet());
         int lastCompletedRound = 0;
 
         // === CROSS-POLLINATION ROUNDS (1 through maxRounds) ===
         for (int round = 1; round <= config.maxRounds(); round++) {
-            log.info("Starting round {}/{} with active agents: {}",
-                round, config.maxRounds(), activeAgents);
+            log.info("Starting round {}/{} with agents: {}",
+                round, config.maxRounds(), allAgents);
 
-            // Safety check: ensure we have agents to execute (should not happen if threshold checks pass)
-            if (activeAgents.isEmpty()) {
-                log.error("[ROUND] No active agents remaining for round {} (internal error)", round);
-                return 4;
-            }
-
-            // Execute round with only active agents
-            Map<String, AgentResult> roundResults = executor.executeRound(round, activeAgents);
+            // Execute round with all agents (agents participate even if they failed in previous rounds)
+            Map<String, AgentResult> roundResults = executor.executeRound(round, allAgents);
 
             // Handle round failure (all agents timed out, crashed, or were filtered)
             if (roundResults.isEmpty()) {
@@ -263,21 +256,22 @@ public class ReviewArenaCli implements Callable<Integer> {
                 return 4;
             }
 
-            // Update active agents: keep only those that succeeded in ALL rounds so far
-            Set<String> successfulThisRound = AgentExecutor.getSuccessfulAgents(roundResults);
-            activeAgents.retainAll(successfulThisRound);
+            // Count successful agents this round
+            long successfulThisRound = roundResults.values().stream()
+                .filter(AgentResult::isSuccess)
+                .count();
 
-            // Check minimum threshold
-            if (activeAgents.size() < config.minAgents()) {
-                log.error("[THRESHOLD] Only {} agents remain active after round {}, minimum {} required. " +
-                    "Aborting tournament.", activeAgents.size(), round, config.minAgents());
+            // Check minimum threshold based on successful agents in this round
+            if (successfulThisRound < config.minAgents()) {
+                log.error("[THRESHOLD] Only {} agents succeeded in round {}, minimum {} required. " +
+                    "Aborting tournament.", successfulThisRound, round, config.minAgents());
                 return 4;
             }
 
-            // Aggregate this round's reviews
+            // Aggregate this round's reviews (only successful ones are included)
             Path roundAllReviews = aggregator.aggregateRound(round, roundResults);
             log.info("Round {} complete: {} agents succeeded, aggregated to {}",
-                round, activeAgents.size(), workspaceManager.relativize(roundAllReviews));
+                round, successfulThisRound, workspaceManager.relativize(roundAllReviews));
 
             lastCompletedRound = round;
         }
@@ -341,7 +335,7 @@ public class ReviewArenaCli implements Callable<Integer> {
         log.info("Tournament flow:");
         log.info("  1. Round 0: Independent reviews (all agents)");
         for (int i = 1; i <= config.maxRounds(); i++) {
-            log.info("  {}. Round {}: Cross-pollination (surviving agents)", i + 1, i);
+            log.info("  {}. Round {}: Cross-pollination (all agents)", i + 1, i);
         }
         log.info("  Note: Final synthesis (Milestone 4) not yet implemented");
     }
