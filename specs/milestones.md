@@ -215,7 +215,7 @@ src/main/java/dev/reviewarena/agent/
 **Plan document:** `specs/synthesis-impl-plan.md`
 
 **Key features:**
-- Select synthesizer agent (prefer Claude, fallback to first available)
+- Validate synthesizer agent availability (Claude required, no fallback)
 - Generate synthesizer prompt at runtime with tournament metadata
 - Write prompt to `.arena/rounds/final/prompt.md` for audit/debugging
 - Execute synthesizer agent with `final-synth.md` template
@@ -223,7 +223,7 @@ src/main/java/dev/reviewarena/agent/
 
 **Design decisions:**
 - Agent startup validation deferred (GitHub issue to be created)
-- Fallback to any enabled agent if Claude unavailable
+- Claude is **required** for synthesis (fail with exit code 4 if unavailable)
 - Include round count and participating agents in prompt
 - Prompt persisted for debugging/reproducibility
 
@@ -235,10 +235,10 @@ src/main/java/dev/reviewarena/agent/
 - `ReviewArenaCli.java` - Add synthesis step after cross-pollination loop
 
 **Success criteria:**
-- [ ] `final-synth.md` template includes tournament metadata
+- [x] `final-synth.md` template includes tournament metadata
 - [ ] `TemplateContext.forSynthesis()` creates valid context
 - [ ] Synthesis prompt written to `.arena/rounds/final/prompt.md`
-- [ ] Synthesizer agent selected (Claude preferred, fallback to others)
+- [ ] Synthesizer agent validated (Claude required, fail if unavailable)
 - [ ] `champion_review.md` created in `.arena/rounds/final/`
 - [ ] Dry-run shows complete tournament flow including synthesis
 - [ ] Exit code 4 with [SYNTHESIS] prefix on synthesis failures
@@ -351,10 +351,10 @@ src/main/java/dev/reviewarena/agent/
 - [x] Progress output shows round status (including timeout settings in dry-run)
 
 ### Milestone 4 Complete When:
-- [ ] `final-synth.md` template includes tournament metadata
+- [x] `final-synth.md` template includes tournament metadata
 - [ ] `TemplateContext.forSynthesis()` creates valid context
 - [ ] Synthesis prompt written to `.arena/rounds/final/prompt.md`
-- [ ] Synthesizer agent selected (prefer Claude, fallback to others)
+- [ ] Synthesizer agent validated (Claude required, fail if unavailable)
 - [ ] `champion_review.md` created in `.arena/rounds/final/`
 - [ ] Dry-run shows complete tournament flow including synthesis
 - [ ] Exit code 4 with [SYNTHESIS] prefix on synthesis failures

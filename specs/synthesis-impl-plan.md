@@ -25,6 +25,7 @@ This document describes the implementation plan for the Final Synthesis step (Mi
 | Date | Reviewer | Changes |
 |------|----------|---------|
 | 2025-12-29 | Claude Opus 4.5 | Fixed critical sync issue: updated `final-synth.md` template to include tournament metadata placeholders. Fixed test method naming inconsistency. Added import note for WorkspaceManager. |
+| 2025-12-29 | Claude Opus 4.5 | Ultra-thorough review: Fixed milestones.md sync (removed "fallback" language). Fixed hardcoded `.arena` paths to use `config.outputDir()`. Added `all_reviews.md` existence validation before synthesis. |
 
 ## Design Decisions (From User Discussion)
 
@@ -261,18 +262,15 @@ public Map<String, Object> toDataModel() {
 
 **File:** `src/main/java/dev/reviewarena/io/WorkspaceManager.java`
 
-**Step 3a: Add constant and import for synthesis template:**
+**Step 3a: Add constant for synthesis template:**
 
-Add the import if not present:
-```java
-import java.util.stream.Collectors;  // For Collectors.joining() in synthesis
-```
-
-Add constant:
+Add constant alongside existing TASK_TEMPLATE:
 ```java
 private static final String TASK_TEMPLATE = "task.md";
 private static final String SYNTHESIS_TEMPLATE = "final-synth.md";
 ```
+
+**Note:** The `config` field (ArenaConfig) is already available in WorkspaceManager. The method uses `config.outputDir()` to build relative paths, ensuring custom output directories work correctly.
 
 **Step 3b: Add method to generate synthesis prompt:**
 
@@ -292,9 +290,17 @@ public Path generateSynthesisPrompt(int finalRound, Set<String> participatingAge
         Path outputPath = finalDir.resolve("champion_review.md");
         Path allReviewsPath = getRoundDir(finalRound).resolve("all_reviews.md");
 
-        // Build relative paths for the prompt
-        String allReviewsRelative = ".arena/rounds/round-" + finalRound + "/all_reviews.md";
-        String outputRelative = ".arena/rounds/final/champion_review.md";
+        // Validate all_reviews.md exists before synthesis
+        if (!Files.exists(allReviewsPath)) {
+            throw new WorkspaceException(
+                "Final round reviews not found: " + allReviewsPath +
+                ". Ensure cross-pollination completed successfully.");
+        }
+
+        // Build relative paths using configured output dir (not hardcoded .arena)
+        String outputDir = config.outputDir();  // e.g., ".arena" or custom path
+        String allReviewsRelative = outputDir + "/rounds/round-" + finalRound + "/all_reviews.md";
+        String outputRelative = outputDir + "/rounds/final/champion_review.md";
 
         // Calculate round counts
         int roundCount = finalRound + 1;  // Round 0 + cross-pollination rounds
@@ -535,7 +541,7 @@ The arena starts the tournament without checking if agents are actually runnable
 |------|---------|---------|
 | `final-synth.md` | `resources/prompts` | Add tournament metadata placeholders |
 | `TemplateContext.java` | `dev.reviewarena.io` | Add `roundCount`, `crossPollinationRounds`, `participatingAgents` fields; add `forSynthesis()` factory |
-| `WorkspaceManager.java` | `dev.reviewarena.io` | Add `generateSynthesisPrompt()`, `getChampionReviewPath()` |
+| `WorkspaceManager.java` | `dev.reviewarena.io` | Add `generateSynthesisPrompt()` (with `all_reviews.md` validation), `getChampionReviewPath()` |
 | `AgentExecutor.java` | `dev.reviewarena.agent` | Add `executeSynthesis()`, `validateSynthesizerAvailable()`, `getSynthesizerAgent()` |
 | `ReviewArenaCli.java` | `dev.reviewarena.cli` | Replace TODO with synthesis logic, update dry-run output |
 
@@ -564,6 +570,8 @@ The arena starts the tournament without checking if agents are actually runnable
    - `testGenerateSynthesisPrompt_createsPromptFile`
    - `testGenerateSynthesisPrompt_includesTaskContent`
    - `testGenerateSynthesisPrompt_includesMetadata`
+   - `testGenerateSynthesisPrompt_usesConfigOutputDir` (not hardcoded `.arena`)
+   - `testGenerateSynthesisPrompt_missingAllReviews_throwsWorkspaceException`
    - `testGetChampionReviewPath_correctLocation`
 
 3. **AgentExecutorTest.java:**
@@ -595,6 +603,7 @@ The arena starts the tournament without checking if agents are actually runnable
 | Success (synthesis complete) | 0 | - | "Tournament complete! Champion review: ..." |
 | Claude not configured | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml." |
 | Claude disabled | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled." |
+| `all_reviews.md` missing | 4 | [SYNTHESIS] | "Final round reviews not found: <path>. Ensure cross-pollination completed successfully." |
 | Synthesis prompt generation failed | 4 | [SYNTHESIS] | "Failed to generate synthesis prompt: ..." |
 | Synthesis execution failed | 4 | [SYNTHESIS] | "Synthesis failed: <reason>" |
 
@@ -607,6 +616,8 @@ The feature is complete when:
 - [x] `final-synth.md` template includes tournament metadata placeholders ✅
 - [ ] `TemplateContext.forSynthesis()` creates valid context with metadata
 - [ ] `WorkspaceManager.generateSynthesisPrompt()` writes to `.arena/rounds/final/prompt.md`
+- [ ] `WorkspaceManager.generateSynthesisPrompt()` uses `config.outputDir()` (not hardcoded `.arena`)
+- [ ] `WorkspaceManager.generateSynthesisPrompt()` validates `all_reviews.md` exists
 - [ ] `AgentExecutor.getSynthesizerAgent()` returns Claude (required per spec, no fallback)
 - [ ] `AgentExecutor.executeSynthesis()` executes synthesizer and produces output
 - [ ] `ReviewArenaCli` integrates synthesis after cross-pollination
@@ -670,6 +681,8 @@ Originally the milestones suggested adding a `ProcessType` enum. After analysis,
 | Claude did not participate in rounds | Valid - Claude still used for synthesis (per spec) |
 | All agents failed in final round | Tournament aborts before synthesis (min-agents check) |
 | Empty `all_reviews.md` | Should not happen if min-agents >= 1; synthesis would produce minimal output |
+| `all_reviews.md` missing | Fail with WorkspaceException before synthesis starts (defensive check) |
+| Custom output dir (`--output /custom`) | Paths in prompt use `config.outputDir()`, not hardcoded `.arena` |
 
 ### TemplateContext Design Rationale
 
