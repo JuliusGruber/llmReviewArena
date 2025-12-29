@@ -169,7 +169,7 @@ class ReviewArenaCliIT {
             assertEquals(0, result.exitCode(), "Exit code should be 0");
             assertTrue(result.stdout().contains("Config file: custom.yaml"),
                 "Should show custom config file");
-            assertTrue(result.stdout().contains("Max rounds: 10"),
+            assertTrue(result.stdout().contains("Cross-pollination rounds: 10"),
                 "Should show custom max rounds");
         }
     }
