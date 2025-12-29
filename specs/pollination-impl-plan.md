@@ -268,12 +268,13 @@ No code changes needed - just verify during implementation that this filtering r
 
 **File:** `ReviewArenaCli.java` (package: `dev.reviewarena.cli`)
 
-**Step 4a: Add required import:**
+**Step 4a: Add required imports:**
 
 Add to the imports section (near line 21):
 
 ```java
 import java.util.HashSet;
+import java.util.Set;
 ```
 
 **Step 4b: Replace the TODO comments in the `call()` method:**
@@ -407,11 +408,11 @@ Round-level timeout and grace period handling are **already fully implemented**:
 | Grace period | `AgentProcess.java:132-151` | `handleTimeout()` with graceful shutdown |
 | Process tree kill | `AgentProcess.java:197-229` | `destroyDescendants()` for Windows child processes |
 
-**Verification checklist:**
-- [ ] Confirm `AgentExecutor.waitForAllWithTimeout()` uses `config.roundTimeoutMs()`
-- [ ] Confirm `AgentProcess` receives `config.gracePeriodMs()` via builder
-- [ ] Confirm `AgentProcess.handleTimeout()` implements graceful → force kill sequence
-- [ ] Confirm timed-out agents return `AgentResult.timeout()` status
+**Verification checklist (all verified):**
+- [x] `AgentExecutor.waitForAllWithTimeout()` uses `config.roundTimeoutMs()` — verified at `AgentExecutor.java:85`
+- [x] `AgentProcess` receives `config.gracePeriodMs()` via builder — verified at `AgentExecutor.java:115`
+- [x] `AgentProcess.handleTimeout()` implements graceful → force kill sequence — verified at `AgentProcess.java:117-154`
+- [x] Timed-out agents return `AgentResult.timeout()` status — verified at `AgentProcess.java:153`
 
 **No new methods needed.** The existing architecture correctly encapsulates process lifecycle management within `AgentProcess`, which is instantiated per-agent and handles its own timeout/termination
 
@@ -435,7 +436,7 @@ Round-level timeout and grace period handling are **already fully implemented**:
 |------|---------|---------|
 | `ArenaConfigTest.java` | `dev.reviewarena.config` | **Update existing:** rename `testValidation_zeroMaxRounds_allowed` → `testValidation_zeroMaxRounds_throws`, change assertion |
 | `AgentExecutorTest.java` | `dev.reviewarena.agent` | Add tests for new `executeRound(int, Set<String>)` overload |
-| `ReviewArenaCliIT.java` | `dev.reviewarena.cli` | **New file:** Integration tests for full tournament flow |
+| `ReviewArenaCliIT.java` | `dev.reviewarena.cli` | **New file:** `src/test/java/dev/reviewarena/cli/ReviewArenaCliIT.java` — Integration tests for full tournament flow |
 
 ---
 
@@ -484,7 +485,9 @@ Before adding new tests, update these existing tests that will break:
 
 ### Mock Agent Scripts (Cross-Platform)
 
-Create both `.sh` and `.bat` versions for cross-platform testing:
+Create both `.sh` and `.bat` versions for cross-platform testing.
+
+**Location:** `src/test/resources/mock-agents/`
 
 **Unix (mock-agent-success.sh):**
 ```bash
