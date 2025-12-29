@@ -164,12 +164,12 @@ class ReviewArenaCliIT {
 
         @Test
         void testDryRunWithCustomOptions_showsSummary() throws IOException, InterruptedException {
-            ProcessResult result = runCli("--dry-run", "-c", "custom.yaml", "-r", "10", "abc1234");
+            ProcessResult result = runCli("--dry-run", "-c", "custom.yaml", "-r", "3", "abc1234");
 
             assertEquals(0, result.exitCode(), "Exit code should be 0");
             assertTrue(result.stdout().contains("Config file: custom.yaml"),
                 "Should show custom config file");
-            assertTrue(result.stdout().contains("Cross-pollination rounds: 10"),
+            assertTrue(result.stdout().contains("Cross-pollination rounds: 3"),
                 "Should show custom max rounds");
         }
     }
