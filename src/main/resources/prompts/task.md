@@ -25,6 +25,7 @@ Evaluate the code with respect to:
 - Reference files, symbols, or diff hunks where possible
 - Avoid generic advice
 - Do not repeat trivial style nitpicks unless they matter
+- **NEVER run `git add` on your review files** - leave them untracked
 
 ## Output Contract
 Write your review to `review.md` using **exactly** this structure:
