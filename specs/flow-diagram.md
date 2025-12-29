@@ -85,13 +85,29 @@
                                      │
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         FINAL OUTPUT GENERATION                              │
+│                         FINAL SYNTHESIS (Claude)                             │
 │                                                                              │
+│  After cross-pollination completes:                                          │
+│                                                                              │
+│   INPUT: round-N/all_reviews.md (final combined reviews)                     │
+│                                                                              │
+│                    ┌────────────────────┐                                   │
+│                    │   Claude Process   │  ← Always Claude (required)       │
+│                    │   (synthesizer)    │                                   │
+│                    └─────────┬──────────┘                                   │
+│                              │                                               │
+│                              ▼                                               │
+│                    ┌────────────────────┐                                   │
+│                    │ champion_review.md │                                   │
+│                    └────────────────────┘                                   │
+│                                                                              │
+│  OUTPUT FILES:                                                               │
 │  .arena/rounds/                                                              │
-│  ├── round-N/all_reviews.md   ← Combined final reviews from all agents      │
+│  ├── round-N/all_reviews.md    ← Combined final reviews from all agents     │
 │  ├── round-N/<agent>/review.md ← Individual agent reviews from final round  │
 │  └── final/                                                                  │
-│      └── champion_review.md   ← Synthesized final review                    │
+│      ├── prompt.md             ← Persisted synthesis prompt (for debugging) │
+│      └── champion_review.md    ← Synthesized final review                   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼

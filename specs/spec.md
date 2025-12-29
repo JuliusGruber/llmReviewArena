@@ -800,20 +800,36 @@ Write the final review to `review.md`.
 ```
 You are the final synthesizer in a code review arena.
 
-You are given multiple high-quality final reviews.
+## Tournament Summary
+- **Rounds completed:** ${roundCount} (Round 0 + ${crossPollinationRounds} cross-pollination rounds)
+- **Participating agents:** ${participatingAgents}
 
-Your task:
+## Input
+You are given multiple high-quality final reviews from: `${allReviewsPath}`
+
+## Your Task
 - Merge them into one single, cohesive review.
 - Remove duplicates.
 - Resolve conflicting recommendations.
 - Keep the strongest phrasing and evidence.
 
-Do NOT introduce new issues.
-Do NOT speculate.
+## Rules
+- Do NOT introduce new issues.
+- Do NOT speculate.
+- Do NOT reference the original reviewers by name.
 
-Produce one final review in `champion_review.md`
-using the standard review structure.
+## Output
+Produce one final review in `${outputPath}` using the standard review structure:
+
+### Summary
+### High-risk issues (must fix)
+### Medium / low-risk issues
+### Suggested patches (diff snippets or pseudocode)
+### Test suggestions
+### Questions for the author
 ```
+
+**Note:** The synthesis prompt is persisted to `.arena/rounds/final/prompt.md` for debugging and reproducibility.
 
 ### Why This Works
 
@@ -917,12 +933,20 @@ Agents write directly to their designated output path without needing to create 
 
 ### Synthesizer Requirement
 
-**Claude is required** for the final synthesis step. If Claude CLI is not installed or configured:
+**Claude is required** for the final synthesis step. The orchestrator fails with exit code 4 in these scenarios:
 
-- The orchestrator fails with exit code 4 (Agent error)
-- Error message: `"Final synthesis requires Claude CLI. Ensure 'claude' is installed and configured."`
+| Scenario | Error Message |
+|----------|---------------|
+| Claude not configured | `"Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml."` |
+| Claude disabled | `"Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled."` |
+| Synthesis prompt generation fails | `"Failed to generate synthesis prompt: <reason>"` |
+| Synthesis execution fails | `"Synthesis failed: <reason>"` |
 
 This is a hard requirement, not a soft fallback. The synthesizer role is critical to producing the final `champion_review.md`.
+
+**Edge cases:**
+- If Claude is the only surviving agent, synthesis still runs (Claude synthesizes its own review)
+- If Claude did not participate in tournament rounds, it is still used for synthesis (per spec)
 
 ### State Recovery
 

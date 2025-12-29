@@ -8,14 +8,26 @@ This document describes the implementation plan for the Final Synthesis step (Mi
 
 **Note:** This is **Milestone 4**. Cross-pollination (Milestone 3) is complete.
 
+## Review Status
+
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| Spec alignment | ✅ Verified | `spec.md` updated to match plan |
+| Flow diagram | ✅ Updated | Synthesis step now shown explicitly |
+| Implementation decisions | ✅ Updated | Synthesis decisions added |
+| Edge cases | ✅ Documented | See [Edge Cases](#edge-cases) section |
+| Test coverage | ✅ Planned | Unit + integration tests specified |
+| **Ready for implementation** | ✅ **YES** | All prerequisites complete |
+
 ## Design Decisions (From User Discussion)
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Agent availability validation | **Deferred** | Create GitHub issue for startup agent validation feature |
 | Synthesizer agent | **Claude required (no fallback)** | Per spec: "Claude is always used for this step" - fail with exit code 4 if unavailable |
-| Prompt metadata | **Include tournament context** | Include round count and participating agents |
+| Prompt metadata | **Include tournament context** | Include round count and participating agents for transparency |
 | Prompt location | **Persisted** | Write to `.arena/rounds/final/prompt.md` for debugging/audit |
+| TemplateContext design | **Extend existing record** | Add nullable synthesis fields to existing record (pragmatic over purity) |
 
 ## Current State Analysis
 
@@ -636,3 +648,22 @@ Originally the milestones suggested adding a `ProcessType` enum. After analysis,
 - `AgentProcess` already handles round=-1 gracefully
 - Logging prefix `[SYNTHESIS]` provides sufficient differentiation
 - No code paths need to switch on process type
+
+### Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| Claude is the only surviving agent | Valid - Claude synthesizes its own review (degenerate but correct) |
+| Claude did not participate in rounds | Valid - Claude still used for synthesis (per spec) |
+| All agents failed in final round | Tournament aborts before synthesis (min-agents check) |
+| Empty `all_reviews.md` | Should not happen if min-agents >= 1; synthesis would produce minimal output |
+
+### TemplateContext Design Rationale
+
+Adding nullable fields (`Integer roundCount`, etc.) to the existing `TemplateContext` record is pragmatic:
+- Avoids creating a parallel `SynthesisContext` class
+- Factory methods hide the complexity from callers
+- Nullable fields are only populated for synthesis context
+- Alternative (separate class) would require duplicating `toDataModel()` logic
+
+The compact constructor validation (`roundCount == crossPollinationRounds + 1`) ensures consistency when both fields are present.

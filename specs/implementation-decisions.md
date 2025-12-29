@@ -12,7 +12,7 @@ This document captures all implementation decisions made for the LLM Review Aren
 | Configuration | SmallRye Config (MicroProfile Config) |
 | YAML Parsing | SnakeYAML (via SmallRye Config) |
 | Logging | SLF4J + Logback |
-| Template Placeholders | String.replace() |
+| Template Engine | FreeMarker (${variableName} syntax) |
 
 ## Maven Coordinates
 
@@ -266,7 +266,7 @@ ArenaException (exit 1 - general error)
 | How to inject config properties? | SmallRye Config (MicroProfile Config) with `@ConfigProperty` |
 | How to parse YAML config? | SmallRye Config with YAML source (SnakeYAML internally) |
 | How to log? | SLF4J + Logback |
-| How to resolve template placeholders? | String.replace() |
+| How to resolve template placeholders? | FreeMarker engine |
 | How to handle agent stdout/stderr? | Drain to DEBUG logs + capture to files |
 | How to run agents in parallel? | Virtual threads + Semaphore |
 | How to terminate timed-out agents? | destroy() → wait → destroyForcibly() |
@@ -295,3 +295,6 @@ ArenaException (exit 1 - general error)
 | Per-agent timeout overrides? | No (single timeout for all) |
 | Raw CLI flag passthrough? | No (use structured flags only) |
 | YAML key naming convention? | kebab-case |
+| Synthesizer agent? | Claude required (no fallback) |
+| Synthesis prompt persistence? | Yes, saved to `.arena/rounds/final/prompt.md` |
+| TemplateContext for synthesis? | Extend existing record with nullable fields |
