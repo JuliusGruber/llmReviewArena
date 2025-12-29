@@ -118,6 +118,14 @@ public class AgentProcess {
         log.warn("Agent '{}' timed out after {}ms, initiating graceful shutdown",
             agentName, timeoutMs);
 
+        // Capture descendants BEFORE destroying the main process, because once
+        // the parent is killed, child processes become orphans and are no longer
+        // visible via process.descendants()
+        List<ProcessHandle> descendants = process.descendants().toList();
+        if (!descendants.isEmpty()) {
+            log.debug("Found {} descendant processes to terminate", descendants.size());
+        }
+
         // Step 1: Request graceful termination
         process.destroy();
 
@@ -126,14 +134,20 @@ public class AgentProcess {
             boolean exited = process.waitFor(gracePeriodMs, TimeUnit.MILLISECONDS);
 
             if (!exited) {
-                // Step 3: Force kill
+                // Step 3: Force kill main process
                 log.warn("Agent '{}' did not terminate gracefully, force killing", agentName);
                 process.destroyForcibly();
                 process.waitFor(gracePeriodMs, TimeUnit.MILLISECONDS);
             }
+
+            // Step 4: Kill all descendants (on Windows, destroy() only kills the immediate
+            // process like cmd.exe, but child processes like powershell.exe continue running)
+            destroyDescendants(descendants);
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             process.destroyForcibly();
+            destroyDescendants(descendants);
         }
 
         return AgentResult.timeout(agentName, round, getDurationMs());
@@ -167,12 +181,51 @@ public class AgentProcess {
             process.destroy();
             try {
                 if (!process.waitFor(gracePeriodMs, TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly();
+                    destroyProcessTree();
                 }
             } catch (InterruptedException e) {
-                process.destroyForcibly();
+                destroyProcessTree();
             }
         }
+    }
+
+    /**
+     * Destroys a list of descendant processes.
+     * This is essential on Windows where killing a parent process (e.g., cmd.exe)
+     * does not automatically kill child processes (e.g., powershell.exe).
+     */
+    private void destroyDescendants(List<ProcessHandle> descendants) {
+        for (ProcessHandle ph : descendants) {
+            if (ph.isAlive()) {
+                log.debug("Force killing descendant process: PID {}", ph.pid());
+                ph.destroyForcibly();
+            }
+        }
+
+        // On Windows, wait a bit for file handles to be released after process termination
+        if (isWindows() && !descendants.isEmpty()) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
+     * Destroys the entire process tree (parent and all descendants).
+     * This is essential on Windows where killing a parent process (e.g., cmd.exe)
+     * does not automatically kill child processes (e.g., powershell.exe).
+     */
+    private void destroyProcessTree() {
+        if (process == null) {
+            return;
+        }
+        // Capture and kill all descendants first
+        List<ProcessHandle> descendants = process.descendants().toList();
+        destroyDescendants(descendants);
+        // Then kill the main process
+        process.destroyForcibly();
     }
 
     private Thread startStreamDrain(InputStream stream, Path logFile, String name) {
