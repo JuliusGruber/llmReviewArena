@@ -184,7 +184,7 @@ src/main/java/dev/reviewarena/agent/
 
 ---
 
-## Milestone 3: Cross-Pollination Rounds ⬅️ CURRENT
+## Milestone 3: Cross-Pollination Rounds ✅ COMPLETE
 
 **Goal:** Implement the multi-round tournament flow (rounds 1-N).
 
@@ -208,31 +208,41 @@ src/main/java/dev/reviewarena/agent/
 
 ---
 
-## Milestone 4: Final Synthesis
+## Milestone 4: Final Synthesis ⬅️ CURRENT
 
-**Goal:** Implement the final synthesis step using Claude.
+**Goal:** Implement the final synthesis step to produce `champion_review.md`.
+
+**Plan document:** `specs/synthesis-impl-plan.md`
 
 **Key features:**
-- Validate Claude is configured and enabled (fail fast before Round 0)
-- Generate synthesizer prompt at runtime (after last round completes)
-- Execute Claude with `final-synth.md` prompt
+- Select synthesizer agent (prefer Claude, fallback to first available)
+- Generate synthesizer prompt at runtime with tournament metadata
+- Write prompt to `.arena/rounds/final/prompt.md` for audit/debugging
+- Execute synthesizer agent with `final-synth.md` template
 - Output `champion_review.md` to `.arena/rounds/final/`
-- ProcessType enum to distinguish ROUND vs SYNTHESIS execution
+
+**Design decisions:**
+- Agent startup validation deferred (GitHub issue to be created)
+- Fallback to any enabled agent if Claude unavailable
+- Include round count and participating agents in prompt
+- Prompt persisted for debugging/reproducibility
 
 **Files to add/modify:**
-- `ProcessType.java` (new) - Enum for ROUND vs SYNTHESIS
-- `AgentProcess.java` - Use ProcessType
-- `TemplateContext.java` - Add `forSynthesis()` factory
-- `WorkspaceManager.java` - Add `getSynthesizerPromptPath()`, `generateSynthesizerPrompt()`
-- `AgentExecutor.java` - Add `validateSynthesizerAvailable()`, `executeSynthesis()`
+- `final-synth.md` - Add tournament metadata placeholders
+- `TemplateContext.java` - Add synthesis fields and `forSynthesis()` factory
+- `WorkspaceManager.java` - Add `generateSynthesisPrompt()`, `getChampionReviewPath()`
+- `AgentExecutor.java` - Add `selectSynthesizerAgent()`, `executeSynthesis()`
 - `ReviewArenaCli.java` - Add synthesis step after cross-pollination loop
 
 **Success criteria:**
-- [ ] Claude availability validated before Round 0
-- [ ] Synthesizer prompt generated at runtime
+- [ ] `final-synth.md` template includes tournament metadata
+- [ ] `TemplateContext.forSynthesis()` creates valid context
+- [ ] Synthesis prompt written to `.arena/rounds/final/prompt.md`
+- [ ] Synthesizer agent selected (Claude preferred, fallback to others)
 - [ ] `champion_review.md` created in `.arena/rounds/final/`
 - [ ] Dry-run shows complete tournament flow including synthesis
 - [ ] Exit code 4 with [SYNTHESIS] prefix on synthesis failures
+- [ ] GitHub issue created for agent startup validation
 
 ---
 
@@ -249,8 +259,8 @@ src/main/java/dev/reviewarena/agent/
 | 7 | ReviewArenaCli integration | GitService, ConfigLoader, WorkspaceManager | ✅ Done |
 | 8 | AgentProcess + AgentExecutor | WorkspaceManager | ✅ Done |
 | 9 | Round 0 + ReviewAggregator | AgentExecutor | ✅ Done |
-| 10 | Cross-Pollination Rounds 1-N | AgentExecutor, ReviewAggregator | ⬅️ Next |
-| 11 | Final Synthesis | Cross-Pollination complete | Milestone 4 |
+| 10 | Cross-Pollination Rounds 1-N | AgentExecutor, ReviewAggregator | ✅ Done |
+| 11 | Final Synthesis | Cross-Pollination complete | ⬅️ Next |
 
 ---
 
@@ -331,17 +341,21 @@ src/main/java/dev/reviewarena/agent/
 - [x] Concurrency respects `max-concurrent`
 - [x] Round 0 executes and produces `all_reviews.md`
 
-### Milestone 3 Complete When:
-- [ ] Cross-pollination rounds 1-N execute successfully
-- [ ] Failed agents excluded from subsequent rounds
-- [ ] Tournament aborts if below minAgents threshold
-- [ ] Round-level timeout kills remaining agents when exceeded
-- [ ] Grace period allows clean shutdown before force-kill
-- [ ] Final `all_reviews.md` generated after last round
-- [ ] Progress output shows round status (including timeout settings in dry-run)
+### Milestone 3 Complete When: ✅
+- [x] Cross-pollination rounds 1-N execute successfully
+- [x] Failed agents excluded from subsequent rounds
+- [x] Tournament aborts if below minAgents threshold
+- [x] Round-level timeout kills remaining agents when exceeded
+- [x] Grace period allows clean shutdown before force-kill
+- [x] Final `all_reviews.md` generated after last round
+- [x] Progress output shows round status (including timeout settings in dry-run)
 
 ### Milestone 4 Complete When:
-- [ ] Claude validated before Round 0 starts
-- [ ] Full tournament runs with synthesis step
-- [ ] Final `champion_review.md` is generated
-- [ ] Dry-run shows complete flow including synthesis
+- [ ] `final-synth.md` template includes tournament metadata
+- [ ] `TemplateContext.forSynthesis()` creates valid context
+- [ ] Synthesis prompt written to `.arena/rounds/final/prompt.md`
+- [ ] Synthesizer agent selected (prefer Claude, fallback to others)
+- [ ] `champion_review.md` created in `.arena/rounds/final/`
+- [ ] Dry-run shows complete tournament flow including synthesis
+- [ ] Exit code 4 with [SYNTHESIS] prefix on synthesis failures
+- [ ] GitHub issue created for agent startup validation
