@@ -108,6 +108,7 @@ public class AgentExecutor {
             .command(command)
             .workingDir(workspace.getArenaDir().getParent()) // project root
             .outputFile(outputFile)
+            .promptFile(promptFile)  // Redirect stdin from prompt file
             .stdoutLog(agentDir.resolve("stdout.log"))
             .stderrLog(agentDir.resolve("stderr.log"))
             .timeoutMs(config.agentTimeoutMs())

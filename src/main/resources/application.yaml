@@ -22,12 +22,12 @@ output:
   dir: .arena
 
 # Default agents (can be overridden in arena.yaml)
+# Note: Prompt is delivered via stdin redirection (not as command argument)
 agents:
   claude:
     command:
       - claude
-      - -p
-      - "@prompt.md"
+      - -p                    # print mode (non-interactive, reads prompt from stdin)
     flags:
       auto-approve: true
     enabled: true
@@ -35,17 +35,14 @@ agents:
   codex:
     command:
       - codex
-      - exec
-      - "@prompt.md"
+      - -q                    # quiet mode requires prompt as positional arg, not stdin
     flags:
       auto-approve: true
-    enabled: false  # Disabled: Codex CLI requires TTY (raw mode stdin)
+    enabled: false            # Disabled: codex -q requires prompt as argument, not stdin
 
   gemini:
     command:
-      - bash
-      - -c
-      - cat @prompt.md | gemini --yolo
+      - gemini                # positional prompt mode (reads from stdin)
     flags:
-      auto-approve: false  # Already included in command string
+      auto-approve: true
     enabled: true

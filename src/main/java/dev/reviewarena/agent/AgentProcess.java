@@ -33,6 +33,7 @@ public class AgentProcess {
     private final List<String> command;
     private final Path workingDir;
     private final Path outputFile;
+    private final Path promptFile;  // Optional: if set, redirects stdin from this file
     private final Path stdoutLog;
     private final Path stderrLog;
     private final long timeoutMs;
@@ -48,6 +49,7 @@ public class AgentProcess {
         this.command = List.copyOf(Objects.requireNonNull(builder.command));
         this.workingDir = Objects.requireNonNull(builder.workingDir);
         this.outputFile = Objects.requireNonNull(builder.outputFile);
+        this.promptFile = builder.promptFile;  // May be null
         this.stdoutLog = Objects.requireNonNull(builder.stdoutLog);
         this.stderrLog = Objects.requireNonNull(builder.stderrLog);
         this.timeoutMs = builder.timeoutMs;
@@ -74,6 +76,12 @@ public class AgentProcess {
 
             ProcessBuilder pb = new ProcessBuilder(effectiveCommand)
                 .directory(workingDir.toFile());
+
+            // Redirect stdin from prompt file if provided
+            if (promptFile != null) {
+                log.debug("Redirecting stdin from: {}", promptFile);
+                pb.redirectInput(promptFile.toFile());
+            }
 
             process = pb.start();
 
@@ -226,6 +234,7 @@ public class AgentProcess {
         private List<String> command;
         private Path workingDir;
         private Path outputFile;
+        private Path promptFile;  // Optional stdin source
         private Path stdoutLog;
         private Path stderrLog;
         private long timeoutMs = 300_000; // 5 min default
@@ -254,6 +263,15 @@ public class AgentProcess {
 
         public Builder outputFile(Path outputFile) {
             this.outputFile = outputFile;
+            return this;
+        }
+
+        /**
+         * Sets the prompt file to redirect to stdin.
+         * If set, the process will receive the file contents on stdin.
+         */
+        public Builder promptFile(Path promptFile) {
+            this.promptFile = promptFile;
             return this;
         }
 
