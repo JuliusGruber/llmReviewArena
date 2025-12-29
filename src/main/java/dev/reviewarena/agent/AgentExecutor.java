@@ -44,10 +44,48 @@ public class AgentExecutor {
             return Map.of();
         }
 
-        log.info("Starting round {} with {} agents: {}",
-            round, enabledAgents.size(),
+        log.info("Starting round {}/{} with {} agents: {}",
+            round, config.maxRounds(), enabledAgents.size(),
             enabledAgents.stream().map(AgentConfig::name).toList());
 
+        return executeAgents(enabledAgents, round);
+    }
+
+    /**
+     * Executes specific agents for a given round.
+     *
+     * @param round the round number (0-indexed)
+     * @param agentNames set of agent names to execute (must be enabled in config)
+     * @return map of agent name to execution result
+     * @throws AgentException if round execution fails catastrophically
+     */
+    public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) {
+        List<AgentConfig> agents = config.agents().values().stream()
+            .filter(AgentConfig::enabled)
+            .filter(a -> agentNames.contains(a.name()))
+            .sorted(Comparator.comparing(AgentConfig::name))
+            .toList();
+
+        if (agents.isEmpty()) {
+            log.warn("No matching agents to execute for round {}", round);
+            return Map.of();
+        }
+
+        log.info("Starting round {}/{} with {} agents: {}",
+            round, config.maxRounds(), agents.size(),
+            agents.stream().map(AgentConfig::name).toList());
+
+        return executeAgents(agents, round);
+    }
+
+    /**
+     * Executes the given agents for a round.
+     *
+     * @param agents the agents to execute
+     * @param round the round number
+     * @return map of agent name to execution result
+     */
+    private Map<String, AgentResult> executeAgents(List<AgentConfig> agents, int round) {
         // Concurrency control: 0 = unlimited, else use semaphore
         Semaphore semaphore = config.maxConcurrent() > 0
             ? new Semaphore(config.maxConcurrent())
@@ -58,7 +96,7 @@ public class AgentExecutor {
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<?>> futures = new ArrayList<>();
 
-            for (AgentConfig agent : enabledAgents) {
+            for (AgentConfig agent : agents) {
                 Future<?> future = executor.submit(() -> {
                     if (semaphore != null) {
                         try {
@@ -90,7 +128,7 @@ public class AgentExecutor {
         }
 
         int successes = (int) results.values().stream().filter(AgentResult::isSuccess).count();
-        log.info("Round {} complete: {}/{} agents succeeded", round, successes, enabledAgents.size());
+        log.info("Round {} complete: {}/{} agents succeeded", round, successes, agents.size());
 
         return Map.copyOf(results);
     }

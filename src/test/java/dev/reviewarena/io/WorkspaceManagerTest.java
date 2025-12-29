@@ -332,9 +332,9 @@ class WorkspaceManagerTest {
     // ===== Edge cases =====
 
     @Test
-    void testInitialize_zeroRounds_createsOnlyRound0() {
+    void testInitialize_oneRound_createsRound0AndRound1() {
         ArenaConfig config = new ArenaConfig(
-            0,  // maxRounds = 0 (only round-0)
+            1,  // maxRounds = 1 (minimum: round-0 + one cross-pollination round)
             ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
             ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
             ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
@@ -347,7 +347,8 @@ class WorkspaceManagerTest {
         manager.initialize("abc1234", "", "");
 
         assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/round-0")));
-        assertFalse(Files.exists(tempDir.resolve(".arena/rounds/round-1")));
+        assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/round-1")));
+        assertFalse(Files.exists(tempDir.resolve(".arena/rounds/round-2")));
     }
 
     @Test

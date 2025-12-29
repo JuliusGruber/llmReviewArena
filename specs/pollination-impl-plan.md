@@ -73,7 +73,7 @@ Done:
 
 ## Implementation Steps
 
-### Step 1: Update Config Validation for maxRounds
+### Step 1: Update Config Validation for maxRounds ✅ DONE
 
 **File:** `ArenaConfig.java` (package: `dev.reviewarena.config`)
 
