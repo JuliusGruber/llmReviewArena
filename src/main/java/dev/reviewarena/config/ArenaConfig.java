@@ -47,8 +47,9 @@ public record ArenaConfig(
      * Compact constructor with validation.
      */
     public ArenaConfig {
-        if (maxRounds < 0) {
-            throw new ConfigException("maxRounds must be non-negative, got: " + maxRounds);
+        if (maxRounds < 1) {
+            throw new ConfigException(
+                "maxRounds must be at least 1 (cross-pollination requires at least one round). Got: " + maxRounds);
         }
         if (maxOutputSizeKb <= 0) {
             throw new ConfigException("maxOutputSizeKb must be positive, got: " + maxOutputSizeKb);

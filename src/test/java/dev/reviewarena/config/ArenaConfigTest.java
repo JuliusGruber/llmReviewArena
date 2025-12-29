@@ -31,7 +31,7 @@ class ArenaConfigTest {
         ConfigException ex = assertThrows(ConfigException.class,
             () -> createConfigWith(b -> b.maxRounds = -1));
 
-        assertTrue(ex.getMessage().contains("maxRounds must be non-negative"));
+        assertTrue(ex.getMessage().contains("maxRounds must be at least 1"));
     }
 
     @Test
@@ -115,10 +115,12 @@ class ArenaConfigTest {
     }
 
     @Test
-    void testValidation_zeroMaxRounds_allowed() {
-        // 0 rounds means no cross-pollination, just initial round
-        ArenaConfig config = createConfigWith(b -> b.maxRounds = 0);
-        assertEquals(0, config.maxRounds());
+    void testValidation_zeroMaxRounds_throws() {
+        // maxRounds must be at least 1 (cross-pollination requires at least one round)
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> createConfigWith(b -> b.maxRounds = 0));
+
+        assertTrue(ex.getMessage().contains("maxRounds must be at least 1"));
     }
 
     @Test
