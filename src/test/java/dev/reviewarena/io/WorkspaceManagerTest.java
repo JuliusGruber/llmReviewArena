@@ -34,6 +34,7 @@ class WorkspaceManagerTest {
             2,  // maxRounds (rounds 0, 1, 2)
             ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB,
             ArenaConfig.DEFAULT_MAX_CONCURRENT,
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT,
             ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
             ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
             ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
@@ -249,9 +250,9 @@ class WorkspaceManagerTest {
 
         ArenaConfig config = new ArenaConfig(
             1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
-            Path.of(".arena"), agents
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -270,9 +271,9 @@ class WorkspaceManagerTest {
     void testInitialize_usesCustomOutputDir() {
         ArenaConfig config = new ArenaConfig(
             1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
-            Path.of("custom-output"),  // custom output dir
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-output"),  // custom output dir
             Map.of("agent1", new AgentConfig("agent1", List.of("cmd"), Map.of(), true))
         );
 
@@ -336,9 +337,9 @@ class WorkspaceManagerTest {
         ArenaConfig config = new ArenaConfig(
             1,  // maxRounds = 1 (minimum: round-0 + one cross-pollination round)
             ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
-            Path.of(".arena"),
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"),
             Map.of("agent1", new AgentConfig("agent1", List.of("cmd"), Map.of(), true))
         );
 
@@ -360,9 +361,9 @@ class WorkspaceManagerTest {
 
         ArenaConfig config = new ArenaConfig(
             1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
-            Path.of(".arena"), agents
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -388,9 +389,9 @@ class WorkspaceManagerTest {
         ArenaConfig config = new ArenaConfig(
             7, // maxRounds = 7 (rounds 0-7, with 6 and 7 using round-5 template)
             ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
-            Path.of(".arena"), agents
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -423,9 +424,9 @@ class WorkspaceManagerTest {
         ArenaConfig config = new ArenaConfig(
             8, // maxRounds = 8
             ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS, ArenaConfig.DEFAULT_MIN_AGENTS,
-            Path.of(".arena"), agents
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);

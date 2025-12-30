@@ -123,6 +123,10 @@ public class ReviewArenaCli implements Callable<Integer> {
             description = "Show what would happen without running agents")
     private boolean dryRun;
 
+    @Option(names = {"-q", "--quiet"},
+            description = "Suppress agent output (don't stream to console)")
+    private boolean quiet;
+
     //==========================================================================
     // Service factories (package-private for testing)
     //==========================================================================
@@ -296,10 +300,12 @@ public class ReviewArenaCli implements Callable<Integer> {
         Integer roundsOverride = maxRounds != ArenaConfig.DEFAULT_MAX_ROUNDS ? maxRounds : null;
         Integer concurrentOverride = effectiveConcurrency != ArenaConfig.DEFAULT_MAX_CONCURRENT
                                      ? effectiveConcurrency : null;
+        // --quiet flag overrides show-agent-output to false
+        Boolean showAgentOutputOverride = quiet ? Boolean.FALSE : null;
         Path outputOverride = !outputDir.equals(Path.of(ArenaConfig.DEFAULT_OUTPUT_DIR))
                               ? outputDir : null;
 
-        return new CliOverrides(roundsOverride, concurrentOverride, outputOverride);
+        return new CliOverrides(roundsOverride, concurrentOverride, showAgentOutputOverride, outputOverride);
     }
 
     private int resolveExecutionMode() {
@@ -320,6 +326,7 @@ public class ReviewArenaCli implements Callable<Integer> {
         log.info("  Total rounds: {} (Round 0 + {} cross-pollination)",
             config.maxRounds() + 1, config.maxRounds());
         log.info("  Concurrency: {}", config.maxConcurrent() == 0 ? "unlimited" : config.maxConcurrent());
+        log.info("  Show agent output: {}", config.showAgentOutput());
         log.info("  Agent timeout: {}ms", config.agentTimeoutMs());
         log.info("  Round timeout: {}ms", config.roundTimeoutMs());
         log.info("  Grace period: {}ms", config.gracePeriodMs());
@@ -367,5 +374,9 @@ public class ReviewArenaCli implements Callable<Integer> {
 
     boolean isDryRun() {
         return dryRun;
+    }
+
+    boolean isQuiet() {
+        return quiet;
     }
 }

@@ -39,6 +39,7 @@ public class AgentProcess {
     private final long timeoutMs;
     private final long gracePeriodMs;
     private final OutputValidator outputValidator;
+    private final boolean showOutput;
 
     private Process process;
     private Instant startTime;
@@ -55,6 +56,7 @@ public class AgentProcess {
         this.timeoutMs = builder.timeoutMs;
         this.gracePeriodMs = builder.gracePeriodMs;
         this.outputValidator = Objects.requireNonNull(builder.outputValidator);
+        this.showOutput = builder.showOutput;
     }
 
     /**
@@ -240,6 +242,14 @@ public class AgentProcess {
                     while ((line = reader.readLine()) != null) {
                         writer.write(line);
                         writer.newLine();
+                        writer.flush();
+
+                        // Print to console with agent prefix if enabled
+                        if (showOutput) {
+                            synchronized (System.out) {
+                                System.out.println("[" + agentName + "] " + line);
+                            }
+                        }
                         log.debug("[{}:{}] {}", agentName, name, line);
                     }
 
@@ -293,6 +303,7 @@ public class AgentProcess {
         private long timeoutMs = 300_000; // 5 min default
         private long gracePeriodMs = 5_000; // 5 sec default
         private OutputValidator outputValidator;
+        private boolean showOutput = true; // Default to showing output
 
         public Builder agentName(String agentName) {
             this.agentName = agentName;
@@ -350,6 +361,14 @@ public class AgentProcess {
 
         public Builder outputValidator(OutputValidator outputValidator) {
             this.outputValidator = outputValidator;
+            return this;
+        }
+
+        /**
+         * Sets whether to print agent output to console with prefixes.
+         */
+        public Builder showOutput(boolean showOutput) {
+            this.showOutput = showOutput;
             return this;
         }
 

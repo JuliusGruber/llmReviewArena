@@ -53,10 +53,11 @@ public class ConfigLoader {
     public record CliOverrides(
         Integer maxRounds,
         Integer maxConcurrent,
+        Boolean showAgentOutput,
         Path outputDir
     ) {
         public static CliOverrides none() {
-            return new CliOverrides(null, null, null);
+            return new CliOverrides(null, null, null, null);
         }
     }
 
@@ -141,6 +142,11 @@ public class ConfigLoader {
             : config.getOptionalValue("execution.max-concurrent", Integer.class)
                     .orElse(ArenaConfig.DEFAULT_MAX_CONCURRENT);
 
+        boolean showAgentOutput = overrides.showAgentOutput() != null
+            ? overrides.showAgentOutput()
+            : config.getOptionalValue("execution.show-agent-output", Boolean.class)
+                    .orElse(ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT);
+
         // Load timeouts
         long agentTimeoutMs = config.getOptionalValue("timeouts.agent-timeout-ms", Long.class)
             .orElse(ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS);
@@ -168,6 +174,7 @@ public class ConfigLoader {
             maxRounds,
             maxOutputSizeKb,
             maxConcurrent,
+            showAgentOutput,
             agentTimeoutMs,
             roundTimeoutMs,
             gracePeriodMs,

@@ -164,6 +164,7 @@ public class AgentExecutor {
             .timeoutMs(config.agentTimeoutMs())
             .gracePeriodMs(config.gracePeriodMs())
             .outputValidator(outputValidator)
+            .showOutput(config.showAgentOutput())
             .build();
 
         return process.execute();

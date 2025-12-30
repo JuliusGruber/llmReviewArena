@@ -101,7 +101,7 @@ class ConfigLoaderTest {
               rounds: 4
             """);
 
-        CliOverrides overrides = new CliOverrides(3, null, null);
+        CliOverrides overrides = new CliOverrides(3, null, null, null);
         ArenaConfig config = loader.load(arenaYaml, overrides);
 
         assertEquals(3, config.maxRounds()); // CLI wins over file
@@ -115,7 +115,7 @@ class ConfigLoaderTest {
               max-concurrent: 8
             """);
 
-        CliOverrides overrides = new CliOverrides(null, 2, null);
+        CliOverrides overrides = new CliOverrides(null, 2, null, null);
         ArenaConfig config = loader.load(arenaYaml, overrides);
 
         assertEquals(2, config.maxConcurrent()); // CLI wins
@@ -130,7 +130,7 @@ class ConfigLoaderTest {
             """);
 
         Path cliOutputDir = Path.of("from-cli");
-        CliOverrides overrides = new CliOverrides(null, null, cliOutputDir);
+        CliOverrides overrides = new CliOverrides(null, null, null, cliOutputDir);
         ArenaConfig config = loader.load(arenaYaml, overrides);
 
         assertEquals(cliOutputDir, config.outputDir()); // CLI wins
@@ -171,7 +171,7 @@ class ConfigLoaderTest {
               rounds: 3
             """);
 
-        CliOverrides overrides = new CliOverrides(10, null, null);
+        CliOverrides overrides = new CliOverrides(10, null, null, null);
         ArenaConfig config = loader.load(arenaYaml, overrides);
 
         assertEquals(5, config.maxRounds()); // CLI override also capped at 5
@@ -327,6 +327,41 @@ class ConfigLoaderTest {
 
         assertNull(none.maxRounds());
         assertNull(none.maxConcurrent());
+        assertNull(none.showAgentOutput());
         assertNull(none.outputDir());
+    }
+
+    @Test
+    void testLoad_showAgentOutputDefault_isTrue() {
+        ArenaConfig config = loader.load(tempDir.resolve("nonexistent.yaml"), CliOverrides.none());
+
+        assertTrue(config.showAgentOutput()); // Default is true
+    }
+
+    @Test
+    void testLoad_showAgentOutputFromFile_loaded() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            execution:
+              show-agent-output: false
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        assertFalse(config.showAgentOutput());
+    }
+
+    @Test
+    void testLoad_cliOverridesShowAgentOutput_takePrecedence() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            execution:
+              show-agent-output: true
+            """);
+
+        CliOverrides overrides = new CliOverrides(null, null, false, null);
+        ArenaConfig config = loader.load(arenaYaml, overrides);
+
+        assertFalse(config.showAgentOutput()); // CLI wins
     }
 }

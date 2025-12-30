@@ -18,6 +18,7 @@ class ArenaConfigTest {
         assertEquals(ArenaConfig.DEFAULT_MAX_ROUNDS, config.maxRounds());
         assertEquals(ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, config.maxOutputSizeKb());
         assertEquals(ArenaConfig.DEFAULT_MAX_CONCURRENT, config.maxConcurrent());
+        assertEquals(ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, config.showAgentOutput());
         assertEquals(ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, config.agentTimeoutMs());
         assertEquals(ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, config.roundTimeoutMs());
         assertEquals(ArenaConfig.DEFAULT_GRACE_PERIOD_MS, config.gracePeriodMs());
@@ -142,6 +143,7 @@ class ArenaConfigTest {
         int maxRounds = ArenaConfig.DEFAULT_MAX_ROUNDS;
         int maxOutputSizeKb = ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB;
         int maxConcurrent = ArenaConfig.DEFAULT_MAX_CONCURRENT;
+        boolean showAgentOutput = ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT;
         long agentTimeoutMs = ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS;
         long roundTimeoutMs = ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS;
         long gracePeriodMs = ArenaConfig.DEFAULT_GRACE_PERIOD_MS;
@@ -151,7 +153,7 @@ class ArenaConfigTest {
 
         ArenaConfig build() {
             return new ArenaConfig(
-                maxRounds, maxOutputSizeKb, maxConcurrent,
+                maxRounds, maxOutputSizeKb, maxConcurrent, showAgentOutput,
                 agentTimeoutMs, roundTimeoutMs, gracePeriodMs,
                 minAgents, outputDir, agents
             );

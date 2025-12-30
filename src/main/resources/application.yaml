@@ -7,6 +7,7 @@ limits:
 
 execution:
   max-concurrent: 0  # 0 = unlimited
+  show-agent-output: true  # Stream agent output to console with prefixes
 
 timeouts:
   agent-timeout-ms: 300000    # 5 minutes

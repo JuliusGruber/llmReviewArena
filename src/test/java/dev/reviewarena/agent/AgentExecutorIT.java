@@ -251,7 +251,7 @@ class AgentExecutorIT {
 
         // Very short timeout
         ArenaConfig config = new ArenaConfig(
-            1, 500, 0,
+            1, 500, 0, false,
             500, // 500ms agent timeout
             5_000, // 5s round timeout
             100, // 100ms grace period
@@ -282,7 +282,7 @@ class AgentExecutorIT {
 
         // Very short timeout
         ArenaConfig config = new ArenaConfig(
-            1, 500, 0,
+            1, 500, 0, false,
             500, // 500ms agent timeout
             5_000, // 5s round timeout
             100, // 100ms grace period
@@ -417,6 +417,7 @@ class AgentExecutorIT {
             1, // maxRounds
             500, // maxOutputSizeKb
             maxConcurrent,
+            false, // showAgentOutput - disable for tests to avoid console noise
             10_000, // agentTimeoutMs
             30_000, // roundTimeoutMs
             1_000, // gracePeriodMs

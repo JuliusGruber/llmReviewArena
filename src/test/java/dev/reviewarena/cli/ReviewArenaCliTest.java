@@ -51,6 +51,7 @@ class ReviewArenaCliTest {
                     overrides.maxRounds() != null ? overrides.maxRounds() : 5,
                     500, // maxOutputSizeKb
                     overrides.maxConcurrent() != null ? overrides.maxConcurrent() : 0,
+                    overrides.showAgentOutput() != null ? overrides.showAgentOutput() : true, // showAgentOutput
                     300_000, // agentTimeoutMs
                     900_000, // roundTimeoutMs
                     5_000, // gracePeriodMs
@@ -248,6 +249,39 @@ class ReviewArenaCliTest {
             commandLine.parseArgs("--max-concurrent", "4", "abc1234");
 
             assertEquals(4, cli.getMaxConcurrent());
+        }
+    }
+
+    @Nested
+    class QuietMode {
+
+        @Test
+        void quietDefault() {
+            commandLine.parseArgs("abc1234");
+
+            assertFalse(cli.isQuiet());
+        }
+
+        @Test
+        void quietEnabled() {
+            commandLine.parseArgs("--quiet", "abc1234");
+
+            assertTrue(cli.isQuiet());
+        }
+
+        @Test
+        void quietShortEnabled() {
+            commandLine.parseArgs("-q", "abc1234");
+
+            assertTrue(cli.isQuiet());
+        }
+
+        @Test
+        void quietWithOtherOptions() {
+            commandLine.parseArgs("-q", "--dry-run", "abc1234");
+
+            assertTrue(cli.isQuiet());
+            assertTrue(cli.isDryRun());
         }
     }
 
@@ -469,6 +503,7 @@ class ReviewArenaCliTest {
             assertTrue(output.contains("--sequential"));
             assertTrue(output.contains("--max-concurrent"));
             assertTrue(output.contains("--dry-run"));
+            assertTrue(output.contains("--quiet"));
         }
     }
 

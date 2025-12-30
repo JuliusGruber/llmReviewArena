@@ -30,7 +30,7 @@ class ReviewAggregatorTest {
             "codex", new AgentConfig("codex", List.of("codex"), Map.of(), true)
         );
         ArenaConfig config = new ArenaConfig(
-            2, 500, 0, 30_000, 90_000, 1_000, 2,
+            2, 500, 0, false, 30_000, 90_000, 1_000, 2,
             Path.of(".arena"), agents
         );
         workspace = new WorkspaceManager(tempDir, config);

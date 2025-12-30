@@ -192,6 +192,7 @@ class AgentExecutorTest {
             2, // maxRounds
             500, // maxOutputSizeKb
             0, // maxConcurrent (unlimited)
+            false, // showAgentOutput - disable for tests to avoid console noise
             30_000, // agentTimeoutMs
             90_000, // roundTimeoutMs
             1_000, // gracePeriodMs
@@ -206,6 +207,7 @@ class AgentExecutorTest {
             2, // maxRounds
             500, // maxOutputSizeKb
             maxConcurrent,
+            false, // showAgentOutput - disable for tests to avoid console noise
             10_000, // agentTimeoutMs
             30_000, // roundTimeoutMs
             1_000, // gracePeriodMs
