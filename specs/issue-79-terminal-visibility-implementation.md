@@ -17,6 +17,20 @@ Users currently have no real-time visibility into agent execution. Output is cap
 
 Implement a **terminal mode** where each agent spawns in its own visible terminal window. Users can watch all agents work in parallel. On success, terminals close automatically. On failure, terminals stay open for inspection.
 
+### Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Windows | ✅ Supported | Windows Terminal, cmd.exe fallback |
+| Linux | ✅ Supported | gnome-terminal, konsole, xfce4-terminal, xterm |
+| macOS | ⏳ Deferred | Will be added in a future iteration |
+
+**Note:** macOS support is intentionally deferred to keep the initial implementation focused. When macOS is added, it will support Terminal.app and iTerm2.
+
+### Prerequisites
+
+- **Windows**: PowerShell 5.1+ (included with Windows 10/11)
+
 ---
 
 ## Architecture Changes
@@ -28,8 +42,9 @@ Introduce a `ProcessExecutor` interface with two implementations:
 ```
 dev.reviewarena.agent
 ├── ProcessExecutor.java           (NEW - interface)
-├── HeadlessExecutor.java          (NEW - current behavior, renamed from embedded in AgentProcess)
+├── HeadlessExecutor.java          (NEW - current behavior, extracted from AgentProcess)
 ├── TerminalExecutor.java          (NEW - terminal mode)
+├── CompletionPoller.java          (NEW - polls for .exitcode file)
 ├── terminal/
 │   ├── TerminalDetector.java      (NEW - detects available terminals)
 │   ├── TerminalType.java          (NEW - enum of supported terminals)
@@ -43,7 +58,6 @@ dev.reviewarena.agent
 package dev.reviewarena.agent;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.Duration;
 
 /**
@@ -55,11 +69,7 @@ public interface ProcessExecutor {
     /**
      * Start the agent process.
      *
-     * @param config Agent configuration
-     * @param workingDir Working directory for the agent
-     * @param promptFile Path to the prompt file (for stdin redirection)
-     * @param outputFile Expected output file (review.md)
-     * @param command The resolved command to execute
+     * @param context Execution context containing agent name, command, paths, etc.
      * @throws IOException if process cannot be started
      */
     void start(AgentExecutionContext context) throws IOException;
@@ -102,17 +112,24 @@ import java.util.List;
 
 /**
  * Context for agent execution, containing all necessary information for ProcessExecutor.
+ * Note: Prompts are passed via command-line flags (e.g., -p @prompt.md), not stdin.
+ *
+ * File locations (all in same directory):
+ *   .arena/rounds/round-N/<agent>/
+ *   ├── review.md      (outputFile)
+ *   ├── stdout.log     (stdoutLog)
+ *   ├── stderr.log     (stderrLog - headless only)
+ *   └── .exitcode      (exitCodeFile - terminal mode)
  */
 public record AgentExecutionContext(
     String agentName,
     int round,
-    List<String> command,
+    List<String> command,     // Fully resolved command including prompt flag
     Path workingDir,
-    Path promptFile,
-    Path outputFile,      // review.md
-    Path stdoutLog,       // for log capture
-    Path stderrLog,       // for log capture
-    Path exitCodeFile,    // .exitcode file for terminal mode
+    Path outputFile,          // .arena/rounds/round-N/<agent>/review.md
+    Path stdoutLog,           // .arena/rounds/round-N/<agent>/stdout.log
+    Path stderrLog,           // .arena/rounds/round-N/<agent>/stderr.log (headless only)
+    Path exitCodeFile,        // .arena/rounds/round-N/<agent>/.exitcode (terminal mode)
     long gracePeriodMs
 ) {}
 ```
@@ -168,6 +185,12 @@ package dev.reviewarena.agent.terminal;
  */
 public class TerminalDetector {
 
+    /**
+     * Environment variable to override terminal detection (for testing).
+     * Set to a TerminalType name: WINDOWS_TERMINAL, CMD, GNOME_TERMINAL, etc.
+     */
+    public static final String TERMINAL_OVERRIDE_ENV = "ARENA_TERMINAL_OVERRIDE";
+
     private static TerminalType cachedTerminal = null;
 
     /**
@@ -179,6 +202,18 @@ public class TerminalDetector {
             return cachedTerminal;
         }
 
+        // Allow override for testing fallback scenarios
+        String override = System.getenv(TERMINAL_OVERRIDE_ENV);
+        if (override != null && !override.isBlank()) {
+            try {
+                cachedTerminal = TerminalType.valueOf(override.toUpperCase());
+                LOG.info("Terminal override via {}: {}", TERMINAL_OVERRIDE_ENV, cachedTerminal);
+                return cachedTerminal;
+            } catch (IllegalArgumentException e) {
+                LOG.warn("Invalid terminal override '{}', using auto-detection", override);
+            }
+        }
+
         if (isWindows()) {
             cachedTerminal = detectWindowsTerminal();
         } else {
@@ -186,6 +221,13 @@ public class TerminalDetector {
         }
 
         return cachedTerminal;
+    }
+
+    /**
+     * Clear cached terminal (for testing).
+     */
+    static void resetCache() {
+        cachedTerminal = null;
     }
 
     private static TerminalType detectWindowsTerminal() {
@@ -242,6 +284,43 @@ public boolean isShowTerminal() {
 }
 ```
 
+### Command-Line Flag
+
+Add a `--headless` flag for one-off overrides without changing config files:
+
+```
+arena review --headless    # Force headless mode (no terminal windows)
+```
+
+**Implementation in CLI class (picocli):**
+
+```java
+@Command(name = "review", description = "Run code review tournament")
+public class ReviewCommand implements Runnable {
+
+    @Option(names = "--headless",
+            description = "Disable terminal windows, run in headless mode")
+    boolean headless;
+
+    @Inject
+    ArenaConfig config;
+
+    @Override
+    public void run() {
+        // CLI flag overrides config file value
+        boolean showTerminal = !headless && config.isShowTerminal();
+
+        // Pass to AgentProcess.Builder
+        AgentProcess.builder()
+            .showTerminal(showTerminal)
+            // ... other config
+            .build();
+    }
+}
+```
+
+**Precedence:** `--headless` flag (highest) → `execution.show-terminal` config → default `true` (lowest)
+
 ### Effective Mode Selection Logic
 
 ```
@@ -256,91 +335,46 @@ if (config.showTerminal && TerminalDetector.detect() != NONE) {
 
 ## Completion Detection
 
-### WatchService-Based Detection
+### Polling-Based Detection
 
-Instead of polling, use Java's `WatchService` API for event-driven file monitoring:
+Use simple polling for the `.exitcode` file. This approach is more reliable than `WatchService` because:
+- Works on all filesystems (including network drives, VM shared folders)
+- The `.exitcode` file is written **after** the command completes - it's the definitive completion signal
+- No need for "file stability" checks since the file is written atomically
+- Simpler implementation with fewer edge cases
 
 ```java
 package dev.reviewarena.agent;
 
 import java.nio.file.*;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
-public class OutputFileWatcher implements AutoCloseable {
+/**
+ * Polls for the .exitcode file that signals agent completion.
+ * The shell wrapper writes this file after the agent command finishes.
+ */
+public class CompletionPoller {
 
-    private final WatchService watchService;
-    private final Path outputDir;
-    private final String targetFileName;  // "review.md"
-
-    public OutputFileWatcher(Path outputDir, String targetFileName) throws IOException {
-        this.watchService = FileSystems.getDefault().newWatchService();
-        this.outputDir = outputDir;
-        this.targetFileName = targetFileName;
-
-        // Register for create and modify events
-        outputDir.register(watchService,
-            StandardWatchEventKinds.ENTRY_CREATE,
-            StandardWatchEventKinds.ENTRY_MODIFY);
-    }
+    private static final long POLL_INTERVAL_MS = 500;
 
     /**
-     * Wait for the target file to appear and stabilize.
+     * Wait for the exit code file to appear, indicating command completion.
      *
+     * @param exitCodeFile Path to the .exitcode file
      * @param timeout Maximum time to wait
-     * @return true if file appeared and stabilized, false if timeout
+     * @return true if file appeared (command completed), false if timeout
      */
-    public boolean awaitFile(Duration timeout) throws InterruptedException {
-        long endTime = System.currentTimeMillis() + timeout.toMillis();
+    public boolean awaitCompletion(Path exitCodeFile, Duration timeout)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
 
-        while (System.currentTimeMillis() < endTime) {
-            long remaining = endTime - System.currentTimeMillis();
-            WatchKey key = watchService.poll(remaining, TimeUnit.MILLISECONDS);
-
-            if (key != null) {
-                for (WatchEvent<?> event : key.pollEvents()) {
-                    Path fileName = (Path) event.context();
-                    if (fileName.toString().equals(targetFileName)) {
-                        // File detected - wait for stability
-                        if (awaitFileStability(outputDir.resolve(targetFileName))) {
-                            return true;
-                        }
-                    }
-                }
-                key.reset();
+        while (System.currentTimeMillis() < deadline) {
+            if (Files.exists(exitCodeFile)) {
+                return true;  // Command finished (success or failure)
             }
+            Thread.sleep(POLL_INTERVAL_MS);
         }
-        return false;
-    }
-
-    /**
-     * Wait for file size to stabilize (2 consecutive same-size readings 500ms apart).
-     */
-    private boolean awaitFileStability(Path file) throws InterruptedException {
-        long lastSize = -1;
-        int stableCount = 0;
-
-        while (stableCount < 2) {
-            Thread.sleep(500);
-            try {
-                long currentSize = Files.size(file);
-                if (currentSize > 0 && currentSize == lastSize) {
-                    stableCount++;
-                } else {
-                    stableCount = 0;
-                    lastSize = currentSize;
-                }
-            } catch (IOException e) {
-                // File might have been deleted - reset
-                stableCount = 0;
-                lastSize = -1;
-            }
-        }
-        return true;
-    }
-
-    @Override
-    public void close() throws IOException {
-        watchService.close();
+        return false;  // Timeout
     }
 }
 ```
@@ -365,52 +399,57 @@ The shell command must write the exit code to a `.exitcode` file that the orches
 
 ### Windows Commands
 
+Windows commands use PowerShell for output capture and exit code handling.
+
 #### Windows Terminal (wt.exe)
 
 ```cmd
-wt.exe -w 0 nt --title "Agent: claude (Round 1)" cmd /c "cd /d {workingDir} && {command} 2>&1 | tee {stdoutLog} && (echo 0 > {exitCodeFile} & exit) || (echo %errorlevel% > {exitCodeFile} & pause)"
+wt.exe -w new --title "Agent: claude (Round 1)" powershell -NoProfile -Command "Set-Location '{workingDir}'; & {command} 2>&1 | Tee-Object -FilePath '{stdoutLog}'; $LASTEXITCODE | Out-File -FilePath '{exitCodeFile}' -NoNewline; if ($LASTEXITCODE -ne 0) { Read-Host 'Press Enter to close...' }"
 ```
 
 **Breakdown:**
-- `wt.exe -w 0 nt` - Open new tab in current window (or new window if none)
+- `wt.exe -w new` - Open a new window (each agent gets its own window)
 - `--title "Agent: <name> (Round N)"` - Window title for identification
-- `cd /d {workingDir}` - Change to working directory
-- `{command} 2>&1 | tee {stdoutLog}` - Run command, capture both streams to log
-- `echo 0 > {exitCodeFile}` - Write success exit code
-- `|| (echo %errorlevel% > {exitCodeFile} & pause)` - On failure: write exit code, pause for inspection
+- `powershell -NoProfile -Command "..."` - Execute via PowerShell
+- `Set-Location '{workingDir}'` - Change to working directory
+- `& {command} 2>&1 | Tee-Object` - Stream output in real-time to terminal and log file
+- `$LASTEXITCODE | Out-File` - Write exit code to file (persists from native command across pipeline)
+- `if ($LASTEXITCODE -ne 0) { Read-Host '...' }` - On failure: pause for inspection
 
 #### cmd.exe (Fallback)
 
 ```cmd
-cmd /c start "Agent: claude (Round 1)" cmd /c "cd /d {workingDir} && {command} 2>&1 | tee {stdoutLog} && (echo 0 > {exitCodeFile} & exit) || (echo %errorlevel% > {exitCodeFile} & pause)"
+cmd /c start "Agent: claude (Round 1)" powershell -NoProfile -Command "Set-Location '{workingDir}'; & {command} 2>&1 | Tee-Object -FilePath '{stdoutLog}'; $LASTEXITCODE | Out-File -FilePath '{exitCodeFile}' -NoNewline; if ($LASTEXITCODE -ne 0) { Read-Host 'Press Enter to close...' }"
 ```
-
-**Note:** `tee` requires Git Bash or similar in PATH. Alternative: Use PowerShell's `Tee-Object`.
 
 ### Linux Commands
 
 #### gnome-terminal
 
 ```bash
-gnome-terminal --title="Agent: claude (Round 1)" -- bash -c "cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; echo $? > {exitCodeFile}; [ $? -eq 0 ] || read -p 'Press Enter to close...'"
+gnome-terminal --title="Agent: claude (Round 1)" -- bash -c "cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; ec=\$?; echo \$ec > {exitCodeFile}; [ \$ec -eq 0 ] || read -p 'Press Enter to close...'"
 ```
+
+**Note:** Exit code is saved to `ec` variable immediately to preserve it before subsequent commands overwrite `$?`.
 
 #### konsole
 
 ```bash
-konsole --new-tab -p tabtitle="Agent: claude (Round 1)" -e bash -c "cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; echo $? > {exitCodeFile}; [ $? -eq 0 ] || read -p 'Press Enter to close...'"
+konsole -p tabtitle="Agent: claude (Round 1)" -e bash -c "cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; ec=\$?; echo \$ec > {exitCodeFile}; [ \$ec -eq 0 ] || read -p 'Press Enter to close...'"
 ```
+
+**Note:** Without `--new-tab`, konsole opens a new window by default.
 
 #### xfce4-terminal
 
 ```bash
-xfce4-terminal --title="Agent: claude (Round 1)" -e "bash -c 'cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; echo \$? > {exitCodeFile}; [ \$? -eq 0 ] || read -p \"Press Enter to close...\"'"
+xfce4-terminal --title="Agent: claude (Round 1)" -e "bash -c 'cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; ec=\$?; echo \$ec > {exitCodeFile}; [ \$ec -eq 0 ] || read -p \"Press Enter to close...\"'"
 ```
 
 #### xterm
 
 ```bash
-xterm -title "Agent: claude (Round 1)" -e bash -c "cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; echo $? > {exitCodeFile}; [ $? -eq 0 ] || read -p 'Press Enter to close...'"
+xterm -title "Agent: claude (Round 1)" -e bash -c "cd {workingDir} && {command} 2>&1 | tee {stdoutLog}; ec=\$?; echo \$ec > {exitCodeFile}; [ \$ec -eq 0 ] || read -p 'Press Enter to close...'"
 ```
 
 ### TerminalCommandBuilder
@@ -460,14 +499,15 @@ import dev.reviewarena.agent.terminal.*;
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 public class TerminalExecutor implements ProcessExecutor {
 
     private static final Logger LOG = LoggerFactory.getLogger(TerminalExecutor.class);
 
     private final TerminalType terminalType;
+    private final CompletionPoller poller = new CompletionPoller();
     private Process terminalProcess;
-    private OutputFileWatcher watcher;
     private AgentExecutionContext context;
     private int exitCode = -1;
 
@@ -479,7 +519,7 @@ public class TerminalExecutor implements ProcessExecutor {
     public void start(AgentExecutionContext context) throws IOException {
         this.context = context;
 
-        // Clean up stale files
+        // Clean up stale files from previous runs
         Files.deleteIfExists(context.outputFile());
         Files.deleteIfExists(context.exitCodeFile());
 
@@ -489,11 +529,6 @@ public class TerminalExecutor implements ProcessExecutor {
 
         LOG.debug("Starting terminal for agent '{}': {}",
             context.agentName(), String.join(" ", terminalCommand));
-
-        // Start file watcher BEFORE spawning process
-        watcher = new OutputFileWatcher(
-            context.outputFile().getParent(),
-            context.outputFile().getFileName().toString());
 
         // Spawn terminal process
         ProcessBuilder pb = new ProcessBuilder(terminalCommand);
@@ -505,20 +540,15 @@ public class TerminalExecutor implements ProcessExecutor {
 
     @Override
     public boolean awaitCompletion(Duration timeout) throws InterruptedException {
-        try {
-            // Wait for review.md to appear and stabilize
-            boolean completed = watcher.awaitFile(timeout);
+        // Poll for .exitcode file - written after command completes
+        boolean completed = poller.awaitCompletion(context.exitCodeFile(), timeout);
 
-            if (completed) {
-                // Read exit code from .exitcode file
-                exitCode = readExitCode();
-                return exitCode == 0;
-            }
-
-            return false;
-        } finally {
-            closeWatcher();
+        if (completed) {
+            exitCode = readExitCode();
+            return exitCode == 0;
         }
+
+        return false;  // Timeout
     }
 
     private int readExitCode() {
@@ -531,7 +561,7 @@ public class TerminalExecutor implements ProcessExecutor {
             LOG.warn("Failed to read exit code for agent '{}': {}",
                 context.agentName(), e.getMessage());
         }
-        // If review.md exists but .exitcode doesn't, assume success
+        // Fallback: if .exitcode missing but review.md exists, assume success
         return Files.exists(context.outputFile()) ? 0 : 1;
     }
 
@@ -542,8 +572,6 @@ public class TerminalExecutor implements ProcessExecutor {
 
     @Override
     public void destroy() {
-        closeWatcher();
-
         if (terminalProcess != null && terminalProcess.isAlive()) {
             // Destroy terminal and all descendants
             terminalProcess.descendants().forEach(ProcessHandle::destroy);
@@ -565,16 +593,6 @@ public class TerminalExecutor implements ProcessExecutor {
     @Override
     public boolean isRunning() {
         return terminalProcess != null && terminalProcess.isAlive();
-    }
-
-    private void closeWatcher() {
-        if (watcher != null) {
-            try {
-                watcher.close();
-            } catch (IOException e) {
-                LOG.debug("Error closing file watcher: {}", e.getMessage());
-            }
-        }
     }
 }
 ```
@@ -603,9 +621,8 @@ public class HeadlessExecutor implements ProcessExecutor {
     public void start(AgentExecutionContext context) throws IOException {
         this.context = context;
 
-        ProcessBuilder pb = new ProcessBuilder(wrapCommand(context.command()));
+        ProcessBuilder pb = new ProcessBuilder(context.command());
         pb.directory(context.workingDir().toFile());
-        pb.redirectInput(context.promptFile().toFile());
 
         process = pb.start();
 
@@ -747,7 +764,7 @@ public class AgentProcess {
    - `TerminalType.java` - enum of supported terminals
    - `TerminalDetector.java` - terminal detection logic
    - `TerminalCommandBuilder.java` - builds terminal commands
-4. **Create OutputFileWatcher** (`agent/OutputFileWatcher.java`)
+4. **Create CompletionPoller** (`agent/CompletionPoller.java`) - polls for `.exitcode` file
 
 ### Phase 2: Executor Implementations
 
@@ -757,22 +774,23 @@ public class AgentProcess {
 ### Phase 3: Integration
 
 7. **Modify ArenaConfig** - add `showTerminal` property
-8. **Modify AgentProcess** - delegate to ProcessExecutor
-9. **Modify AgentProcess.Builder** - add `showTerminal` field
-10. **Modify AgentExecutor** - pass `showTerminal` config to AgentProcess
+8. **Add `--headless` CLI flag** - override config for one-off runs
+9. **Modify AgentProcess** - delegate to ProcessExecutor
+10. **Modify AgentProcess.Builder** - add `showTerminal` field
+11. **Modify AgentExecutor** - pass `showTerminal` config to AgentProcess
 
 ### Phase 4: Testing
 
-11. **Unit tests for TerminalDetector** - mock process execution
-12. **Unit tests for TerminalCommandBuilder** - verify command generation
-13. **Unit tests for OutputFileWatcher** - mock file system events
-14. **Integration tests** - mock terminal execution
+12. **Unit tests for TerminalDetector** - mock process execution
+13. **Unit tests for TerminalCommandBuilder** - verify command generation
+14. **Unit tests for CompletionPoller** - test with temporary files
+15. **Integration tests** - mock terminal execution
 
 ### Phase 5: Documentation
 
-15. **Update spec.md** - document terminal mode behavior
-16. **Update implementation-decisions.md** - document new components
-17. **Update README** - add terminal mode usage instructions
+16. **Update spec.md** - document terminal mode behavior
+17. **Update implementation-decisions.md** - document new components
+18. **Update README** - add terminal mode usage instructions
 
 ---
 
@@ -828,13 +846,14 @@ execution:
 | `src/main/java/dev/reviewarena/agent/AgentExecutionContext.java` | NEW |
 | `src/main/java/dev/reviewarena/agent/HeadlessExecutor.java` | NEW |
 | `src/main/java/dev/reviewarena/agent/TerminalExecutor.java` | NEW |
-| `src/main/java/dev/reviewarena/agent/OutputFileWatcher.java` | NEW |
+| `src/main/java/dev/reviewarena/agent/CompletionPoller.java` | NEW |
 | `src/main/java/dev/reviewarena/agent/terminal/TerminalType.java` | NEW |
 | `src/main/java/dev/reviewarena/agent/terminal/TerminalDetector.java` | NEW |
 | `src/main/java/dev/reviewarena/agent/terminal/TerminalCommandBuilder.java` | NEW |
 | `src/main/java/dev/reviewarena/agent/AgentProcess.java` | MODIFY |
 | `src/main/java/dev/reviewarena/agent/AgentExecutor.java` | MODIFY |
 | `src/main/java/dev/reviewarena/config/ArenaConfig.java` | MODIFY |
+| `src/main/java/dev/reviewarena/cli/ReviewArenaCli.java` | MODIFY |
 | `src/main/resources/application.yaml` | MODIFY |
 
 ---
@@ -843,11 +862,13 @@ execution:
 
 | Risk | Mitigation |
 |------|------------|
-| `tee` not available on Windows | Require Git Bash in PATH, or use PowerShell alternative |
-| WatchService platform differences | Test on both Windows and Linux; fallback to polling if needed |
+| PowerShell version compatibility | Require PowerShell 5.1+ (included with Windows 10/11) |
 | Terminal process tree issues | Use process descendants API for cleanup |
-| Exit code file race condition | Stability polling ensures file is fully written |
+| Polling overhead | 500ms interval is low-overhead; file existence check is fast |
+| Exit code file not written (crash) | Fallback: if `review.md` exists but `.exitcode` missing, assume success |
 | Orphaned terminal windows on failure | Leave for user to close manually (per spec) |
+| Terminal process tree cleanup | Some terminals may not be fully killable via Java; user closes manually if needed |
+| User closes terminal manually | Treated as timeout - agent waits until `agent-timeout-ms` expires |
 
 ---
 
@@ -876,6 +897,25 @@ execution:
 - [ ] Exit code is correctly read from .exitcode file
 - [ ] Fallback to headless mode when terminal unavailable
 - [ ] Configuration toggle works (`show-terminal: false`)
+- [ ] `--headless` CLI flag overrides config
+
+**Testing fallback terminals:**
+
+Use the `ARENA_TERMINAL_OVERRIDE` environment variable to force a specific terminal:
+
+```bash
+# Test cmd.exe fallback on Windows (even if Windows Terminal is installed)
+set ARENA_TERMINAL_OVERRIDE=CMD
+arena review ...
+
+# Test xterm fallback on Linux
+export ARENA_TERMINAL_OVERRIDE=XTERM
+arena review ...
+
+# Test headless fallback (no terminal available)
+export ARENA_TERMINAL_OVERRIDE=NONE
+arena review ...
+```
 
 ---
 
