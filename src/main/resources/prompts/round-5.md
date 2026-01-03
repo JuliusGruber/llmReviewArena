@@ -15,7 +15,20 @@ You are given commit hash(es) or a staged flag to review:
 ## Your Input
 
 - The original code under review
-- Round 4 reviews from all agents: `${allReviewsPath}`
+- Round 4 reviews from all agents (provided below)
+
+### Previous Round Reviews
+
+The reviews from the previous round are embedded below for your reference.
+If for any reason the content below is empty, you can read from: `${allReviewsPath}`
+
+---
+<#if previousReviewsContent??>
+${previousReviewsContent}
+<#else>
+*Previous reviews not embedded. Please read from the file path above.*
+</#if>
+---
 
 ## The "Best of All Worlds" Approach - Final Round: The Definitive Review
 
@@ -26,7 +39,7 @@ The tournament has worked: multiple perspectives have been synthesized, claims h
 ## Your Process (Work Through This Step by Step)
 
 ### Step 1: Read All Round 4 Reviews
-Read `${allReviewsPath}`. Reviews should be nearly converged.
+Read the **Previous Round Reviews** section above. Reviews should be nearly converged.
 
 ### Step 2: Final Verification Pass
 One last time, verify the most critical issues:

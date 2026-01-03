@@ -15,7 +15,20 @@ You are given commit hash(es) or a staged flag to review:
 ## Your Input
 
 - The original code under review
-- Round 2 reviews from all agents: `${allReviewsPath}`
+- Round 2 reviews from all agents (provided below)
+
+### Previous Round Reviews
+
+The reviews from the previous round are embedded below for your reference.
+If for any reason the content below is empty, you can read from: `${allReviewsPath}`
+
+---
+<#if previousReviewsContent??>
+${previousReviewsContent}
+<#else>
+*Previous reviews not embedded. Please read from the file path above.*
+</#if>
+---
 
 ## The "Best of All Worlds" Approach - Round 3 Focus: Refinement & Calibration
 
@@ -28,7 +41,7 @@ Reviews are converging. The major issues have been identified and evidence gathe
 ## Your Process (Work Through This Step by Step)
 
 ### Step 1: Read All Round 2 Reviews
-Read `${allReviewsPath}`. The reviews should now be evidence-backed and fairly aligned.
+Read the **Previous Round Reviews** section above. The reviews should now be evidence-backed and fairly aligned.
 
 ### Step 2: Re-verify Remaining Issues
 Even at Round 3, verify each issue yourself:

@@ -15,7 +15,20 @@ You are given commit hash(es) or a staged flag to review:
 ## Your Input
 
 - The original code under review (as specified above)
-- Reviews from other agents: `${allReviewsPath}`
+- Reviews from other agents (provided below)
+
+### Previous Round Reviews
+
+The reviews from the previous round are embedded below for your reference.
+If for any reason the content below is empty, you can read from: `${allReviewsPath}`
+
+---
+<#if previousReviewsContent??>
+${previousReviewsContent}
+<#else>
+*Previous reviews not embedded. Please read from the file path above.*
+</#if>
+---
 
 ## The "Best of All Worlds" Approach
 
@@ -30,7 +43,7 @@ This approach breaks "local optima" - when you see radically different perspecti
 ## Your Process (Work Through This Step by Step)
 
 ### Step 1: Read All Competing Reviews
-Read `${allReviewsPath}` carefully. Note each distinct issue raised by any reviewer.
+Read the **Previous Round Reviews** section above carefully. Note each distinct issue raised by any reviewer.
 
 ### Step 2: Verify Each Point
 For **every issue** raised by competing reviewers:

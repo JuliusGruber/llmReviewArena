@@ -247,6 +247,11 @@ public class ReviewArenaCli implements Callable<Integer> {
 
         // === CROSS-POLLINATION ROUNDS (1 through maxRounds) ===
         for (int round = 1; round <= config.maxRounds(); round++) {
+            // Regenerate prompts with embedded previous reviews content
+            // This is necessary because some AI agents (e.g., Gemini CLI) cannot read files
+            // in .gitignored directories, so we embed the content directly in the prompt
+            workspaceManager.regenerateRoundPrompts(round, commit1, commit2, stagedFlagValue);
+
             // Execute round with all agents (agents participate even if they failed in previous rounds)
             Map<String, AgentResult> roundResults = executor.executeRound(round, allAgents);
 

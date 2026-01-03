@@ -209,6 +209,56 @@ public class WorkspaceManager {
         return getPromptsDir().resolve("round-" + round + "-" + agentName + ".md");
     }
 
+    /**
+     * Regenerates the prompts for a specific round with embedded previous reviews content.
+     *
+     * <p>This method should be called before executing rounds > 0 to embed the actual
+     * content of the previous round's all_reviews.md directly into the prompt. This is
+     * necessary because some AI agents (e.g., Gemini CLI) cannot read files in .gitignored
+     * directories.
+     *
+     * @param round      the round number (must be > 0)
+     * @param commit1    first commit reference (empty string if using --staged)
+     * @param commit2    second commit reference for ranges (empty string for single commit or --staged)
+     * @param stagedFlag the staged flag value ("--staged" if reviewing staged, empty string otherwise)
+     * @throws WorkspaceException if prompt regeneration fails
+     */
+    public void regenerateRoundPrompts(int round, String commit1, String commit2, String stagedFlag) {
+        if (round <= 0) {
+            throw new IllegalArgumentException("Round must be > 0 for prompt regeneration");
+        }
+
+        try {
+            // Read the previous round's all_reviews.md content
+            Path previousReviewsFile = getRoundDir(round - 1).resolve("all_reviews.md");
+            String previousReviewsContent = Files.readString(previousReviewsFile, StandardCharsets.UTF_8);
+
+            // Get task.md content to prepend
+            String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask());
+
+            Set<String> agentNames = getEnabledAgentNames();
+
+            // Regenerate prompt for each agent
+            for (String agentName : agentNames) {
+                String outputPath = ".arena/rounds/round-" + round + "/" + agentName + "/review.md";
+                String allReviewsPath = ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
+
+                TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath,
+                        previousReviewsContent, commit1, commit2, stagedFlag);
+
+                int templateRound = Math.min(round, 5);
+                String roundContent = templateLoader.render("round-" + templateRound + ".md", ctx);
+
+                String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
+
+                Files.writeString(getPromptsDir().resolve("round-" + round + "-" + agentName + ".md"),
+                        fullPrompt, StandardCharsets.UTF_8);
+            }
+        } catch (IOException e) {
+            throw new WorkspaceException("Failed to regenerate round " + round + " prompts", e);
+        }
+    }
+
     private void createRoundDirectory(Path roundDir, Set<String> agentNames) throws IOException {
         Files.createDirectories(roundDir);
         for (String agentName : agentNames) {
@@ -248,8 +298,10 @@ public class WorkspaceManager {
                 String allReviewsPath = (round == 0) ? null
                         : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
 
+                // At initialization time, previousReviewsContent is null (content doesn't exist yet)
+                // It will be populated later by regenerateRoundPrompts() before each round > 0
                 TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath,
-                        commit1, commit2, stagedFlag);
+                        null, commit1, commit2, stagedFlag);
                 // Use round-5.md template for rounds > 5 (final convergence template is reusable)
                 int templateRound = Math.min(round, 5);
                 String roundContent = templateLoader.render("round-" + templateRound + ".md", ctx);

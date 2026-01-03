@@ -30,7 +30,7 @@ class TemplateLoaderTest {
     @Test
     void render_roundZeroTemplate_resolvesPlaceholders() {
         TemplateContext context = TemplateContext.forRound(
-                0, ".arena/rounds/round-0/review.md", null, "", "", "");
+                0, ".arena/rounds/round-0/review.md", null, null, "", "", "");
 
         String result = templateLoader.render("round-0.md", context);
 
@@ -46,7 +46,7 @@ class TemplateLoaderTest {
                 1,
                 ".arena/rounds/round-1/review.md",
                 ".arena/rounds/round-0/all_reviews.md",
-                "", "", "");
+                null, "", "", "");
 
         String result = templateLoader.render("round-1.md", context);
 
@@ -84,11 +84,13 @@ class TemplateLoaderTest {
                 2,
                 ".arena/rounds/round-2/review.md",
                 ".arena/rounds/round-1/all_reviews.md",
+                "embedded review content",
                 "abc123", "def456", "");
 
         assertEquals(2, context.roundNumber());
         assertEquals(".arena/rounds/round-2/review.md", context.outputPath());
         assertEquals(".arena/rounds/round-1/all_reviews.md", context.allReviewsPath());
+        assertEquals("embedded review content", context.previousReviewsContent());
         assertEquals("abc123", context.commit1());
         assertEquals("def456", context.commit2());
     }
@@ -113,6 +115,7 @@ class TemplateLoaderTest {
                 1,
                 ".arena/rounds/round-1/review.md",
                 ".arena/rounds/round-0/all_reviews.md",
+                "embedded previous reviews",
                 "commit1", "commit2", "--staged");
 
         var model = context.toDataModel();
@@ -120,6 +123,7 @@ class TemplateLoaderTest {
         assertEquals(1, model.get("roundNumber"));
         assertEquals(".arena/rounds/round-1/review.md", model.get("outputPath"));
         assertEquals(".arena/rounds/round-0/all_reviews.md", model.get("allReviewsPath"));
+        assertEquals("embedded previous reviews", model.get("previousReviewsContent"));
         assertEquals("commit1", model.get("commit1"));
         assertEquals("commit2", model.get("commit2"));
         assertEquals("--staged", model.get("stagedFlag"));

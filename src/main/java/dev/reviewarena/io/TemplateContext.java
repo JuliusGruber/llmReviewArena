@@ -12,17 +12,19 @@ import java.util.Map;
  *   <li>{@link #forRound} - for round prompt generation (one prompt per round, shared by all agents)</li>
  * </ul>
  *
- * @param roundNumber    Current round number (0-indexed), -1 if not applicable
- * @param outputPath     Path where the agent should write its review output
- * @param allReviewsPath Path to the combined reviews from the previous round (null for round 0)
- * @param commit1        First commit reference (empty string if using --staged)
- * @param commit2        Second commit reference for ranges (empty string for single commit or --staged)
- * @param stagedFlag     The staged flag value ("--staged" if reviewing staged, empty string otherwise)
+ * @param roundNumber            Current round number (0-indexed), -1 if not applicable
+ * @param outputPath             Path where the agent should write its review output
+ * @param allReviewsPath         Path to the combined reviews from the previous round (null for round 0)
+ * @param previousReviewsContent The actual content of previous round reviews, embedded directly (null for round 0)
+ * @param commit1                First commit reference (empty string if using --staged)
+ * @param commit2                Second commit reference for ranges (empty string for single commit or --staged)
+ * @param stagedFlag             The staged flag value ("--staged" if reviewing staged, empty string otherwise)
  */
 public record TemplateContext(
         int roundNumber,
         String outputPath,
         String allReviewsPath,
+        String previousReviewsContent,
         String commit1,
         String commit2,
         String stagedFlag
@@ -34,23 +36,26 @@ public record TemplateContext(
      * @return a template context for task.md rendering
      */
     public static TemplateContext forTask() {
-        return new TemplateContext(-1, null, null, "", "", "");
+        return new TemplateContext(-1, null, null, null, "", "", "");
     }
 
     /**
      * Creates a context for round prompt generation.
      *
-     * @param roundNumber    current round number (0-indexed)
-     * @param outputPath     path where agent should write its review
-     * @param allReviewsPath path to combined reviews from previous round (null for round 0)
-     * @param commit1        first commit reference (empty string if using --staged)
-     * @param commit2        second commit reference for ranges (empty string for single commit or --staged)
-     * @param stagedFlag     the staged flag value ("--staged" if reviewing staged, empty string otherwise)
+     * @param roundNumber            current round number (0-indexed)
+     * @param outputPath             path where agent should write its review
+     * @param allReviewsPath         path to combined reviews from previous round (null for round 0)
+     * @param previousReviewsContent the actual content of previous round reviews (null for round 0)
+     * @param commit1                first commit reference (empty string if using --staged)
+     * @param commit2                second commit reference for ranges (empty string for single commit or --staged)
+     * @param stagedFlag             the staged flag value ("--staged" if reviewing staged, empty string otherwise)
      * @return a template context for round prompt rendering
      */
     public static TemplateContext forRound(int roundNumber, String outputPath, String allReviewsPath,
+                                           String previousReviewsContent,
                                            String commit1, String commit2, String stagedFlag) {
-        return new TemplateContext(roundNumber, outputPath, allReviewsPath, commit1, commit2, stagedFlag);
+        return new TemplateContext(roundNumber, outputPath, allReviewsPath, previousReviewsContent,
+                commit1, commit2, stagedFlag);
     }
 
     /**
@@ -72,6 +77,9 @@ public record TemplateContext(
         }
         if (allReviewsPath != null) {
             model.put("allReviewsPath", allReviewsPath);
+        }
+        if (previousReviewsContent != null) {
+            model.put("previousReviewsContent", previousReviewsContent);
         }
         if (commit1 != null) {
             model.put("commit1", commit1);

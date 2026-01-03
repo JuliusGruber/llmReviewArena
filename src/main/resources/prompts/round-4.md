@@ -15,7 +15,20 @@ You are given commit hash(es) or a staged flag to review:
 ## Your Input
 
 - The original code under review
-- Round 3 reviews from all agents: `${allReviewsPath}`
+- Round 3 reviews from all agents (provided below)
+
+### Previous Round Reviews
+
+The reviews from the previous round are embedded below for your reference.
+If for any reason the content below is empty, you can read from: `${allReviewsPath}`
+
+---
+<#if previousReviewsContent??>
+${previousReviewsContent}
+<#else>
+*Previous reviews not embedded. Please read from the file path above.*
+</#if>
+---
 
 ## The "Best of All Worlds" Approach - Round 4 Focus: Consolidation
 
@@ -28,7 +41,7 @@ Reviews should now be nearly identical in substance. This round focuses on **fin
 ## Your Process (Work Through This Step by Step)
 
 ### Step 1: Read All Round 3 Reviews
-Read `${allReviewsPath}`. Reviews should be well-aligned by now.
+Read the **Previous Round Reviews** section above. Reviews should be well-aligned by now.
 
 ### Step 2: Spot-Check Key Issues
 You don't need to re-verify everything, but **spot-check** the most important issues:

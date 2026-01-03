@@ -15,7 +15,20 @@ You are given commit hash(es) or a staged flag to review:
 ## Your Input
 
 - The original code under review
-- Round 1 reviews from all agents: `${allReviewsPath}`
+- Round 1 reviews from all agents (provided below)
+
+### Previous Round Reviews
+
+The reviews from the previous round are embedded below for your reference.
+If for any reason the content below is empty, you can read from: `${allReviewsPath}`
+
+---
+<#if previousReviewsContent??>
+${previousReviewsContent}
+<#else>
+*Previous reviews not embedded. Please read from the file path above.*
+</#if>
+---
 
 ## The "Best of All Worlds" Approach - Round 2 Focus: Precision & Evidence
 
@@ -29,7 +42,7 @@ The tournament method works because each reviewer brings different perspectives.
 ## Your Process (Work Through This Step by Step)
 
 ### Step 1: Read All Round 1 Reviews
-Read `${allReviewsPath}`. Create a mental list of every issue raised.
+Read the **Previous Round Reviews** section above. Create a mental list of every issue raised.
 
 ### Step 2: Verify and Strengthen Each Issue
 For **every issue** in the combined reviews:
