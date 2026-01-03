@@ -246,9 +246,7 @@ public class AgentProcess {
 
                         // Print to console with agent prefix if enabled
                         if (showOutput) {
-                            synchronized (System.out) {
-                                System.out.println("[" + agentName + "] " + line);
-                            }
+                            log.info("[{}] {}", agentName, line);
                         }
                         log.debug("[{}:{}] {}", agentName, name, line);
                     }
