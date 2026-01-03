@@ -53,7 +53,7 @@ print(f"Using codex at: {codex_path}", file=sys.stderr)
 
 # On Windows, we need shell=True for .cmd files to work properly
 use_shell = platform.system() == 'Windows'
-result = subprocess.run(cmd, input=prompt_content, text=True, capture_output=True, shell=use_shell)
+result = subprocess.run(cmd, input=prompt_content, text=True, capture_output=True, shell=use_shell, encoding='utf-8')
 
 if result.returncode != 0:
     print(f"Codex exec failed with return code {result.returncode}", file=sys.stderr)
