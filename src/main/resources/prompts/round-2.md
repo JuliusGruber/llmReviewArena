@@ -92,5 +92,3 @@ Write a review where every high-risk issue includes:
 ## When You're Done
 
 Write your refined, evidence-backed review to `${outputPath}`.
-
-Commit your review file when ready.

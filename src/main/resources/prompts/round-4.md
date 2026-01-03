@@ -86,5 +86,3 @@ Before finalizing, verify:
 ## When You're Done
 
 Write your consolidated review to `${outputPath}`.
-
-Commit your review file when ready.

@@ -91,4 +91,4 @@ Aim for a review that:
 
 Write your final review to `${outputPath}`.
 
-This is your best work. Commit your review file when ready.
+This is your best work.
