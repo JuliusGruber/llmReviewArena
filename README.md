@@ -18,6 +18,81 @@ review-arena --staged
 review-arena abc1234 --rounds 3
 ```
 
+## Prerequisites: Coding Agents
+
+LLM Review Arena orchestrates CLI-based coding agents as subprocesses. You need at least one agent installed.
+
+### Required: Claude CLI
+
+Claude CLI is **mandatory** - it's used for the final synthesis step that produces `champion_review.md`.
+
+1. **Install** from [Anthropic's Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+2. **Verify installation:**
+   ```bash
+   claude --version
+   ```
+3. **Authenticate** following Claude Code setup instructions
+
+### Optional: Additional Agents
+
+Install additional agents to enable multi-agent tournament rounds. The more agents, the richer the cross-pollination.
+
+#### Gemini CLI (enabled by default)
+
+Install from [Google's Gemini CLI](https://github.com/google-gemini/gemini-cli):
+
+```bash
+npm install -g @google/gemini-cli
+```
+
+Verify: `gemini --version`
+
+#### Codex CLI (disabled by default)
+
+```bash
+npm install -g @openai/codex
+```
+
+**Additional requirement:** Python 3 must be installed (used by the wrapper script).
+
+Verify: `codex --version && python --version`
+
+### Agent Configuration
+
+Create `arena.yaml` in your project root to enable/disable agents:
+
+```yaml
+agents:
+  claude:
+    enabled: true    # Required for synthesis - cannot be disabled
+  gemini:
+    enabled: true    # Set to false if not installed
+  codex:
+    enabled: false   # Set to true if installed
+```
+
+### Custom Agent Paths
+
+If agents are not in your PATH, specify the full command:
+
+```yaml
+agents:
+  claude:
+    command:
+      - /usr/local/bin/claude
+      - -p
+    enabled: true
+```
+
+### Minimum Agents
+
+The tournament requires at least 2 agents by default. For single-agent mode (testing), set:
+
+```yaml
+tournament:
+  min-agents: 1
+```
+
 ## Inspiration
 
 This project is a vibe coding experiment inspired by Jeffrey Emanuel's work on multi-round LLM collaboration:
