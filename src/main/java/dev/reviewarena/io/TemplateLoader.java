@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Map;
 
 /**
  * Loads and renders prompt templates using Freemarker.
@@ -51,12 +52,36 @@ public class TemplateLoader {
      * @throws TemplateException if template loading or processing fails
      */
     public String render(String templateName, TemplateContext context) {
-        log.debug("Rendering template: {} with context: {}", templateName, context);
+        return render(templateName, context.toDataModel());
+    }
+
+    /**
+     * Renders a template with the given synthesis context.
+     *
+     * @param templateName the template file name (e.g., "final-synth.md")
+     * @param context      the synthesis context with placeholder values
+     * @return the rendered template content
+     * @throws TemplateException if rendering fails
+     */
+    public String render(String templateName, SynthesisContext context) {
+        return render(templateName, context.toDataModel());
+    }
+
+    /**
+     * Renders a template with a raw data model map.
+     *
+     * @param templateName the template file name
+     * @param dataModel    the placeholder values
+     * @return the rendered template content
+     * @throws TemplateException if rendering fails
+     */
+    public String render(String templateName, Map<String, Object> dataModel) {
+        log.debug("Rendering template: {} with data model: {}", templateName, dataModel);
 
         try {
             Template template = freemarkerConfig.getTemplate(templateName);
             StringWriter writer = new StringWriter();
-            template.process(context.toDataModel(), writer);
+            template.process(dataModel, writer);
             return writer.toString();
         } catch (IOException e) {
             throw new TemplateException("Failed to load template: " + templateName, e);

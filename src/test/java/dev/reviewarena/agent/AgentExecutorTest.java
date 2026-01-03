@@ -216,4 +216,116 @@ class AgentExecutorTest {
             agents
         );
     }
+
+    // ===== Synthesis-related tests =====
+
+    @Test
+    void validateSynthesizerAvailable_claudeConfiguredAndEnabled_succeeds() {
+        Map<String, AgentConfig> agents = Map.of(
+            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), true)
+        );
+        config = createConfig(agents);
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("test-commit", "", "");
+
+        AgentExecutor executor = new AgentExecutor(config, workspace);
+
+        // Should not throw
+        assertDoesNotThrow(() -> executor.validateSynthesizerAvailable());
+    }
+
+    @Test
+    void validateSynthesizerAvailable_claudeNotConfigured_throwsAgentException() {
+        Map<String, AgentConfig> agents = Map.of(
+            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+        );
+        config = createConfig(agents);
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("test-commit", "", "");
+
+        AgentExecutor executor = new AgentExecutor(config, workspace);
+
+        AgentException ex = assertThrows(AgentException.class, () ->
+            executor.validateSynthesizerAvailable());
+        assertTrue(ex.getMessage().contains("Final synthesis requires Claude CLI"));
+        assertTrue(ex.getMessage().contains("configured"));
+    }
+
+    @Test
+    void validateSynthesizerAvailable_claudeDisabled_throwsAgentException() {
+        Map<String, AgentConfig> agents = Map.of(
+            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false)
+        );
+        config = createConfig(agents);
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("test-commit", "", "");
+
+        AgentExecutor executor = new AgentExecutor(config, workspace);
+
+        AgentException ex = assertThrows(AgentException.class, () ->
+            executor.validateSynthesizerAvailable());
+        assertTrue(ex.getMessage().contains("Final synthesis requires Claude CLI"));
+        assertTrue(ex.getMessage().contains("disabled"));
+    }
+
+    @Test
+    void getSynthesizerAgent_returnsClaude() {
+        Map<String, AgentConfig> agents = Map.of(
+            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), true),
+            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+        );
+        config = createConfig(agents);
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("test-commit", "", "");
+
+        AgentExecutor executor = new AgentExecutor(config, workspace);
+
+        assertEquals("claude", executor.getSynthesizerAgent());
+    }
+
+    @Test
+    void getSynthesizerAgent_claudeNotAvailable_throwsAgentException() {
+        Map<String, AgentConfig> agents = Map.of(
+            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+        );
+        config = createConfig(agents);
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("test-commit", "", "");
+
+        AgentExecutor executor = new AgentExecutor(config, workspace);
+
+        assertThrows(AgentException.class, () -> executor.getSynthesizerAgent());
+    }
+
+    @Test
+    void executeSynthesis_agentNotFound_throwsAgentException() {
+        Map<String, AgentConfig> agents = Map.of(
+            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+        );
+        config = createConfig(agents);
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("test-commit", "", "");
+
+        AgentExecutor executor = new AgentExecutor(config, workspace);
+
+        AgentException ex = assertThrows(AgentException.class, () ->
+            executor.executeSynthesis("claude", Path.of("/prompt.md"), Path.of("/output.md")));
+        assertTrue(ex.getMessage().contains("not found"));
+    }
+
+    @Test
+    void executeSynthesis_agentDisabled_throwsAgentException() {
+        Map<String, AgentConfig> agents = Map.of(
+            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false)
+        );
+        config = createConfig(agents);
+        workspace = new WorkspaceManager(tempDir, config);
+        workspace.initialize("test-commit", "", "");
+
+        AgentExecutor executor = new AgentExecutor(config, workspace);
+
+        AgentException ex = assertThrows(AgentException.class, () ->
+            executor.executeSynthesis("claude", Path.of("/prompt.md"), Path.of("/output.md")));
+        assertTrue(ex.getMessage().contains("disabled"));
+    }
 }

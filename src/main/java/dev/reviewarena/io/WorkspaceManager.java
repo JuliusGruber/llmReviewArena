@@ -46,6 +46,7 @@ import java.util.stream.Stream;
 public class WorkspaceManager {
 
     private static final String TASK_TEMPLATE = "task.md";
+    private static final String SYNTHESIS_TEMPLATE = "final-synth.md";
 
     private final Path projectRoot;
     private final ArenaConfig config;
@@ -181,6 +182,74 @@ public class WorkspaceManager {
     }
 
     /**
+     * Gets the path to the champion_review.md output file.
+     *
+     * @return the champion review path
+     */
+    public Path getChampionReviewPath() {
+        return getFinalDir().resolve("champion_review.md");
+    }
+
+    /**
+     * Generates the synthesis prompt at runtime (after tournament completes).
+     *
+     * @param finalRound           the last completed round number
+     * @param participatingAgents  set of agents that succeeded in the final round
+     * @return the path to the generated synthesis prompt
+     * @throws WorkspaceException if prompt generation fails
+     */
+    public Path generateSynthesisPrompt(int finalRound, java.util.Set<String> participatingAgents) {
+        try {
+            Path finalDir = getFinalDir();
+            Path promptPath = finalDir.resolve("prompt.md");
+            Path allReviewsFile = getRoundDir(finalRound).resolve("all_reviews.md");
+
+            // Validate all_reviews.md exists before synthesis
+            if (!Files.exists(allReviewsFile)) {
+                throw new WorkspaceException(
+                    "Final round reviews not found: " + allReviewsFile +
+                    ". Ensure cross-pollination completed successfully.");
+            }
+
+            // Build relative paths using configured output dir (not hardcoded .arena)
+            String outputDir = config.outputDir().toString().replace('\\', '/');
+            String allReviewsRelative = outputDir + "/rounds/round-" + finalRound + "/all_reviews.md";
+            String outputRelative = outputDir + "/rounds/final/champion_review.md";
+
+            // Calculate round counts
+            int roundCount = finalRound + 1;  // Round 0 + cross-pollination rounds
+            int crossPollinationRounds = finalRound;  // Rounds 1 through N
+
+            // Format participating agents (only those who succeeded in final round)
+            String agentsList = participatingAgents.stream()
+                .sorted()
+                .collect(Collectors.joining(", "));
+
+            // Get task.md content to prepend
+            String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask());
+
+            // Render synthesis template using SynthesisContext
+            SynthesisContext ctx = new SynthesisContext(
+                outputRelative,
+                allReviewsRelative,
+                roundCount,
+                crossPollinationRounds,
+                agentsList
+            );
+            String synthContent = templateLoader.render(SYNTHESIS_TEMPLATE, ctx);
+
+            // Combine task + synthesis into complete prompt
+            String fullPrompt = taskContent + "\n\n---\n\n" + synthContent;
+
+            Files.writeString(promptPath, fullPrompt, StandardCharsets.UTF_8);
+
+            return promptPath;
+        } catch (IOException e) {
+            throw new WorkspaceException("Failed to generate synthesis prompt", e);
+        }
+    }
+
+    /**
      * Gets the path to the task.md file.
      *
      * @return the task.md path
@@ -239,9 +308,10 @@ public class WorkspaceManager {
             Set<String> agentNames = getEnabledAgentNames();
 
             // Regenerate prompt for each agent
+            String outputDir = config.outputDir().toString().replace('\\', '/');
             for (String agentName : agentNames) {
-                String outputPath = ".arena/rounds/round-" + round + "/" + agentName + "/review.md";
-                String allReviewsPath = ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
+                String outputPath = outputDir + "/rounds/round-" + round + "/" + agentName + "/review.md";
+                String allReviewsPath = outputDir + "/rounds/round-" + (round - 1) + "/all_reviews.md";
 
                 TemplateContext ctx = TemplateContext.forRound(round, outputPath, allReviewsPath,
                         previousReviewsContent, commit1, commit2, stagedFlag);
@@ -292,11 +362,12 @@ public class WorkspaceManager {
         Set<String> agentNames = getEnabledAgentNames();
 
         // Generate prompt for each round and each agent
+        String outputDir = config.outputDir().toString().replace('\\', '/');
         for (int round = 0; round <= config.maxRounds(); round++) {
             for (String agentName : agentNames) {
-                String outputPath = ".arena/rounds/round-" + round + "/" + agentName + "/review.md";
+                String outputPath = outputDir + "/rounds/round-" + round + "/" + agentName + "/review.md";
                 String allReviewsPath = (round == 0) ? null
-                        : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
+                        : outputDir + "/rounds/round-" + (round - 1) + "/all_reviews.md";
 
                 // At initialization time, previousReviewsContent is null (content doesn't exist yet)
                 // It will be populated later by regenerateRoundPrompts() before each round > 0

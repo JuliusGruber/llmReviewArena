@@ -1,12 +1,15 @@
 package dev.reviewarena.cli;
 
+import dev.reviewarena.agent.AgentException;
 import dev.reviewarena.agent.AgentExecutor;
 import dev.reviewarena.agent.AgentResult;
 import dev.reviewarena.agent.ReviewAggregator;
+import dev.reviewarena.agent.SynthesisResult;
 import dev.reviewarena.config.ArenaConfig;
 import dev.reviewarena.config.ConfigLoader;
 import dev.reviewarena.config.ConfigLoader.CliOverrides;
 import dev.reviewarena.git.GitService;
+import dev.reviewarena.io.WorkspaceException;
 import dev.reviewarena.io.WorkspaceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -244,6 +247,7 @@ public class ReviewArenaCli implements Callable<Integer> {
         // Track all enabled agents - agents participate in every round even if they failed previously
         Set<String> allAgents = new HashSet<>(round0Results.keySet());
         int lastCompletedRound = 0;
+        Map<String, AgentResult> lastRoundResults = round0Results;
 
         // === CROSS-POLLINATION ROUNDS (1 through maxRounds) ===
         for (int round = 1; round <= config.maxRounds(); round++) {
@@ -280,12 +284,46 @@ public class ReviewArenaCli implements Callable<Integer> {
                 round, successfulThisRound, workspaceManager.relativize(roundAllReviews));
 
             lastCompletedRound = round;
+            lastRoundResults = roundResults;
         }
 
-        // === TOURNAMENT COMPLETE ===
+        // === TOURNAMENT COMPLETE - START SYNTHESIS ===
         Path finalAllReviews = workspaceManager.getRoundDir(lastCompletedRound).resolve("all_reviews.md");
         log.info("Cross-pollination complete! Final reviews: {}", workspaceManager.relativize(finalAllReviews));
-        log.info("Synthesis step not yet implemented (Milestone 4)");
+
+        // Get agents that succeeded in the final round (their reviews are in all_reviews.md)
+        Set<String> finalRoundSuccesses = AgentExecutor.getSuccessfulAgents(lastRoundResults);
+
+        // Validate and get synthesizer agent (Claude required per spec)
+        String synthesizerAgent;
+        try {
+            synthesizerAgent = executor.getSynthesizerAgent();
+            log.info("[SYNTHESIS] Using synthesizer: {}", synthesizerAgent);
+        } catch (AgentException e) {
+            log.error("[SYNTHESIS] {}", e.getMessage());
+            return 4;
+        }
+
+        // Generate synthesis prompt (participatingAgents = final round successes)
+        Path promptPath;
+        try {
+            promptPath = workspaceManager.generateSynthesisPrompt(lastCompletedRound, finalRoundSuccesses);
+            log.info("[SYNTHESIS] Prompt generated: {}", workspaceManager.relativize(promptPath));
+        } catch (WorkspaceException e) {
+            log.error("[SYNTHESIS] Failed to generate synthesis prompt: {}", e.getMessage());
+            return 4;
+        }
+
+        // Execute synthesis (returns SynthesisResult, not AgentResult)
+        Path championReviewPath = workspaceManager.getChampionReviewPath();
+        SynthesisResult synthesisResult = executor.executeSynthesis(synthesizerAgent, promptPath, championReviewPath);
+
+        if (!synthesisResult.success()) {
+            log.error("[SYNTHESIS] Synthesis failed: {}", synthesisResult.failureReason());
+            return 4;
+        }
+
+        log.info("Tournament complete! Champion review: {}", workspaceManager.relativize(championReviewPath));
 
         return 0;
     }
@@ -346,7 +384,8 @@ public class ReviewArenaCli implements Callable<Integer> {
         for (int i = 1; i <= config.maxRounds(); i++) {
             log.info("  {}. Round {}: Cross-pollination (all agents)", i + 1, i);
         }
-        log.info("  Note: Final synthesis (Milestone 4) not yet implemented");
+        log.info("  {}. Final synthesis: Champion review (claude)", config.maxRounds() + 2);
+        log.info("Synthesis agent: claude (required)");
     }
 
     //==========================================================================

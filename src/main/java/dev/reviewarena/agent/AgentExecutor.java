@@ -6,6 +6,8 @@ import dev.reviewarena.io.WorkspaceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -225,5 +227,100 @@ public class AgentExecutor {
             .filter(e -> e.getValue().isSuccess())
             .map(Map.Entry::getKey)
             .collect(java.util.stream.Collectors.toSet());
+    }
+
+    /**
+     * Validates that Claude is available for synthesis.
+     * Per spec: "Claude is always used for this step regardless of which agents participated."
+     *
+     * @throws AgentException if Claude is not configured or not enabled
+     */
+    public void validateSynthesizerAvailable() {
+        AgentConfig claude = config.agents().get("claude");
+        if (claude == null) {
+            throw new AgentException(
+                "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml.");
+        }
+        if (!claude.enabled()) {
+            throw new AgentException(
+                "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled.");
+        }
+    }
+
+    /**
+     * Gets the synthesizer agent name.
+     * Per spec: Claude is always used for synthesis.
+     *
+     * @return "claude" (the only valid synthesizer per spec)
+     * @throws AgentException if Claude is not available
+     */
+    public String getSynthesizerAgent() {
+        validateSynthesizerAvailable();
+        return "claude";
+    }
+
+    /**
+     * Executes the synthesis step using the specified agent.
+     *
+     * @param agentName  the name of the agent to use for synthesis (must be "claude")
+     * @param promptPath the path to the synthesis prompt
+     * @param outputPath the path where champion_review.md should be written
+     * @return the synthesis result
+     * @throws AgentException if agent is not found or disabled
+     */
+    public SynthesisResult executeSynthesis(String agentName, Path promptPath, Path outputPath) {
+        AgentConfig agentConfig = config.agents().get(agentName);
+        if (agentConfig == null || !agentConfig.enabled()) {
+            throw new AgentException("Synthesizer agent '" + agentName + "' not found or disabled");
+        }
+
+        log.info("[SYNTHESIS] Starting synthesis with agent: {}", agentName);
+
+        Path finalDir = workspace.getFinalDir();
+        List<String> command = commandBuilder.build(agentConfig, promptPath, outputPath);
+
+        long startTime = System.currentTimeMillis();
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(command)
+                .directory(workspace.getArenaDir().getParent().toFile())
+                .redirectOutput(finalDir.resolve("synthesis-stdout.log").toFile())
+                .redirectError(finalDir.resolve("synthesis-stderr.log").toFile());
+
+            Process process = pb.start();
+            boolean finished = process.waitFor(config.agentTimeoutMs(), TimeUnit.MILLISECONDS);
+
+            long durationMs = System.currentTimeMillis() - startTime;
+
+            if (!finished) {
+                process.destroyForcibly();
+                log.error("[SYNTHESIS] Synthesis timed out after {}ms", durationMs);
+                return SynthesisResult.timeout(agentName, durationMs);
+            }
+
+            int exitCode = process.exitValue();
+
+            // Validate output
+            if (exitCode != 0) {
+                log.error("[SYNTHESIS] Synthesis failed with exit code {}", exitCode);
+                return SynthesisResult.failed(agentName, durationMs, "Exit code: " + exitCode);
+            }
+
+            if (!Files.exists(outputPath) || Files.size(outputPath) == 0) {
+                log.error("[SYNTHESIS] Synthesis produced no output");
+                return SynthesisResult.failed(agentName, durationMs, "No output produced");
+            }
+
+            log.info("[SYNTHESIS] Synthesis completed successfully in {}ms", durationMs);
+            return SynthesisResult.success(agentName, durationMs, outputPath);
+
+        } catch (IOException | InterruptedException e) {
+            long durationMs = System.currentTimeMillis() - startTime;
+            log.error("[SYNTHESIS] Synthesis execution error: {}", e.getMessage());
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return SynthesisResult.failed(agentName, durationMs, e.getMessage());
+        }
     }
 }

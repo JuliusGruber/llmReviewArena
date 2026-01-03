@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -440,5 +441,124 @@ class WorkspaceManagerTest {
             assertTrue(Files.isDirectory(tempDir.resolve(".arena/rounds/round-" + round + "/claude")),
                 "Round " + round + " claude directory should exist");
         }
+    }
+
+    // ===== Synthesis-related tests =====
+
+    @Test
+    void testGetChampionReviewPath_returnsCorrectPath() {
+        WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
+
+        assertEquals(tempDir.resolve(".arena/rounds/final/champion_review.md"),
+            manager.getChampionReviewPath());
+    }
+
+    @Test
+    void testGenerateSynthesisPrompt_createsPromptFile() throws IOException {
+        WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
+        manager.initialize("abc1234", "", "");
+
+        // Create the all_reviews.md file that synthesis needs
+        Path finalRoundDir = manager.getRoundDir(2); // maxRounds = 2
+        Files.writeString(finalRoundDir.resolve("all_reviews.md"),
+            "# Claude\nSome review content\n\n# Codex\nMore review content");
+
+        Path promptPath = manager.generateSynthesisPrompt(2, Set.of("claude", "codex"));
+
+        assertTrue(Files.exists(promptPath));
+        assertEquals(tempDir.resolve(".arena/rounds/final/prompt.md"), promptPath);
+    }
+
+    @Test
+    void testGenerateSynthesisPrompt_includesTaskContent() throws IOException {
+        WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
+        manager.initialize("abc1234", "", "");
+
+        // Create the all_reviews.md file
+        Path finalRoundDir = manager.getRoundDir(2);
+        Files.writeString(finalRoundDir.resolve("all_reviews.md"), "# Claude\nReview");
+
+        manager.generateSynthesisPrompt(2, Set.of("claude"));
+
+        String content = Files.readString(tempDir.resolve(".arena/rounds/final/prompt.md"));
+        assertTrue(content.contains("Code Review Arena"));
+    }
+
+    @Test
+    void testGenerateSynthesisPrompt_includesMetadata() throws IOException {
+        WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
+        manager.initialize("abc1234", "", "");
+
+        Path finalRoundDir = manager.getRoundDir(2);
+        Files.writeString(finalRoundDir.resolve("all_reviews.md"), "# Claude\nReview\n# Codex\nReview");
+
+        manager.generateSynthesisPrompt(2, Set.of("claude", "codex"));
+
+        String content = Files.readString(tempDir.resolve(".arena/rounds/final/prompt.md"));
+        // Should include round counts
+        assertTrue(content.contains("3")); // roundCount = 3 (round 0 + 2 cross-pollination)
+        assertTrue(content.contains("2")); // crossPollinationRounds = 2
+        // Should include participating agents (sorted alphabetically)
+        assertTrue(content.contains("claude, codex"));
+    }
+
+    @Test
+    void testGenerateSynthesisPrompt_usesConfigOutputDir() throws IOException {
+        ArenaConfig customConfig = new ArenaConfig(
+            2, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-out"),
+            Map.of("claude", new AgentConfig("claude", List.of("claude"), Map.of(), true))
+        );
+
+        WorkspaceManager manager = new WorkspaceManager(tempDir, customConfig);
+        manager.initialize("abc1234", "", "");
+
+        Path finalRoundDir = manager.getRoundDir(2);
+        Files.writeString(finalRoundDir.resolve("all_reviews.md"), "# Claude\nReview");
+
+        manager.generateSynthesisPrompt(2, Set.of("claude"));
+
+        String content = Files.readString(tempDir.resolve("custom-out/rounds/final/prompt.md"));
+        // Paths in prompt should use custom output dir, not hardcoded .arena
+        assertTrue(content.contains("custom-out/rounds/round-2/all_reviews.md"));
+        assertTrue(content.contains("custom-out/rounds/final/champion_review.md"));
+    }
+
+    @Test
+    void testGenerateSynthesisPrompt_missingAllReviews_throwsWorkspaceException() {
+        WorkspaceManager manager = new WorkspaceManager(tempDir, defaultConfig);
+        manager.initialize("abc1234", "", "");
+
+        // Don't create all_reviews.md - should fail
+        WorkspaceException ex = assertThrows(WorkspaceException.class, () ->
+            manager.generateSynthesisPrompt(2, Set.of("claude")));
+        assertTrue(ex.getMessage().contains("Final round reviews not found"));
+    }
+
+    @Test
+    void testRegenerateRoundPrompts_usesConfigOutputDir() throws IOException {
+        ArenaConfig customConfig = new ArenaConfig(
+            2, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
+            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
+            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
+            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-out"),
+            Map.of("claude", new AgentConfig("claude", List.of("claude"), Map.of(), true))
+        );
+
+        WorkspaceManager manager = new WorkspaceManager(tempDir, customConfig);
+        manager.initialize("abc1234", "", "");
+
+        // Create round 0's all_reviews.md
+        Path round0Dir = manager.getRoundDir(0);
+        Files.writeString(round0Dir.resolve("all_reviews.md"), "# Claude\nRound 0 review");
+
+        manager.regenerateRoundPrompts(1, "abc1234", "", "");
+
+        String content = Files.readString(tempDir.resolve("custom-out/prompts/round-1-claude.md"));
+        // Should use custom-out, not hardcoded .arena
+        assertTrue(content.contains("custom-out/rounds/round-1/claude/review.md"));
+        assertTrue(content.contains("custom-out/rounds/round-0/all_reviews.md"));
     }
 }
