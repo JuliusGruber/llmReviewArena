@@ -7,6 +7,7 @@ agents:
     docker:
       enabled: true
       sandbox: false
+      image: "docker/sandbox-templates:claude-code"
     command:
       - claude
       - -p
