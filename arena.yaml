@@ -6,7 +6,7 @@ agents:
     # Requires Docker Desktop 4.50+ with sandbox support.
     docker:
       enabled: true
-      sandbox: true
+      sandbox: false
     command:
       - claude
       - -p
