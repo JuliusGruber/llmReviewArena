@@ -168,6 +168,8 @@ public class DockerCommandBuilder {
         result.add("docker");
         result.add("run");
         result.add("--rm");                    // Ephemeral container
+        result.add("--name");
+        result.add(agentName);                 // Name container after the agent
         result.add("-i");                      // Keep stdin open for prompt redirection
 
         // Network configuration (defaults to bridge if not specified)
@@ -186,17 +188,24 @@ public class DockerCommandBuilder {
             result.add(userMapping);
         }
 
-        // Mount Claude credentials directory for Pro/Max subscription authentication
-        // This allows using `/login` credentials instead of API keys
-        // Note: Must be read-write as Claude CLI writes session data, debug logs, etc.
+        // Mount only the Claude credentials FILE (not the whole directory) as read-only
+        // for Pro/Max subscription authentication via `/login` credentials.
+        //
+        // IMPORTANT: We mount ONLY .credentials.json, not the entire ~/.claude/ directory.
+        // Claude CLI tries to write shell-snapshots, debug logs, history, etc. to ~/.claude/.
+        // When mounting a Windows directory into Linux containers, these write operations
+        // can hang due to NTFS/CIFS filesystem compatibility issues (processes enter
+        // uninterruptible disk sleep state 'D').
+        //
+        // The credentials file itself only needs read access for authentication.
         if (isClaudeAgent(agentName)) {
-            Path claudeCredentials = getClaudeCredentialsPath();
-            if (claudeCredentials != null) {
+            Path credentialsFile = getClaudeCredentialsFile();
+            if (credentialsFile != null) {
                 result.add("-v");
-                // Mount to /home/agent/.claude for docker/sandbox-templates:claude-code image
-                // which runs as user 'agent' with home /home/agent
-                result.add(claudeCredentials + ":/home/agent/.claude");
-                log.debug("Mounting Claude credentials from: {}", claudeCredentials);
+                // Mount as read-only to /home/agent/.claude/.credentials.json
+                // The docker/sandbox-templates:claude-code image runs as user 'agent'
+                result.add(credentialsFile + ":/home/agent/.claude/.credentials.json:ro");
+                log.debug("Mounting Claude credentials from: {}", credentialsFile);
             }
         }
 
@@ -325,25 +334,24 @@ public class DockerCommandBuilder {
     }
 
     /**
-     * Gets the Claude Code credentials directory path if it exists.
-     * Claude stores credentials in ~/.claude/ directory.
+     * Gets the Claude Code credentials file path if it exists.
+     * Claude stores credentials in ~/.claude/.credentials.json.
      *
-     * @return Path to credentials directory, or null if not found
+     * @return Path to credentials file, or null if not found
      */
-    private Path getClaudeCredentialsPath() {
+    private Path getClaudeCredentialsFile() {
         String userHome = System.getProperty("user.home");
         if (userHome == null) {
             return null;
         }
 
-        Path claudeDir = Path.of(userHome, ".claude");
-        Path credentialsFile = claudeDir.resolve(".credentials.json");
+        Path credentialsFile = Path.of(userHome, ".claude", ".credentials.json");
 
         if (java.nio.file.Files.exists(credentialsFile)) {
-            return claudeDir;
+            return credentialsFile;
         }
 
-        log.debug("Claude credentials not found at {}. Use 'claude' and '/login' to authenticate.", claudeDir);
+        log.debug("Claude credentials not found at {}. Use 'claude' and '/login' to authenticate.", credentialsFile);
         return null;
     }
 
