@@ -922,57 +922,31 @@ When running in Docker, paths must be translated from host paths to container pa
 
 ## Implementation Steps
 
-### Phase 0: Test Migration (MUST DO FIRST)
+### ~~Phase 0: Test Migration (MUST DO FIRST)~~ ✅ COMPLETED
 
-**Why:** Adding a 5th parameter to `AgentConfig` record breaks 70 existing constructor calls (67 in tests + 3 in main).
-This phase updates all existing code to be compatible before making the breaking change.
+> **Commit:** `35625e4` - Migrate test usages to AgentConfig factory methods
 
-1. **Audit existing AgentConfig usages**
-   ```bash
-   grep -r "new AgentConfig(" src/test --include="*.java" | wc -l  # 67 usages
-   grep -r "new AgentConfig(" src/main --include="*.java" | wc -l  # 3 usages
-   ```
+~~**Why:** Adding a 5th parameter to `AgentConfig` record breaks 70 existing constructor calls (67 in tests + 3 in main).
+This phase updates all existing code to be compatible before making the breaking change.~~
 
-2. **Update all test files to use factory methods**
-   Convert `new AgentConfig(name, command, flags, enabled)` to `AgentConfig.of(...)` or `AgentConfig.disabled(...)`:
+~~1. **Audit existing AgentConfig usages**~~
 
-   | File | Usages |
+~~2. **Update all test files to use factory methods**~~
+   ~~Convert `new AgentConfig(name, command, flags, enabled)` to `AgentConfig.of(...)` or `AgentConfig.disabled(...)`:~~
+
+   | File | Status |
    |------|--------|
-   | `AgentExecutorTest.java` | 18 |
-   | `AgentExecutorIT.java` | 15 |
-   | `WorkspaceManagerTest.java` | 13 |
-   | `CommandBuilderTest.java` | 11 |
-   | `AgentConfigTest.java` | 5 |
-   | `ReviewArenaCliTest.java` | 3 |
-   | `ReviewAggregatorTest.java` | 2 |
-   | **Total** | **67** |
+   | `AgentExecutorTest.java` | ✅ |
+   | `AgentExecutorIT.java` | ✅ |
+   | `WorkspaceManagerTest.java` | ✅ |
+   | `CommandBuilderTest.java` | ✅ |
+   | `AgentConfigTest.java` | ✅ (validation tests kept as-is) |
+   | `ReviewArenaCliTest.java` | ✅ |
+   | `ReviewAggregatorTest.java` | ✅ |
 
-   **Pattern:**
-   ```java
-   // Before:
-   new AgentConfig("claude", List.of("claude", "-p"), Map.of(), true)
+~~3. **Update ConfigLoader.loadAgentConfig()**~~ (deferred to Phase 1b)
 
-   // After (for enabled=true with flags):
-   AgentConfig.of("claude", List.of("claude", "-p"), Map.of())
-
-   // After (for enabled=true without flags):
-   AgentConfig.of("claude", List.of("claude", "-p"))
-
-   // After (for enabled=false without flags - use new factory method):
-   AgentConfig.disabled("claude", List.of("claude", "-p"))
-
-   // After (for enabled=false WITH flags - use full constructor, will add 5th param later):
-   new AgentConfig("claude", List.of("claude", "-p"), Map.of("auto-approve", true), false)
-   ```
-
-3. **Update ConfigLoader.loadAgentConfig()**
-   - File: `src/main/java/dev/reviewarena/config/ConfigLoader.java`
-   - Change to use factory method (prepare for docker field)
-
-4. **Run all tests to verify no regressions**
-   ```bash
-   mvn verify -Dsurefire.includes="**/*Test*,**/*IT*"
-   ```
+~~4. **Run all tests to verify no regressions**~~ ✅ All 145 tests pass
 
 ### Phase 1: Core Infrastructure
 
