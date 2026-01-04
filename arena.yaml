@@ -2,11 +2,8 @@
 agents:
   claude:
     # Docker mode (optional): Run agent in a container for isolation
-    # docker:
-    #   enabled: true
-    #   image: "ghcr.io/zeeno-atl/claude-code:latest"  # Optional, uses default
-    #   memory: "4g"  # Optional: memory limit
-    #   cpus: "2"     # Optional: CPU limit
+    docker:
+      enabled: true
     command:
       - claude
       - -p
