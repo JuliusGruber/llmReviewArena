@@ -3,7 +3,7 @@ agents:
   claude:
     # Docker Desktop Sandbox mode: Uses 'docker sandbox run claude' which handles
     # Claude CLI installation, credentials, and permissions automatically.
-    # Requires Docker Desktop with sandbox support.
+    # Requires Docker Desktop 4.50+ with sandbox support.
     docker:
       enabled: true
       sandbox: true
