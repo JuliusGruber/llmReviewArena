@@ -21,3 +21,10 @@
 - Use Context7 MCP tools to look up current library documentation before implementing features
 - Always check Context7 when adding new dependencies or using unfamiliar APIs
 - Prefer Context7 docs over training knowledge for version-specific syntax and best practices
+
+## Implementation Plan Review
+Before approving any implementation plan:
+
+1. **Verify assumptions by reading code** - If a plan claims "X cannot be used because Y", read X's source code to confirm. Cite the specific lines that prove the constraint exists.
+
+2. **Search for reuse before creating** - Before the plan creates new process, I/O, or utility code, search the codebase for existing solutions. Prefer wrapping or adapting existing code over duplication.
