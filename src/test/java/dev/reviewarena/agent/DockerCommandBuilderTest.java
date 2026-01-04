@@ -27,7 +27,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_includesDockerRunWithRequiredFlags() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent", "-p", "prompt.md");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -40,7 +40,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesDefaultBridgeNetworkWhenNotConfigured() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -51,7 +51,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesConfiguredNetworkMode() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, "host");
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, "host");
         List<String> command = List.of("agent");
 
         // On non-Linux, host networking falls back to bridge (no --network flag)
@@ -71,7 +71,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_rejectsInvalidNetworkMode() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, "custom-invalid");
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, "custom-invalid");
         List<String> command = List.of("agent");
 
         ConfigException ex = assertThrows(ConfigException.class,
@@ -83,7 +83,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_mountsWorkingDirectoryAsWorkspace() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -99,7 +99,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesConfiguredImage() {
-        DockerConfig docker = new DockerConfig(true, "custom-image:v1.0", null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, "custom-image:v1.0", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("claude", docker, command, tempDir);
@@ -110,7 +110,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesDefaultImageForClaude() {
-        DockerConfig docker = new DockerConfig(true, null, null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("claude", "-p", "prompt.md");
 
         List<String> result = builder.build("claude", docker, command, tempDir);
@@ -120,7 +120,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesDefaultImageForGemini() {
-        DockerConfig docker = new DockerConfig(true, null, null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("gemini", "-p", "prompt.md");
 
         List<String> result = builder.build("gemini", docker, command, tempDir);
@@ -130,7 +130,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_throwsForCodexWithoutConfiguredImage() {
-        DockerConfig docker = new DockerConfig(true, null, null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("codex", "exec", "prompt.md");
 
         ConfigException ex = assertThrows(ConfigException.class,
@@ -143,7 +143,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_addsMemoryLimit() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", "4g", null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", "4g", null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -154,7 +154,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_addsCpuLimit() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, "2", null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, "2", null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -165,7 +165,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_addsResourceLimits() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", "8g", "4", null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", "8g", "4", null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -178,7 +178,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_returnsImmutableList() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -188,7 +188,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_agentNameIsCaseInsensitive() {
-        DockerConfig docker = new DockerConfig(true, null, null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("claude");
 
         List<String> result = builder.build("CLAUDE", docker, command, tempDir);
@@ -200,7 +200,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_rejectsMemoryWithInjectedFlags() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", "4g --privileged", null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", "4g --privileged", null, null);
         List<String> command = List.of("agent");
 
         ConfigException ex = assertThrows(ConfigException.class,
@@ -212,7 +212,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_rejectsCpusWithInjectedCommands() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, "2; rm -rf /", null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, "2; rm -rf /", null);
         List<String> command = List.of("agent");
 
         ConfigException ex = assertThrows(ConfigException.class,
@@ -225,17 +225,17 @@ class DockerCommandBuilderTest {
     void build_acceptsValidMemoryFormats() {
         // Lowercase
         assertDoesNotThrow(() -> builder.build("test",
-            new DockerConfig(true, "test-image:latest", "512m", null, null),
+            new DockerConfig(true, false, "test-image:latest", "512m", null, null),
             List.of("agent"), tempDir));
 
         // Uppercase
         assertDoesNotThrow(() -> builder.build("test",
-            new DockerConfig(true, "test-image:latest", "4G", null, null),
+            new DockerConfig(true, false, "test-image:latest", "4G", null, null),
             List.of("agent"), tempDir));
 
         // No suffix (bytes)
         assertDoesNotThrow(() -> builder.build("test",
-            new DockerConfig(true, "test-image:latest", "1073741824", null, null),
+            new DockerConfig(true, false, "test-image:latest", "1073741824", null, null),
             List.of("agent"), tempDir));
     }
 
@@ -243,17 +243,17 @@ class DockerCommandBuilderTest {
     void build_acceptsValidCpuFormats() {
         // Integer
         assertDoesNotThrow(() -> builder.build("test",
-            new DockerConfig(true, "test-image:latest", null, "2", null),
+            new DockerConfig(true, false, "test-image:latest", null, "2", null),
             List.of("agent"), tempDir));
 
         // Decimal
         assertDoesNotThrow(() -> builder.build("test",
-            new DockerConfig(true, "test-image:latest", null, "1.5", null),
+            new DockerConfig(true, false, "test-image:latest", null, "1.5", null),
             List.of("agent"), tempDir));
 
         // Small fraction
         assertDoesNotThrow(() -> builder.build("test",
-            new DockerConfig(true, "test-image:latest", null, "0.5", null),
+            new DockerConfig(true, false, "test-image:latest", null, "0.5", null),
             List.of("agent"), tempDir));
     }
 
@@ -262,7 +262,7 @@ class DockerCommandBuilderTest {
     @Test
     @EnabledOnOs({OS.LINUX, OS.MAC})
     void build_addsUserMappingOnUnix() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -276,7 +276,7 @@ class DockerCommandBuilderTest {
     @Test
     @EnabledOnOs(OS.WINDOWS)
     void build_omitsUserMappingOnWindows() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);

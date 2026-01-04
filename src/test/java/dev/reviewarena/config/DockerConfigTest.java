@@ -11,6 +11,7 @@ class DockerConfigTest {
         DockerConfig config = DockerConfig.disabled();
 
         assertFalse(config.enabled());
+        assertFalse(config.sandbox());
         assertNull(config.image());
         assertNull(config.memory());
         assertNull(config.cpus());
@@ -19,9 +20,10 @@ class DockerConfigTest {
 
     @Test
     void testConstructor_allFields() {
-        DockerConfig config = new DockerConfig(true, "my-image:latest", "4g", "2", "host");
+        DockerConfig config = new DockerConfig(true, false, "my-image:latest", "4g", "2", "host");
 
         assertTrue(config.enabled());
+        assertFalse(config.sandbox());
         assertEquals("my-image:latest", config.image());
         assertEquals("4g", config.memory());
         assertEquals("2", config.cpus());
@@ -30,9 +32,10 @@ class DockerConfigTest {
 
     @Test
     void testConstructor_enabledWithNullOptionals() {
-        DockerConfig config = new DockerConfig(true, null, null, null, null);
+        DockerConfig config = new DockerConfig(true, false, null, null, null, null);
 
         assertTrue(config.enabled());
+        assertFalse(config.sandbox());
         assertNull(config.image());
         assertNull(config.memory());
         assertNull(config.cpus());
@@ -40,8 +43,16 @@ class DockerConfigTest {
     }
 
     @Test
+    void testConstructor_sandboxMode() {
+        DockerConfig config = new DockerConfig(true, true, null, null, null, null);
+
+        assertTrue(config.enabled());
+        assertTrue(config.sandbox());
+    }
+
+    @Test
     void testConstructor_partialFields() {
-        DockerConfig config = new DockerConfig(true, "image:tag", "2g", null, "bridge");
+        DockerConfig config = new DockerConfig(true, false, "image:tag", "2g", null, "bridge");
 
         assertTrue(config.enabled());
         assertEquals("image:tag", config.image());
@@ -52,8 +63,8 @@ class DockerConfigTest {
 
     @Test
     void testEquals_sameValues() {
-        DockerConfig config1 = new DockerConfig(true, "img", "1g", "1", null);
-        DockerConfig config2 = new DockerConfig(true, "img", "1g", "1", null);
+        DockerConfig config1 = new DockerConfig(true, false, "img", "1g", "1", null);
+        DockerConfig config2 = new DockerConfig(true, false, "img", "1g", "1", null);
 
         assertEquals(config1, config2);
         assertEquals(config1.hashCode(), config2.hashCode());

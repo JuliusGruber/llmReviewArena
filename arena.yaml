@@ -1,9 +1,12 @@
 # Local arena configuration to enable all agents
 agents:
   claude:
-    # Docker mode (optional): Run agent in a container for isolation
+    # Docker Desktop Sandbox mode: Uses 'docker sandbox run claude' which handles
+    # Claude CLI installation, credentials, and permissions automatically.
+    # Requires Docker Desktop with sandbox support.
     docker:
       enabled: true
+      sandbox: true
     command:
       - claude
       - -p

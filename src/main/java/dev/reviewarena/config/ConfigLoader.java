@@ -245,6 +245,10 @@ public class ConfigLoader {
             return DockerConfig.disabled();
         }
 
+        // Sandbox mode uses 'docker sandbox run' (Docker Desktop feature)
+        boolean sandbox = config.getOptionalValue(prefix + ".sandbox", Boolean.class)
+            .orElse(false);
+
         String image = config.getOptionalValue(prefix + ".image", String.class)
             .orElse(null);
         String memory = config.getOptionalValue(prefix + ".memory", String.class)
@@ -254,7 +258,7 @@ public class ConfigLoader {
         String networkMode = config.getOptionalValue(prefix + ".network-mode", String.class)
             .orElse(null);
 
-        return new DockerConfig(true, image, memory, cpus, networkMode);
+        return new DockerConfig(true, sandbox, image, memory, cpus, networkMode);
     }
 
     private Map<String, Object> loadAgentFlags(SmallRyeConfig config, String prefix) {

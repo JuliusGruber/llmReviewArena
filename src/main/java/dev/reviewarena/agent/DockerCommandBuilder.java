@@ -38,6 +38,9 @@ public class DockerCommandBuilder {
         "gemini", "naoyoshinori/gemini-cli:node"
     );
 
+    // Agents supported by Docker Desktop Sandbox ('docker sandbox run')
+    private static final Set<String> SANDBOX_AGENTS = Set.of("claude", "gemini");
+
     private static final List<String> API_KEY_ENV_VARS = List.of(
         "ANTHROPIC_API_KEY",
         "OPENAI_API_KEY",
@@ -51,19 +54,107 @@ public class DockerCommandBuilder {
     private static final Set<String> VALID_NETWORK_MODES = Set.of("bridge", "host", "none");
 
     /**
-     * Wraps an agent command with docker run, translating host paths to container paths.
+     * Wraps an agent command with docker run or docker sandbox run.
      *
      * <p>The command arguments should contain HOST paths (absolute paths on the host
      * filesystem). This method scans the command for paths under workingDir and
      * translates them to container paths (/workspace/...).
      *
-     * @param agentName   Name of the agent (for default image lookup)
+     * @param agentName   Name of the agent (for default image lookup or sandbox agent name)
      * @param docker      Docker configuration
      * @param command     Agent command with HOST paths (as produced by CommandBuilder)
      * @param workingDir  Host working directory to mount as /workspace
-     * @return Complete docker run command with translated paths
+     * @return Complete docker command with translated paths
      */
     public List<String> build(
+            String agentName,
+            DockerConfig docker,
+            List<String> command,
+            Path workingDir
+    ) {
+        if (docker.sandbox()) {
+            return buildSandboxCommand(agentName, docker, command, workingDir);
+        }
+        return buildDockerRunCommand(agentName, docker, command, workingDir);
+    }
+
+    /**
+     * Builds a Docker Desktop Sandbox command ('docker sandbox run').
+     *
+     * <p>Sandbox mode is simpler than docker run - it handles:
+     * <ul>
+     *   <li>Credential management automatically</li>
+     *   <li>Container cleanup</li>
+     *   <li>Network configuration</li>
+     *   <li>User permissions</li>
+     * </ul>
+     *
+     * <p>Supported agents: claude, gemini
+     */
+    private List<String> buildSandboxCommand(
+            String agentName,
+            DockerConfig docker,
+            List<String> command,
+            Path workingDir
+    ) {
+        var result = new ArrayList<String>();
+
+        result.add("docker");
+        result.add("sandbox");
+        result.add("run");
+
+        // Mount project directory as /workspace
+        result.add("-v");
+        result.add(workingDir.toAbsolutePath() + ":/workspace");
+
+        // Pass API keys from host environment (only if set)
+        for (String envVar : API_KEY_ENV_VARS) {
+            if (System.getenv(envVar) != null) {
+                result.add("-e");
+                result.add(envVar + "=" + System.getenv(envVar));
+            }
+        }
+
+        // Agent name (claude or gemini)
+        String sandboxAgent = agentName.toLowerCase();
+        if (!SANDBOX_AGENTS.contains(sandboxAgent)) {
+            throw new ConfigException(
+                "Docker sandbox mode is only supported for agents: " + SANDBOX_AGENTS + ". " +
+                "Agent '%s' is not supported. Use regular Docker mode (sandbox: false) instead."
+                .formatted(agentName));
+        }
+        result.add(sandboxAgent);
+
+        // Add agent-specific flags (skip the agent command name, keep flags)
+        // command = ["claude", "-p"] -> we only need ["-p"]
+        List<String> agentFlags = extractAgentFlags(command, agentName);
+        List<String> translatedFlags = translatePathsInCommand(agentFlags, workingDir);
+        result.addAll(translatedFlags);
+
+        log.debug("Built Docker sandbox command for {}: {}", agentName, result);
+        return List.copyOf(result);
+    }
+
+    /**
+     * Extracts agent flags from the command, removing the agent command name.
+     * E.g., ["claude", "-p", "/path/file"] -> ["-p", "/path/file"]
+     */
+    private List<String> extractAgentFlags(List<String> command, String agentName) {
+        if (command.isEmpty()) {
+            return List.of();
+        }
+        // Skip the first element if it matches the agent name
+        String first = command.getFirst().toLowerCase();
+        if (first.equals(agentName.toLowerCase()) || first.endsWith("/" + agentName.toLowerCase())) {
+            return command.subList(1, command.size());
+        }
+        return command;
+    }
+
+    /**
+     * Builds a standard Docker run command.
+     */
+    private List<String> buildDockerRunCommand(
             String agentName,
             DockerConfig docker,
             List<String> command,
