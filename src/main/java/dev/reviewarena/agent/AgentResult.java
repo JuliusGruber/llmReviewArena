@@ -31,6 +31,12 @@ public record AgentResult(
         if (durationMs < 0) {
             throw new IllegalArgumentException("durationMs must be non-negative");
         }
+        if (status == Status.SUCCESS && outputFile == null) {
+            throw new IllegalArgumentException("outputFile required for SUCCESS status");
+        }
+        if (status != Status.SUCCESS && failureReason == null) {
+            throw new IllegalArgumentException("failureReason required for non-SUCCESS status");
+        }
     }
 
     public boolean isSuccess() {
