@@ -41,31 +41,33 @@ agents:
       auto-approve: true
     enabled: true
 
-  # codex:
-  #   # Docker mode requires building Codex image locally:
-  #   #   git clone https://github.com/openai/codex-universal
-  #   #   docker build -t codex-universal:latest .
-  #   # docker:
-  #   #   enabled: true
-  #   #   image: "codex-universal:latest"  # Required - no default image
-  #   command:
-  #     - python
-  #     - src/main/resources/codex-wrapper.py
-  #     - "@prompt.md"
-  #     - "@output"
-  #   flags:
-  #     auto-approve: true
-  #   enabled: true
+  # Codex - temporarily disabled
+  codex:
+    # Docker mode requires building Codex image locally:
+    #   git clone https://github.com/openai/codex-universal
+    #   docker build -t codex-universal:latest .
+    # docker:
+    #   enabled: true
+    #   image: "codex-universal:latest"  # Required - no default image
+    command:
+      - python
+      - src/main/resources/codex-wrapper.py
+      - "@prompt.md"
+      - "@output"
+    flags:
+      auto-approve: true
+    enabled: false  # Explicitly disabled
 
-  # gemini:
-  #   # docker:
-  #   #   enabled: true
-  #   #   image: "naoyoshinori/gemini-cli:node"  # Optional, uses default
-  #   command:
-  #     - gemini
-  #   flags:
-  #     auto-approve: true
-  #   enabled: true
+  # Gemini - temporarily disabled
+  gemini:
+    # docker:
+    #   enabled: true
+    #   image: "naoyoshinori/gemini-cli:node"  # Optional, uses default
+    command:
+      - gemini
+    flags:
+      auto-approve: true
+    enabled: false  # Explicitly disabled
 
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)

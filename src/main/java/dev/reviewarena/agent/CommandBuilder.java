@@ -93,12 +93,7 @@ public class CommandBuilder {
 
         // Translate auto-approve flag
         if (Boolean.TRUE.equals(flags.get("auto-approve"))) {
-            String autoApproveFlag = switch (agentName) {
-                case "claude" -> "--dangerously-skip-permissions";
-                case "codex" -> "--full-auto";
-                case "gemini" -> "--yolo";
-                default -> null;
-            };
+            String autoApproveFlag = getAutoApproveFlag(agentName);
             if (autoApproveFlag != null && !command.contains(autoApproveFlag)) {
                 command.add(autoApproveFlag);
             } else if (autoApproveFlag == null) {
@@ -108,7 +103,7 @@ public class CommandBuilder {
         }
 
         // Translate allowed-tools flag (Claude only)
-        if ("claude".equals(agentName) && flags.containsKey("allowed-tools")) {
+        if (isClaudeAgent(agentName) && flags.containsKey("allowed-tools")) {
             Object allowedTools = flags.get("allowed-tools");
             if (allowedTools instanceof List<?> toolList && !toolList.isEmpty()) {
                 String toolsCsv = toolList.stream()
@@ -121,5 +116,41 @@ public class CommandBuilder {
                 }
             }
         }
+    }
+
+    /**
+     * Gets the auto-approve flag for the given agent name.
+     * Supports prefix matching (e.g., "claude2" matches "claude").
+     */
+    private String getAutoApproveFlag(String agentName) {
+        if (isClaudeAgent(agentName)) {
+            return "--dangerously-skip-permissions";
+        } else if (isCodexAgent(agentName)) {
+            return "--full-auto";
+        } else if (isGeminiAgent(agentName)) {
+            return "--yolo";
+        }
+        return null;
+    }
+
+    /**
+     * Checks if the agent name represents a Claude agent (exact match or prefix).
+     */
+    private boolean isClaudeAgent(String agentName) {
+        return agentName.equals("claude") || agentName.startsWith("claude");
+    }
+
+    /**
+     * Checks if the agent name represents a Codex agent (exact match or prefix).
+     */
+    private boolean isCodexAgent(String agentName) {
+        return agentName.equals("codex") || agentName.startsWith("codex");
+    }
+
+    /**
+     * Checks if the agent name represents a Gemini agent (exact match or prefix).
+     */
+    private boolean isGeminiAgent(String agentName) {
+        return agentName.equals("gemini") || agentName.startsWith("gemini");
     }
 }
