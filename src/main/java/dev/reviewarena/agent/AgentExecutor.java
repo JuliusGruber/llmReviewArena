@@ -193,7 +193,10 @@ public class AgentExecutor {
         // CommandBuilder uses HOST paths - path translation happens in AgentProcess.resolveCommand()
         List<String> command = commandBuilder.build(agentConfig, promptFile, outputFile);
 
-        AgentProcess process = AgentProcess.builder()
+        // Use try-with-resources to ensure process resources are cleaned up.
+        // AgentProcess.execute() also calls close() in its finally block, but this provides
+        // an extra safety net for any future code paths that might not call execute().
+        try (AgentProcess process = AgentProcess.builder()
             .agentName(agentConfig.name())
             .round(round)
             .command(command)           // HOST paths from CommandBuilder
@@ -207,9 +210,10 @@ public class AgentExecutor {
             .outputValidator(outputValidator)
             .showOutput(config.showAgentOutput())
             .dockerConfig(agentConfig.docker())  // Pass Docker config
-            .build();
+            .build()) {
 
-        return process.execute();
+            return process.execute();
+        }
     }
 
     private void waitForAllWithTimeout(List<Future<?>> futures, long timeoutMs) {
@@ -326,9 +330,10 @@ public class AgentExecutor {
         // CommandBuilder uses HOST paths - same as executeAgent()
         List<String> command = commandBuilder.build(agentConfig, promptPath, outputPath);
 
-        // Use AgentProcess for consistent command resolution
-        // Docker path translation happens in resolveCommand() if Docker is enabled
-        AgentProcess process = AgentProcess.builder()
+        // Use try-with-resources to ensure process resources are cleaned up.
+        // AgentProcess.execute() also calls close() in its finally block, but this provides
+        // an extra safety net for any future code paths that might not call execute().
+        try (AgentProcess process = AgentProcess.builder()
             .agentName(agentName + "-synthesis")
             .round(SYNTHESIS_ROUND)
             .command(command)             // HOST paths from CommandBuilder
@@ -342,24 +347,25 @@ public class AgentExecutor {
             .outputValidator(outputValidator)
             .showOutput(config.showAgentOutput())
             .dockerConfig(agentConfig.docker())  // Pass Docker config
-            .build();
+            .build()) {
 
-        AgentResult result = process.execute();
+            AgentResult result = process.execute();
 
-        // Convert AgentResult to SynthesisResult
-        return switch (result.status()) {
-            case SUCCESS -> {
-                log.info("[SYNTHESIS] Synthesis completed successfully in {}ms", result.durationMs());
-                yield SynthesisResult.success(agentName, result.durationMs(), outputPath);
-            }
-            case TIMEOUT -> {
-                log.error("[SYNTHESIS] Synthesis timed out after {}ms", result.durationMs());
-                yield SynthesisResult.timeout(agentName, result.durationMs());
-            }
-            case FAILED, INVALID_OUTPUT -> {
-                log.error("[SYNTHESIS] Synthesis failed: {}", result.failureReason());
-                yield SynthesisResult.failed(agentName, result.durationMs(), result.failureReason());
-            }
-        };
+            // Convert AgentResult to SynthesisResult
+            return switch (result.status()) {
+                case SUCCESS -> {
+                    log.info("[SYNTHESIS] Synthesis completed successfully in {}ms", result.durationMs());
+                    yield SynthesisResult.success(agentName, result.durationMs(), outputPath);
+                }
+                case TIMEOUT -> {
+                    log.error("[SYNTHESIS] Synthesis timed out after {}ms", result.durationMs());
+                    yield SynthesisResult.timeout(agentName, result.durationMs());
+                }
+                case FAILED, INVALID_OUTPUT -> {
+                    log.error("[SYNTHESIS] Synthesis failed: {}", result.failureReason());
+                    yield SynthesisResult.failed(agentName, result.durationMs(), result.failureReason());
+                }
+            };
+        }
     }
 }

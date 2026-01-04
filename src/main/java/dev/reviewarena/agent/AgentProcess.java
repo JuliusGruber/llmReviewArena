@@ -25,8 +25,12 @@ import java.util.concurrent.TimeUnit;
  *   <li>Timeout enforcement with graceful termination</li>
  *   <li>Output validation</li>
  * </ul>
+ *
+ * <p>Implements {@link AutoCloseable} to ensure proper cleanup of process resources,
+ * especially important on Windows where file handles may remain locked if not
+ * explicitly closed.
  */
-public class AgentProcess {
+public class AgentProcess implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(AgentProcess.class);
 
@@ -47,6 +51,8 @@ public class AgentProcess {
 
     private Process process;
     private Instant startTime;
+    private Thread stdinThread;
+    private volatile boolean closed = false;
 
     private AgentProcess(Builder builder) {
         this.agentName = Objects.requireNonNull(builder.agentName);
@@ -68,6 +74,10 @@ public class AgentProcess {
     /**
      * Executes the agent process and waits for completion or timeout.
      *
+     * <p>The prompt file (if specified) is read into memory before starting the process,
+     * ensuring the file handle is closed immediately. This prevents file locking issues
+     * on Windows when the process crashes or exits quickly.
+     *
      * @return the execution result
      */
     public AgentResult execute() {
@@ -78,6 +88,17 @@ public class AgentProcess {
         startTime = Instant.now();
 
         try {
+            // Read prompt file into memory BEFORE starting process.
+            // This ensures the file handle is closed immediately, preventing file locking
+            // issues on Windows when the process crashes or exits quickly.
+            byte[] promptContent = null;
+            if (promptFile != null) {
+                log.debug("Reading prompt file into memory: {}", promptFile);
+                promptContent = Files.readAllBytes(promptFile);
+                log.debug("Prompt file read: {} bytes", promptContent.length);
+                // File handle is now CLOSED - no risk of locking
+            }
+
             // On Windows, wrap command with cmd /c to resolve .cmd/.bat files in PATH
             List<String> effectiveCommand = resolveCommand(command);
             log.debug("Effective command: {}", effectiveCommand);
@@ -85,17 +106,15 @@ public class AgentProcess {
             ProcessBuilder pb = new ProcessBuilder(effectiveCommand)
                 .directory(workingDir.toFile());
 
-            // Stdin redirection: Works for both native and Docker modes
-            // - Native: ProcessBuilder reads file and pipes to process stdin
-            // - Docker: ProcessBuilder reads file, Docker's -i flag keeps stdin open,
-            //           and the file contents flow: file -> ProcessBuilder -> docker stdin -> container stdin
-            // Both modes use the HOST path because ProcessBuilder reads the file on the host
-            if (promptFile != null) {
-                log.debug("Redirecting stdin from: {}", promptFile);
-                pb.redirectInput(promptFile.toFile());  // Always use HOST path
-            }
+            // NOTE: We do NOT use pb.redirectInput(file) because that holds a file handle
+            // that may not be released if the process crashes quickly (causes file locking on Windows)
 
             process = pb.start();
+
+            // Pipe prompt content to stdin from memory (no file handle held)
+            if (promptContent != null) {
+                stdinThread = startStdinPipe(promptContent);
+            }
 
             // Start background threads to capture output
             Thread stdoutThread = startStreamDrain(process.getInputStream(), stdoutLog, "stdout");
@@ -109,6 +128,9 @@ public class AgentProcess {
             }
 
             // Wait for stream threads to finish
+            if (stdinThread != null) {
+                stdinThread.join(1000);
+            }
             stdoutThread.join(1000);
             stderrThread.join(1000);
 
@@ -123,6 +145,9 @@ public class AgentProcess {
             terminateProcess();
             return AgentResult.failed(agentName, round, -1, getDurationMs(),
                 "Execution interrupted");
+        } finally {
+            // Ensure all resources are cleaned up, even on unexpected exceptions
+            close();
         }
     }
 
@@ -267,8 +292,85 @@ public class AgentProcess {
             });
     }
 
+    /**
+     * Pipes prompt content from memory to the process's stdin.
+     *
+     * <p>This approach avoids file handle leaks because the prompt file was already
+     * read into memory and its handle closed before this method is called.
+     *
+     * @param promptContent the prompt content to pipe
+     * @return the thread performing the piping
+     */
+    private Thread startStdinPipe(byte[] promptContent) {
+        return Thread.ofVirtual()
+            .name(agentName + "-stdin-pipe")
+            .start(() -> {
+                try (OutputStream stdin = process.getOutputStream()) {
+                    stdin.write(promptContent);
+                    stdin.flush();
+                } catch (IOException e) {
+                    // Process may have exited before we could write - this is normal for quick failures
+                    log.debug("Error piping stdin for agent '{}': {}", agentName, e.getMessage());
+                }
+            });
+    }
+
     private long getDurationMs() {
         return Duration.between(startTime, Instant.now()).toMillis();
+    }
+
+    /**
+     * Closes this agent process and releases all associated resources.
+     *
+     * <p>This method ensures:
+     * <ul>
+     *   <li>The process is terminated if still running</li>
+     *   <li>All process streams (stdin, stdout, stderr) are closed</li>
+     *   <li>The stdin piping thread is interrupted if still running</li>
+     * </ul>
+     *
+     * <p>This method is idempotent - calling it multiple times has no additional effect.
+     * It is automatically called by {@link #execute()} in a finally block.
+     */
+    @Override
+    public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+
+        log.debug("Closing agent process resources for '{}'", agentName);
+
+        // Interrupt stdin thread if still running
+        if (stdinThread != null && stdinThread.isAlive()) {
+            stdinThread.interrupt();
+        }
+
+        // Terminate process if still running
+        if (process != null) {
+            // Close all process streams explicitly
+            closeQuietly(process.getOutputStream());  // stdin
+            closeQuietly(process.getInputStream());   // stdout
+            closeQuietly(process.getErrorStream());   // stderr
+
+            // Destroy process tree if still alive
+            if (process.isAlive()) {
+                destroyProcessTree();
+            }
+        }
+    }
+
+    /**
+     * Closes a Closeable without throwing exceptions.
+     */
+    private void closeQuietly(Closeable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException e) {
+                log.trace("Error closing stream for agent '{}': {}", agentName, e.getMessage());
+            }
+        }
     }
 
     /**
