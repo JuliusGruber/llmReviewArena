@@ -1018,32 +1018,34 @@ This phase updates all existing code to be compatible before making the breaking
    ~~- Test `translatePathsInCommand()` throws ConfigException for external paths~~
    ~~- Test `looksLikeAbsolutePath()` edge cases~~
 
-### Phase 3: Integration
+### Phase 3: Integration ✅ COMPLETED (steps 10-12)
 
-10. **Update `AgentProcess`**
-    - File: `src/main/java/dev/reviewarena/agent/AgentProcess.java`
-    - Add `DockerConfig dockerConfig` field (never null, from AgentConfig)
-    - Add `DockerCommandBuilder dockerCommandBuilder` instance field
-    - Add `dockerConfig(DockerConfig)` to Builder with validation
-    - Update `resolveCommand()` to call DockerCommandBuilder when Docker enabled (FIRST, before Windows check)
-    - Document that Docker commands don't need cmd /c wrapping
-    - Document stdin redirection works for both native and Docker modes
+> **Commit:** `617d406` - Implement Phase 3: AgentProcess and AgentExecutor Docker integration
 
-11. **Update `AgentExecutor`**
-    - File: `src/main/java/dev/reviewarena/agent/AgentExecutor.java`
-    - Add `DockerChecker` field (interface for testability)
-    - Add package-private constructor for test injection
-    - Add `validateDockerIfNeeded()` method (call from constructor)
-    - Update `executeAgent()` to pass `dockerConfig` to AgentProcess builder
-    - Update `executeSynthesis()` to pass `dockerConfig` to AgentProcess builder
-    - **No path translation needed** - HOST paths flow through, translation in AgentProcess
+~~10. **Update `AgentProcess`**~~
+    ~~- File: `src/main/java/dev/reviewarena/agent/AgentProcess.java`~~
+    ~~- Add `DockerConfig dockerConfig` field (never null, from AgentConfig)~~
+    ~~- Add `DockerCommandBuilder dockerCommandBuilder` instance field~~
+    ~~- Add `dockerConfig(DockerConfig)` to Builder with validation~~
+    ~~- Update `resolveCommand()` to call DockerCommandBuilder when Docker enabled (FIRST, before Windows check)~~
+    ~~- Document that Docker commands don't need cmd /c wrapping~~
+    ~~- Document stdin redirection works for both native and Docker modes~~
 
-12. **CommandBuilder - NO CHANGES NEEDED**
-    - `CommandBuilder.java` remains unchanged
-    - Produces commands with HOST paths (as it always has)
-    - Path translation happens in `DockerCommandBuilder` (called from `AgentProcess`)
+~~11. **Update `AgentExecutor`**~~
+    ~~- File: `src/main/java/dev/reviewarena/agent/AgentExecutor.java`~~
+    ~~- Add `DockerChecker` field (interface for testability)~~
+    ~~- Add package-private constructor for test injection~~
+    ~~- Add `validateDockerIfNeeded()` method (call from constructor)~~
+    ~~- Update `executeAgent()` to pass `dockerConfig` to AgentProcess builder~~
+    ~~- Update `executeSynthesis()` to pass `dockerConfig` to AgentProcess builder~~
+    ~~- **No path translation needed** - HOST paths flow through, translation in AgentProcess~~
 
-13. **Add integration tests**
+~~12. **CommandBuilder - NO CHANGES NEEDED**~~
+    ~~- `CommandBuilder.java` remains unchanged~~
+    ~~- Produces commands with HOST paths (as it always has)~~
+    ~~- Path translation happens in `DockerCommandBuilder` (called from `AgentProcess`)~~
+
+13. **Add integration tests** (deferred - requires Docker in CI)
     - File: `src/test/java/dev/reviewarena/agent/DockerAgentExecutionIT.java`
     - Test agent execution in Docker (requires Docker in CI)
     - Use JUnit Assumptions to skip when Docker unavailable
