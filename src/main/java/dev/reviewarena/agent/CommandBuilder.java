@@ -89,21 +89,21 @@ public class CommandBuilder {
 
     private void addTranslatedFlags(List<String> command, AgentConfig config) {
         Map<String, Object> flags = config.flags();
-        String agentName = config.name().toLowerCase();
+        String type = config.type();
 
         // Translate auto-approve flag
         if (Boolean.TRUE.equals(flags.get("auto-approve"))) {
-            String autoApproveFlag = getAutoApproveFlag(agentName);
+            String autoApproveFlag = getAutoApproveFlag(type);
             if (autoApproveFlag != null && !command.contains(autoApproveFlag)) {
                 command.add(autoApproveFlag);
             } else if (autoApproveFlag == null) {
-                log.warn("Unknown agent '{}' has auto-approve enabled but no flag translation available. " +
-                         "Agent will run without auto-approve flag.", agentName);
+                log.warn("Agent '{}' (type '{}') has auto-approve enabled but no flag translation available. " +
+                         "Agent will run without auto-approve flag.", config.name(), type);
             }
         }
 
         // Translate allowed-tools flag (Claude only)
-        if (isClaudeAgent(agentName) && flags.containsKey("allowed-tools")) {
+        if ("claude".equals(type) && flags.containsKey("allowed-tools")) {
             Object allowedTools = flags.get("allowed-tools");
             if (allowedTools instanceof List<?> toolList && !toolList.isEmpty()) {
                 String toolsCsv = toolList.stream()
@@ -119,38 +119,19 @@ public class CommandBuilder {
     }
 
     /**
-     * Gets the auto-approve flag for the given agent name.
-     * Supports prefix matching (e.g., "claude2" matches "claude").
+     * Gets the auto-approve flag for the given agent type.
+     *
+     * @param type the agent type (claude, codex, gemini)
+     * @return the CLI-specific auto-approve flag, or null if unknown type
      */
-    private String getAutoApproveFlag(String agentName) {
-        if (isClaudeAgent(agentName)) {
+    private String getAutoApproveFlag(String type) {
+        if ("claude".equals(type)) {
             return "--dangerously-skip-permissions";
-        } else if (isCodexAgent(agentName)) {
+        } else if ("codex".equals(type)) {
             return "--full-auto";
-        } else if (isGeminiAgent(agentName)) {
+        } else if ("gemini".equals(type)) {
             return "--yolo";
         }
         return null;
-    }
-
-    /**
-     * Checks if the agent name represents a Claude agent (exact match or prefix).
-     */
-    private boolean isClaudeAgent(String agentName) {
-        return agentName.equals("claude") || agentName.startsWith("claude");
-    }
-
-    /**
-     * Checks if the agent name represents a Codex agent (exact match or prefix).
-     */
-    private boolean isCodexAgent(String agentName) {
-        return agentName.equals("codex") || agentName.startsWith("codex");
-    }
-
-    /**
-     * Checks if the agent name represents a Gemini agent (exact match or prefix).
-     */
-    private boolean isGeminiAgent(String agentName) {
-        return agentName.equals("gemini") || agentName.startsWith("gemini");
     }
 }

@@ -185,6 +185,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               myagent:
+                type: claude
                 command:
                   - myagent
                   - run
@@ -195,6 +196,7 @@ class ConfigLoaderTest {
         assertTrue(config.agents().containsKey("myagent"));
         AgentConfig agent = config.agents().get("myagent");
         assertEquals("myagent", agent.name());
+        assertEquals("claude", agent.type());
         assertEquals(2, agent.command().size());
         assertEquals("myagent", agent.command().get(0));
         assertEquals("run", agent.command().get(1));
@@ -206,12 +208,15 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               agent1:
+                type: claude
                 command:
                   - cmd1
               agent2:
+                type: codex
                 command:
                   - cmd2
               agent3:
+                type: gemini
                 command:
                   - cmd3
             """);
@@ -230,6 +235,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               flagged:
+                type: claude
                 command:
                   - cmd
                 flags:
@@ -251,6 +257,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               disabled-agent:
+                type: claude
                 command:
                   - cmd
                 enabled: false
@@ -269,6 +276,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               default-enabled:
+                type: claude
                 command:
                   - cmd
             """);
@@ -373,6 +381,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               myagent:
+                type: claude
                 command:
                   - myagent
             """);
@@ -390,6 +399,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               dockeragent:
+                type: claude
                 command:
                   - agent
                 docker:
@@ -409,6 +419,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               dockeragent:
+                type: claude
                 command:
                   - agent
                 docker:
@@ -428,6 +439,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               fullconfig:
+                type: claude
                 command:
                   - agent
                 docker:
@@ -453,6 +465,7 @@ class ConfigLoaderTest {
         Files.writeString(arenaYaml, """
             agents:
               partialconfig:
+                type: claude
                 command:
                   - agent
                 docker:
@@ -468,5 +481,49 @@ class ConfigLoaderTest {
         assertNull(agent.docker().image()); // Not specified
         assertEquals("2g", agent.docker().memory());
         assertNull(agent.docker().cpus()); // Not specified
+    }
+
+    @Test
+    void testLoad_agentWithTypeInferred_fromName() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              claude-fast:
+                command:
+                  - claude
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        // Type should be inferred from name prefix "claude"
+        AgentConfig agent = config.agents().get("claude-fast");
+        assertEquals("claude", agent.type());
+    }
+
+    @Test
+    void testLoad_agentWithUnknownType_throws() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              custom:
+                type: unknown-type
+                command:
+                  - agent
+            """);
+
+        assertThrows(ConfigException.class, () -> loader.load(arenaYaml, CliOverrides.none()));
+    }
+
+    @Test
+    void testLoad_agentWithNoTypeAndUnrecognizedName_throws() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              custom-agent:
+                command:
+                  - agent
+            """);
+
+        assertThrows(ConfigException.class, () -> loader.load(arenaYaml, CliOverrides.none()));
     }
 }

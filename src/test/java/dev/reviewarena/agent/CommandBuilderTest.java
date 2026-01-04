@@ -47,7 +47,7 @@ class CommandBuilderTest {
 
     @Test
     void build_claude_addsAutoApproveFlag() {
-        AgentConfig config = AgentConfig.of("claude",
+        AgentConfig config = AgentConfig.of("claude", "claude",
             List.of("claude", "-p", "@prompt.md"),
             Map.of("auto-approve", true));
 
@@ -58,7 +58,7 @@ class CommandBuilderTest {
 
     @Test
     void build_codex_addsAutoApproveFlag() {
-        AgentConfig config = AgentConfig.of("codex",
+        AgentConfig config = AgentConfig.of("codex", "codex",
             List.of("codex", "exec", "@prompt.md"),
             Map.of("auto-approve", true));
 
@@ -69,7 +69,7 @@ class CommandBuilderTest {
 
     @Test
     void build_gemini_addsAutoApproveFlag() {
-        AgentConfig config = AgentConfig.of("gemini",
+        AgentConfig config = AgentConfig.of("gemini", "gemini",
             List.of("gemini", "-p", "@prompt.md"),
             Map.of("auto-approve", true));
 
@@ -80,7 +80,7 @@ class CommandBuilderTest {
 
     @Test
     void build_claude_addsAllowedTools() {
-        AgentConfig config = AgentConfig.of("claude",
+        AgentConfig config = AgentConfig.of("claude", "claude",
             List.of("claude", "-p", "@prompt.md"),
             Map.of("allowed-tools", List.of("Read", "Write", "Edit")));
 
@@ -93,7 +93,7 @@ class CommandBuilderTest {
 
     @Test
     void build_nonClaude_ignoresAllowedTools() {
-        AgentConfig config = AgentConfig.of("codex",
+        AgentConfig config = AgentConfig.of("codex", "codex",
             List.of("codex", "exec", "@prompt.md"),
             Map.of("allowed-tools", List.of("Read", "Write")));
 
@@ -104,7 +104,7 @@ class CommandBuilderTest {
 
     @Test
     void build_noAutoApprove_doesNotAddFlag() {
-        AgentConfig config = AgentConfig.of("claude",
+        AgentConfig config = AgentConfig.of("claude", "claude",
             List.of("claude", "-p", "@prompt.md"),
             Map.of("auto-approve", false));
 
@@ -114,19 +114,33 @@ class CommandBuilderTest {
     }
 
     @Test
-    void build_unknownAgent_warnsAndContinues() {
+    void build_nullType_warnsAndContinues() {
+        // Agent with null type - no CLI-specific flags added
         AgentConfig config = AgentConfig.of("custom-agent",
             List.of("custom", "@prompt.md"),
             Map.of("auto-approve", true));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
-        // No CLI-specific flags added for unknown agents (warning logged)
+        // No CLI-specific flags added for null type (warning logged)
         assertFalse(command.contains("--dangerously-skip-permissions"));
         assertFalse(command.contains("--full-auto"));
         assertFalse(command.contains("--yolo"));
         // Command still builds successfully - just warns
         assertTrue(command.contains("custom"));
+    }
+
+    @Test
+    void build_customNameWithClaudeType_addsClaudeFlag() {
+        // Agent with custom name but explicit claude type
+        AgentConfig config = AgentConfig.of("fast-reviewer", "claude",
+            List.of("claude", "-p", "@prompt.md"),
+            Map.of("auto-approve", true));
+
+        List<String> command = builder.build(config, promptFile, outputFile);
+
+        // Claude-specific flag should be added based on type, not name
+        assertTrue(command.contains("--dangerously-skip-permissions"));
     }
 
     @Test
@@ -140,8 +154,9 @@ class CommandBuilderTest {
     }
 
     @Test
-    void build_caseInsensitiveAgentName() {
-        AgentConfig config = AgentConfig.of("CLAUDE",
+    void build_caseInsensitiveType() {
+        // Type matching is case-sensitive, using exact "claude" type
+        AgentConfig config = AgentConfig.of("CLAUDE", "claude",
             List.of("claude", "-p", "@prompt.md"),
             Map.of("auto-approve", true));
 

@@ -35,6 +35,7 @@ public class AgentProcess implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(AgentProcess.class);
 
     private final String agentName;
+    private final String agentType;
     private final int round;
     private final List<String> command;
     private final Path workingDir;
@@ -56,6 +57,7 @@ public class AgentProcess implements AutoCloseable {
 
     private AgentProcess(Builder builder) {
         this.agentName = Objects.requireNonNull(builder.agentName);
+        this.agentType = Objects.requireNonNull(builder.agentType);
         this.round = builder.round;
         this.command = List.copyOf(Objects.requireNonNull(builder.command));
         this.workingDir = Objects.requireNonNull(builder.workingDir);
@@ -393,6 +395,7 @@ public class AgentProcess implements AutoCloseable {
             // DockerCommandBuilder handles path translation from host paths to container paths
             return dockerCommandBuilder.build(
                 agentName,
+                agentType,
                 dockerConfig,
                 command,  // Contains HOST paths from CommandBuilder
                 workingDir
@@ -424,6 +427,7 @@ public class AgentProcess implements AutoCloseable {
 
     public static class Builder {
         private String agentName;
+        private String agentType;
         private int round;
         private List<String> command;
         private Path workingDir;
@@ -439,6 +443,11 @@ public class AgentProcess implements AutoCloseable {
 
         public Builder agentName(String agentName) {
             this.agentName = agentName;
+            return this;
+        }
+
+        public Builder agentType(String agentType) {
+            this.agentType = agentType;
             return this;
         }
 

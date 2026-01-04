@@ -26,6 +26,7 @@ output:
 # Note: Prompt is delivered via stdin redirection (not as command argument)
 agents:
   claude:
+    type: claude
     command:
       - claude
       - -p                    # print mode (non-interactive, reads prompt from stdin)
@@ -34,6 +35,7 @@ agents:
     enabled: true
 
   codex:
+    type: codex
     command:
       - codex
       - -q                    # quiet mode requires prompt as positional arg, not stdin
@@ -42,6 +44,7 @@ agents:
     enabled: false            # Disabled: codex -q requires prompt as argument, not stdin
 
   gemini:
+    type: gemini
     command:
       - gemini                # positional prompt mode (reads from stdin)
     flags:

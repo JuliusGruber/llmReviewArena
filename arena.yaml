@@ -1,6 +1,7 @@
 # Local arena configuration to enable all agents
 agents:
   claude:
+    type: claude
     # Regular Docker mode with credential mounting
     # Authenticate locally first with: claude /login
     # Credentials from ~/.claude/ are mounted into the container
@@ -16,6 +17,7 @@ agents:
     enabled: true
 
   claude2:
+    type: claude
     # Second Claude instance
     docker:
       enabled: true
@@ -29,6 +31,7 @@ agents:
     enabled: true
 
   claude3:
+    type: claude
     # Third Claude instance
     docker:
       enabled: true
@@ -43,6 +46,7 @@ agents:
 
   # Codex - temporarily disabled
   codex:
+    type: codex
     # Docker mode requires building Codex image locally:
     #   git clone https://github.com/openai/codex-universal
     #   docker build -t codex-universal:latest .
@@ -60,6 +64,7 @@ agents:
 
   # Gemini - temporarily disabled
   gemini:
+    type: gemini
     # docker:
     #   enabled: true
     #   image: "naoyoshinori/gemini-cli:node"  # Optional, uses default

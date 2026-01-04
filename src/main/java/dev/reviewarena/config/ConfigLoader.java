@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Loads configuration from multiple sources with proper precedence.
@@ -28,6 +29,12 @@ import java.util.Optional;
 public class ConfigLoader {
 
     private static final String DEFAULT_CONFIG_FILE = "arena.yaml";
+
+    /**
+     * Known agent types for validation.
+     * If an agent specifies or infers a type not in this set, configuration fails.
+     */
+    private static final Set<String> KNOWN_TYPES = Set.of("claude", "codex", "gemini");
 
     private final Path baseDir;
 
@@ -220,6 +227,22 @@ public class ConfigLoader {
         }
         List<String> command = commandOpt.get();
 
+        // Load type (explicit or inferred from name)
+        String type = config.getOptionalValue(prefix + ".type", String.class)
+            .orElseGet(() -> inferTypeFromName(agentName));
+
+        // Validate type
+        if (type != null && !KNOWN_TYPES.contains(type)) {
+            throw new ConfigException(
+                "Agent '" + agentName + "' has unknown type '" + type + "'. " +
+                "Valid types are: " + KNOWN_TYPES);
+        }
+        if (type == null) {
+            throw new ConfigException(
+                "Agent '" + agentName + "' has no 'type' specified and type could not be inferred from name. " +
+                "Add 'type: <type>' to the agent configuration. Valid types are: " + KNOWN_TYPES);
+        }
+
         // Load enabled flag (default true)
         boolean enabled = config.getOptionalValue(prefix + ".enabled", Boolean.class)
             .orElse(true);
@@ -230,7 +253,25 @@ public class ConfigLoader {
         // Load docker config
         DockerConfig docker = loadDockerConfig(config, prefix + ".docker");
 
-        return new AgentConfig(agentName, command, flags, enabled, docker);
+        return new AgentConfig(agentName, type, command, flags, enabled, docker);
+    }
+
+    /**
+     * Infers agent type from agent name for backward compatibility.
+     *
+     * @param agentName the agent name
+     * @return inferred type, or null if not recognizable
+     */
+    private String inferTypeFromName(String agentName) {
+        String lowerName = agentName.toLowerCase();
+        if (lowerName.startsWith("claude")) {
+            return "claude";
+        } else if (lowerName.startsWith("codex")) {
+            return "codex";
+        } else if (lowerName.startsWith("gemini")) {
+            return "gemini";
+        }
+        return null;
     }
 
     /**

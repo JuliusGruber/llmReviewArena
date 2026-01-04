@@ -49,6 +49,7 @@ class AgentProcessTest {
 
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("cmd", "/c", script.toString(), outputDir.toString()))
             .workingDir(tempDir)
@@ -83,6 +84,7 @@ class AgentProcessTest {
 
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("bash", script.toString(), outputDir.toString()))
             .workingDir(tempDir)
@@ -108,6 +110,7 @@ class AgentProcessTest {
     void execute_failingProcess_windows() {
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("cmd", "/c", "exit", "1"))
             .workingDir(tempDir)
@@ -132,6 +135,7 @@ class AgentProcessTest {
     void execute_failingProcess_unix() {
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("bash", "-c", "exit 1"))
             .workingDir(tempDir)
@@ -157,6 +161,7 @@ class AgentProcessTest {
         // Use PowerShell to sleep - works reliably in non-interactive mode
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("powershell", "-Command", "Start-Sleep -Seconds 30"))
             .workingDir(Path.of(System.getProperty("java.io.tmpdir")))
@@ -180,6 +185,7 @@ class AgentProcessTest {
     void execute_timeout_unix() {
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("sleep", "30"))
             .workingDir(tempDir)
@@ -208,6 +214,7 @@ class AgentProcessTest {
 
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("cmd", "/c", script.toString()))
             .workingDir(tempDir)
@@ -236,6 +243,7 @@ class AgentProcessTest {
 
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(List.of("bash", script.toString()))
             .workingDir(tempDir)
@@ -273,6 +281,7 @@ class AgentProcessTest {
 
         AgentProcess agent = AgentProcess.builder()
             .agentName("test")
+            .agentType("claude")
             .round(0)
             .command(command)
             .workingDir(tempDir)
@@ -299,6 +308,7 @@ class AgentProcessTest {
     void builder_missingAgentName_throws() {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -328,6 +338,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -343,6 +354,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .outputFile(outputFile)
                 .stdoutLog(stdoutLog)
@@ -357,6 +369,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .stdoutLog(stdoutLog)
@@ -371,6 +384,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -385,6 +399,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -399,6 +414,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -415,6 +431,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -431,6 +448,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("   ")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -446,6 +464,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of())
                 .workingDir(tempDir)
                 .outputFile(outputFile)
@@ -461,6 +480,7 @@ class AgentProcessTest {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .command(List.of("echo", "test"))
                 .workingDir(tempDir)
                 .outputFile(outputFile)

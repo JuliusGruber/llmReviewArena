@@ -34,9 +34,40 @@ class AgentConfigTest {
     }
 
     @Test
+    void testOf_withExplicitType() {
+        AgentConfig config = AgentConfig.of("my-claude", "claude", List.of("claude", "-p"));
+
+        assertEquals("my-claude", config.name());
+        assertEquals("claude", config.type());
+        assertEquals(List.of("claude", "-p"), config.command());
+        assertTrue(config.flags().isEmpty());
+        assertTrue(config.enabled());
+    }
+
+    @Test
+    void testOf_withExplicitTypeAndFlags() {
+        Map<String, Object> flags = Map.of("auto-approve", true);
+        AgentConfig config = AgentConfig.of("fast-reviewer", "claude", List.of("claude", "-p"), flags);
+
+        assertEquals("fast-reviewer", config.name());
+        assertEquals("claude", config.type());
+        assertEquals(List.of("claude", "-p"), config.command());
+        assertEquals(true, config.flags().get("auto-approve"));
+        assertTrue(config.enabled());
+    }
+
+    @Test
+    void testOf_withoutType_hasNullType() {
+        AgentConfig config = AgentConfig.of("claude", List.of("claude", "-p"));
+
+        assertEquals("claude", config.name());
+        assertNull(config.type());
+    }
+
+    @Test
     void testValidation_nullName_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig(null, List.of("cmd"), Map.of(), true, null));
+            () -> new AgentConfig(null, "claude", List.of("cmd"), Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("name must not be null or blank"));
     }
@@ -44,7 +75,7 @@ class AgentConfigTest {
     @Test
     void testValidation_blankName_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig("   ", List.of("cmd"), Map.of(), true, null));
+            () -> new AgentConfig("   ", "claude", List.of("cmd"), Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("name must not be null or blank"));
     }
@@ -52,7 +83,7 @@ class AgentConfigTest {
     @Test
     void testValidation_nullCommand_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig("agent", null, Map.of(), true, null));
+            () -> new AgentConfig("agent", "claude", null, Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("command must not be null or empty"));
     }
@@ -60,7 +91,7 @@ class AgentConfigTest {
     @Test
     void testValidation_emptyCommand_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig("agent", List.of(), Map.of(), true, null));
+            () -> new AgentConfig("agent", "claude", List.of(), Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("command must not be null or empty"));
     }
@@ -96,7 +127,7 @@ class AgentConfigTest {
 
     @Test
     void testFlags_nullBecomesEmptyMap() {
-        AgentConfig config = new AgentConfig("agent", List.of("cmd"), null, true, null);
+        AgentConfig config = new AgentConfig("agent", "claude", List.of("cmd"), null, true, null);
 
         assertNotNull(config.flags());
         assertTrue(config.flags().isEmpty());
@@ -104,7 +135,7 @@ class AgentConfigTest {
 
     @Test
     void testDocker_nullBecomesDisabled() {
-        AgentConfig config = new AgentConfig("agent", List.of("cmd"), Map.of(), true, null);
+        AgentConfig config = new AgentConfig("agent", "claude", List.of("cmd"), Map.of(), true, null);
 
         assertNotNull(config.docker());
         assertFalse(config.docker().enabled());

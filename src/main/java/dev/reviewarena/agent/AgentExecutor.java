@@ -198,6 +198,7 @@ public class AgentExecutor {
         // an extra safety net for any future code paths that might not call execute().
         try (AgentProcess process = AgentProcess.builder()
             .agentName(agentConfig.name())
+            .agentType(agentConfig.type())
             .round(round)
             .command(command)           // HOST paths from CommandBuilder
             .workingDir(projectRoot)
@@ -335,6 +336,7 @@ public class AgentExecutor {
         // an extra safety net for any future code paths that might not call execute().
         try (AgentProcess process = AgentProcess.builder()
             .agentName(agentName + "-synthesis")
+            .agentType(agentConfig.type())
             .round(SYNTHESIS_ROUND)
             .command(command)             // HOST paths from CommandBuilder
             .workingDir(projectRoot)

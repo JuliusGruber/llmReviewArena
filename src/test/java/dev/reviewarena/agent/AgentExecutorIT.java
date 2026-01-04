@@ -56,9 +56,9 @@ class AgentExecutorIT {
         successScript.toFile().setExecutable(true);
 
         Map<String, AgentConfig> agents = Map.of(
-            "agent1", AgentConfig.of("agent1",
+            "agent1", AgentConfig.of("agent1", "claude",
                 List.of("bash", successScript.toString(), "@output")),
-            "agent2", AgentConfig.of("agent2",
+            "agent2", AgentConfig.of("agent2", "claude",
                 List.of("bash", successScript.toString(), "@output"))
         );
 
@@ -101,9 +101,9 @@ class AgentExecutorIT {
             """);
 
         Map<String, AgentConfig> agents = Map.of(
-            "agent1", AgentConfig.of("agent1",
+            "agent1", AgentConfig.of("agent1", "claude",
                 List.of("cmd", "/c", successScript.toString(), "@output")),
-            "agent2", AgentConfig.of("agent2",
+            "agent2", AgentConfig.of("agent2", "claude",
                 List.of("cmd", "/c", successScript.toString(), "@output"))
         );
 
@@ -128,9 +128,9 @@ class AgentExecutorIT {
     void executeRound_respectsMaxConcurrent() {
         // Configure 3 agents with non-existent commands (will fail quickly)
         Map<String, AgentConfig> agents = Map.of(
-            "a1", AgentConfig.of("a1", List.of("nonexistent-cmd-12345")),
-            "a2", AgentConfig.of("a2", List.of("nonexistent-cmd-12345")),
-            "a3", AgentConfig.of("a3", List.of("nonexistent-cmd-12345"))
+            "a1", AgentConfig.of("a1", "claude", List.of("nonexistent-cmd-12345")),
+            "a2", AgentConfig.of("a2", "claude", List.of("nonexistent-cmd-12345")),
+            "a3", AgentConfig.of("a3", "claude", List.of("nonexistent-cmd-12345"))
         );
 
         ArenaConfig config = createConfig(agents, 1); // Sequential (max 1 concurrent)
@@ -174,9 +174,9 @@ class AgentExecutorIT {
         failScript.toFile().setExecutable(true);
 
         Map<String, AgentConfig> agents = Map.of(
-            "success-agent", AgentConfig.of("success-agent",
+            "success-agent", AgentConfig.of("success-agent", "claude",
                 List.of("bash", successScript.toString(), "@output")),
-            "fail-agent", AgentConfig.of("fail-agent",
+            "fail-agent", AgentConfig.of("fail-agent", "claude",
                 List.of("bash", failScript.toString()))
         );
 
@@ -211,9 +211,9 @@ class AgentExecutorIT {
             """);
 
         Map<String, AgentConfig> agents = Map.of(
-            "success-agent", AgentConfig.of("success-agent",
+            "success-agent", AgentConfig.of("success-agent", "claude",
                 List.of("cmd", "/c", successScript.toString(), "@output")),
-            "fail-agent", AgentConfig.of("fail-agent",
+            "fail-agent", AgentConfig.of("fail-agent", "claude",
                 List.of("cmd", "/c", "exit", "1"))
         );
 
@@ -245,7 +245,7 @@ class AgentExecutorIT {
         slowScript.toFile().setExecutable(true);
 
         Map<String, AgentConfig> agents = Map.of(
-            "slow-agent", AgentConfig.of("slow-agent",
+            "slow-agent", AgentConfig.of("slow-agent", "claude",
                 List.of("bash", slowScript.toString()))
         );
 
@@ -276,7 +276,7 @@ class AgentExecutorIT {
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     void executeRound_agentTimeout_windows() {
         Map<String, AgentConfig> agents = Map.of(
-            "slow-agent", AgentConfig.of("slow-agent",
+            "slow-agent", AgentConfig.of("slow-agent", "claude",
                 List.of("powershell", "-Command", "Start-Sleep -Seconds 30"))
         );
 
@@ -336,7 +336,7 @@ class AgentExecutorIT {
         }
 
         Map<String, AgentConfig> agents = Map.of(
-            "output-agent", AgentConfig.of("output-agent", command)
+            "output-agent", AgentConfig.of("output-agent", "claude", command)
         );
 
         ArenaConfig config = createConfig(agents, 0);
@@ -397,7 +397,7 @@ class AgentExecutorIT {
         }
 
         Map<String, AgentConfig> agents = Map.of(
-            "empty-agent", AgentConfig.of("empty-agent", command)
+            "empty-agent", AgentConfig.of("empty-agent", "claude", command)
         );
 
         ArenaConfig config = createConfig(agents, 0);

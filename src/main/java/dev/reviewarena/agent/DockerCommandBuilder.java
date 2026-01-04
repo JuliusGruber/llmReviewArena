@@ -61,6 +61,7 @@ public class DockerCommandBuilder {
      * translates them to container paths (/workspace/...).
      *
      * @param agentName   Name of the agent (for default image lookup or sandbox agent name)
+     * @param agentType   Agent type (claude, codex, gemini) for type-specific behavior
      * @param docker      Docker configuration
      * @param command     Agent command with HOST paths (as produced by CommandBuilder)
      * @param workingDir  Host working directory to mount as /workspace
@@ -68,14 +69,15 @@ public class DockerCommandBuilder {
      */
     public List<String> build(
             String agentName,
+            String agentType,
             DockerConfig docker,
             List<String> command,
             Path workingDir
     ) {
         if (docker.sandbox()) {
-            return buildSandboxCommand(agentName, docker, command, workingDir);
+            return buildSandboxCommand(agentName, agentType, docker, command, workingDir);
         }
-        return buildDockerRunCommand(agentName, docker, command, workingDir);
+        return buildDockerRunCommand(agentName, agentType, docker, command, workingDir);
     }
 
     /**
@@ -89,10 +91,11 @@ public class DockerCommandBuilder {
      *   <li>User permissions</li>
      * </ul>
      *
-     * <p>Supported agents: claude, gemini
+     * <p>Supported agent types: claude, gemini
      */
     private List<String> buildSandboxCommand(
             String agentName,
+            String agentType,
             DockerConfig docker,
             List<String> command,
             Path workingDir
@@ -115,15 +118,14 @@ public class DockerCommandBuilder {
             }
         }
 
-        // Agent name (claude or gemini)
-        String sandboxAgent = agentName.toLowerCase();
-        if (!SANDBOX_AGENTS.contains(sandboxAgent)) {
+        // Agent type (claude or gemini) for sandbox mode
+        if (!SANDBOX_AGENTS.contains(agentType)) {
             throw new ConfigException(
-                "Docker sandbox mode is only supported for agents: " + SANDBOX_AGENTS + ". " +
-                "Agent '%s' is not supported. Use regular Docker mode (sandbox: false) instead."
-                .formatted(agentName));
+                "Docker sandbox mode is only supported for agent types: " + SANDBOX_AGENTS + ". " +
+                "Agent '%s' (type '%s') is not supported. Use regular Docker mode (sandbox: false) instead."
+                .formatted(agentName, agentType));
         }
-        result.add(sandboxAgent);
+        result.add(agentType);
 
         // Add agent-specific flags (skip the agent command name, keep flags)
         // command = ["claude", "-p"] -> we only need ["-p"]
@@ -156,6 +158,7 @@ public class DockerCommandBuilder {
      */
     private List<String> buildDockerRunCommand(
             String agentName,
+            String agentType,
             DockerConfig docker,
             List<String> command,
             Path workingDir
@@ -198,7 +201,7 @@ public class DockerCommandBuilder {
         // uninterruptible disk sleep state 'D').
         //
         // The credentials file itself only needs read access for authentication.
-        if (isClaudeAgent(agentName)) {
+        if ("claude".equals(agentType)) {
             Path credentialsFile = getClaudeCredentialsFile();
             if (credentialsFile != null) {
                 result.add("-v");
@@ -228,13 +231,14 @@ public class DockerCommandBuilder {
             result.add(docker.cpus());
         }
 
-        // Image (use configured or default)
+        // Image (use configured or default based on agent type)
         String image = docker.image() != null
             ? docker.image()
-            : DEFAULT_IMAGES.get(agentName.toLowerCase());
+            : DEFAULT_IMAGES.get(agentType);
         if (image == null) {
             throw new ConfigException(
-                "No Docker image specified for agent '%s' and no default available. ".formatted(agentName) +
+                "No Docker image specified for agent '%s' (type '%s') and no default available. "
+                    .formatted(agentName, agentType) +
                 "For Codex, you must build or specify an image:\n" +
                 "  Option 1: Build locally: git clone https://github.com/openai/codex-universal && " +
                 "docker build -t codex-universal:latest .\n" +
@@ -353,14 +357,6 @@ public class DockerCommandBuilder {
 
         log.debug("Claude credentials not found at {}. Use 'claude' and '/login' to authenticate.", credentialsFile);
         return null;
-    }
-
-    /**
-     * Checks if the agent name represents a Claude agent (prefix matching).
-     * Matches "claude", "claude2", "claude3", etc.
-     */
-    private boolean isClaudeAgent(String agentName) {
-        return agentName.toLowerCase().startsWith("claude");
     }
 
     /**

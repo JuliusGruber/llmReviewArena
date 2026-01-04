@@ -6,7 +6,8 @@ import java.util.Map;
 /**
  * Configuration for a single AI agent.
  *
- * @param name     Agent identifier (e.g., "claude", "codex", "gemini")
+ * @param name     Agent identifier (e.g., "claude", "codex", "gemini", "fast-reviewer")
+ * @param type     Agent type for flag translation (e.g., "claude", "codex", "gemini")
  * @param command  Command and arguments to spawn the agent
  * @param flags    Agent-specific flags (auto-approve, etc.)
  * @param enabled  Whether this agent participates in tournaments
@@ -14,6 +15,7 @@ import java.util.Map;
  */
 public record AgentConfig(
     String name,
+    String type,
     List<String> command,
     Map<String, Object> flags,
     boolean enabled,
@@ -38,22 +40,38 @@ public record AgentConfig(
 
     /**
      * Creates an AgentConfig with enabled=true, empty flags, and Docker disabled.
+     * Type is set to null (should be inferred by ConfigLoader).
      */
     public static AgentConfig of(String name, List<String> command) {
-        return new AgentConfig(name, command, Map.of(), true, DockerConfig.disabled());
+        return new AgentConfig(name, null, command, Map.of(), true, DockerConfig.disabled());
+    }
+
+    /**
+     * Creates an AgentConfig with explicit type, enabled=true, empty flags, and Docker disabled.
+     */
+    public static AgentConfig of(String name, String type, List<String> command) {
+        return new AgentConfig(name, type, command, Map.of(), true, DockerConfig.disabled());
     }
 
     /**
      * Creates an AgentConfig with custom flags, enabled=true, and Docker disabled.
+     * Type is set to null (should be inferred by ConfigLoader).
      */
     public static AgentConfig of(String name, List<String> command, Map<String, Object> flags) {
-        return new AgentConfig(name, command, flags, true, DockerConfig.disabled());
+        return new AgentConfig(name, null, command, flags, true, DockerConfig.disabled());
+    }
+
+    /**
+     * Creates an AgentConfig with explicit type, custom flags, enabled=true, and Docker disabled.
+     */
+    public static AgentConfig of(String name, String type, List<String> command, Map<String, Object> flags) {
+        return new AgentConfig(name, type, command, flags, true, DockerConfig.disabled());
     }
 
     /**
      * Creates a disabled AgentConfig (for testing scenarios where agent is configured but disabled).
      */
     public static AgentConfig disabled(String name, List<String> command) {
-        return new AgentConfig(name, command, Map.of(), false, DockerConfig.disabled());
+        return new AgentConfig(name, null, command, Map.of(), false, DockerConfig.disabled());
     }
 }
