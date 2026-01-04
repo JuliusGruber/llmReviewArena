@@ -3,11 +3,61 @@
 **Issue:** #83
 **Status:** Ready for Review
 **Created:** 2026-01-04
-**Reviewed:** 2026-01-04 (fixed inconsistencies with existing codebase)
+**Reviewed:** 2026-01-04 (v3 - fixed test migration, stdin docs, security claims, path validation)
 
 ## Summary
 
 Add the ability to run agents (Claude, Codex, Gemini) inside Docker containers for improved isolation, security, and reproducibility.
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           AgentExecutor                                  │
+│  - Validates Docker availability at startup                             │
+│  - Passes HOST paths to CommandBuilder                                  │
+│  - Passes dockerConfig to AgentProcess                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+    ┌───────────────────────────┐   ┌───────────────────────────┐
+    │      CommandBuilder       │   │       AgentProcess        │
+    │  - Builds command with    │   │  - resolveCommand()       │
+    │    HOST paths             │   │    detects Docker mode    │
+    │  - NO Docker awareness    │   │  - stdin uses HOST path   │
+    └───────────────────────────┘   └───────────────────────────┘
+                    │                               │
+                    │              Docker mode?     │
+                    │               ┌───────────────┴───────────────┐
+                    │               │ YES                           │ NO
+                    │               ▼                               ▼
+                    │   ┌───────────────────────────┐   ┌───────────────────┐
+                    │   │   DockerCommandBuilder    │   │  Windows cmd /c   │
+                    │   │  - Wraps with docker run  │   │  wrapping         │
+                    │   │  - Translates HOST paths  │   └───────────────────┘
+                    │   │    to /workspace/...      │
+                    │   │  - Adds -i for stdin      │
+                    │   └───────────────────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────────────────────────────────────────┐
+    │  Final command example (Docker mode):                             │
+    │  docker run --rm -i --network host                                │
+    │    -v /host/project:/workspace -w /workspace                      │
+    │    -e ANTHROPIC_API_KEY                                           │
+    │    ghcr.io/zeeno-atl/claude-code:latest                          │
+    │    claude -p /workspace/.arena/rounds/0/claude/prompt.md          │
+    │            ▲                                                      │
+    │            └── Translated from C:\host\project\.arena\...         │
+    └───────────────────────────────────────────────────────────────────┘
+```
+
+**Key Design Principles:**
+1. **CommandBuilder unchanged** - produces HOST paths, Docker-agnostic
+2. **Path translation centralized** - happens in DockerCommandBuilder AFTER CommandBuilder
+3. **Stdin works in both modes** - ProcessBuilder reads HOST file, Docker's `-i` forwards to container
+4. **Output validation uses HOST paths** - OutputValidator reads from host filesystem after agent completes
 
 ## Design Decisions
 
@@ -16,10 +66,24 @@ Add the ability to run agents (Claude, Codex, Gemini) inside Docker containers f
 | Scope | All agents at once | Complete feature, consistent behavior |
 | Credentials | API keys via `-e` env vars | Simple, stateless, no OAuth complexity |
 | Runtime | Docker only | Most common, simpler implementation |
-| Networking | Host network (`--network host`) | Simpler API access, fewer connectivity issues |
+| Networking | Host network (`--network host`) | Simpler API access, fewer connectivity issues (see Security Notes below) |
 | Fallback | Fail fast with clear error | Explicit behavior, no silent degradation |
 | Defaults | Sensible defaults per agent | Better out-of-box experience |
-| Prompt passing | File mount only | Reliable, simpler than stdin piping |
+| Prompt passing | Host stdin + file mount | ProcessBuilder pipes file to Docker stdin via `-i` flag |
+| Path translation | In DockerCommandBuilder | All path translation centralized in one place, after CommandBuilder runs |
+
+### Security Notes
+
+**What Docker isolation provides:**
+- **Filesystem isolation** - Containers can only access the mounted `/workspace` directory
+- **Process isolation** - Container processes are isolated from host processes
+- **Clean environment** - No access to host user files, SSH keys, or credentials outside env vars
+
+**What `--network host` does NOT provide:**
+- **Network isolation** - Containers share the host network namespace and can access localhost services
+- This is acceptable for our use case (outbound API calls only) but means containers could theoretically access local services running on the host
+
+**Future enhancement:** Add `--network none` or custom bridge network option for stricter isolation when API keys are passed via environment variables (no network access needed for credential retrieval).
 
 ### Platform Notes
 
@@ -68,10 +132,14 @@ agents:
 | Agent | Default Image | Source | Notes |
 |-------|---------------|--------|-------|
 | Claude | `ghcr.io/zeeno-atl/claude-code:latest` | [GitHub](https://github.com/Zeeno-atl/claude-code) | Always installs latest CLI |
-| Codex | `ghcr.io/openai/codex-universal:latest` | [GitHub](https://github.com/openai/codex-universal) | Official OpenAI reference; users may need to build locally if not published |
+| Codex | *None - must be configured* | [GitHub](https://github.com/openai/codex-universal) | No published image; requires local build or custom image |
 | Gemini | `naoyoshinori/gemini-cli:node` | [Docker Hub](https://hub.docker.com/r/naoyoshinori/gemini-cli) | Well-maintained community image |
 
-> **Note:** If `codex-universal` is not available on GHCR, users must build locally from the GitHub repo and tag as `codex-universal:latest`, or specify a custom image in their config.
+> **Codex Docker Setup:** OpenAI does not publish pre-built Docker images for Codex CLI. Users must either:
+> 1. Build locally: `git clone https://github.com/openai/codex-universal && docker build -t codex-universal:latest .`
+> 2. Use a community image and specify it in `arena.yaml`: `docker.image: "your-image:tag"`
+>
+> If `docker.enabled: true` is set for Codex without specifying an image, the arena will fail fast with a clear error message listing available options.
 
 ## Architecture
 
@@ -181,25 +249,29 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Builds Docker run commands for containerized agent execution.
  *
- * <p>Path translation: When Docker is enabled, all paths in the command
- * (prompt file, output file) must be translated from host paths to
+ * <p>Path translation: This class handles ALL path translation from host paths to
  * container paths. The workingDir is mounted as /workspace, so:
  * <ul>
  *   <li>{@code C:\project\.arena\prompt.md} → {@code /workspace/.arena/prompt.md}</li>
  *   <li>{@code /home/user/project/.arena/review.md} → {@code /workspace/.arena/review.md}</li>
  * </ul>
+ *
+ * <p>The command passed to {@link #build} should contain HOST paths (as produced by
+ * CommandBuilder). This class translates them to container paths automatically.
  */
 public class DockerCommandBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(DockerCommandBuilder.class);
 
+    // Note: Codex has no default - OpenAI doesn't publish pre-built images
     private static final Map<String, String> DEFAULT_IMAGES = Map.of(
         "claude", "ghcr.io/zeeno-atl/claude-code:latest",
-        "codex", "ghcr.io/openai/codex-universal:latest",
         "gemini", "naoyoshinori/gemini-cli:node"
     );
 
@@ -211,16 +283,17 @@ public class DockerCommandBuilder {
     );
 
     /**
-     * Wraps an agent command with docker run.
+     * Wraps an agent command with docker run, translating host paths to container paths.
      *
-     * <p>The command arguments are expected to already have paths translated
-     * to container paths (e.g., /workspace/.arena/...) by the caller.
+     * <p>The command arguments should contain HOST paths (absolute paths on the host
+     * filesystem). This method scans the command for paths under workingDir and
+     * translates them to container paths (/workspace/...).
      *
      * @param agentName   Name of the agent (for default image lookup)
      * @param docker      Docker configuration
-     * @param command     Agent command with container-relative paths
+     * @param command     Agent command with HOST paths (as produced by CommandBuilder)
      * @param workingDir  Host working directory to mount as /workspace
-     * @return Complete docker run command
+     * @return Complete docker run command with translated paths
      */
     public List<String> build(
             String agentName,
@@ -233,6 +306,7 @@ public class DockerCommandBuilder {
         result.add("docker");
         result.add("run");
         result.add("--rm");                    // Ephemeral container
+        result.add("-i");                      // Keep stdin open for prompt redirection
         result.add("--network");
         result.add("host");                    // Host networking (see Platform Notes)
 
@@ -243,6 +317,7 @@ public class DockerCommandBuilder {
         result.add("/workspace");
 
         // Pass API keys from host environment (only if set)
+        // Note: Env vars must be set in the shell that launches the arena
         for (String envVar : API_KEY_ENV_VARS) {
             if (System.getenv(envVar) != null) {
                 result.add("-e");
@@ -271,11 +346,74 @@ public class DockerCommandBuilder {
         }
         result.add(image);
 
-        // Agent command (paths should already be container-relative)
-        result.addAll(command);
+        // Translate host paths in command to container paths
+        List<String> translatedCommand = translatePathsInCommand(command, workingDir);
+        result.addAll(translatedCommand);
 
         log.debug("Built Docker command for {}: {}", agentName, result);
         return List.copyOf(result);
+    }
+
+    /**
+     * Translates host paths in command arguments to container paths.
+     *
+     * <p>Scans each argument for paths that are under workingDir and replaces
+     * them with container-relative paths (/workspace/...).
+     *
+     * <p><b>Important:</b> Paths outside workingDir cannot be translated and will
+     * cause container execution to fail. This method logs warnings for such paths
+     * to help users diagnose configuration issues.
+     *
+     * @param command    Command with host paths
+     * @param workingDir Host working directory (mounted as /workspace)
+     * @return Command with translated container paths
+     */
+    private List<String> translatePathsInCommand(List<String> command, Path workingDir) {
+        Path absWorkingDir = workingDir.toAbsolutePath().normalize();
+        String workingDirStr = absWorkingDir.toString();
+
+        // Also handle forward-slash version for cross-platform compatibility
+        String workingDirForward = workingDirStr.replace('\\', '/');
+
+        List<String> translated = new ArrayList<>();
+        for (String arg : command) {
+            String translatedArg = arg;
+
+            // Check if argument contains the working directory path
+            if (arg.contains(workingDirStr)) {
+                // Replace host path prefix with /workspace
+                translatedArg = arg.replace(workingDirStr, "/workspace");
+                // Normalize to forward slashes for Linux container
+                translatedArg = translatedArg.replace('\\', '/');
+            } else if (arg.contains(workingDirForward)) {
+                translatedArg = arg.replace(workingDirForward, "/workspace");
+            } else if (looksLikeAbsolutePath(arg)) {
+                // Warn about absolute paths outside workingDir - these won't work in container
+                log.warn("Command argument '{}' appears to be an absolute path outside the " +
+                    "project directory. This path will not be accessible inside the Docker " +
+                    "container. Consider moving the file under the project directory.", arg);
+            }
+
+            translated.add(translatedArg);
+        }
+        return translated;
+    }
+
+    /**
+     * Heuristic check for absolute paths (Windows or Unix style).
+     */
+    private boolean looksLikeAbsolutePath(String arg) {
+        // Windows: C:\... or D:\...
+        if (arg.length() >= 3 && Character.isLetter(arg.charAt(0))
+                && arg.charAt(1) == ':' && (arg.charAt(2) == '\\' || arg.charAt(2) == '/')) {
+            return true;
+        }
+        // Unix: /home/... /tmp/... etc (but not flags like --foo)
+        if (arg.startsWith("/") && !arg.startsWith("--") && arg.length() > 1
+                && Character.isLetterOrDigit(arg.charAt(1))) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -284,9 +422,20 @@ public class DockerCommandBuilder {
      * @param hostPath    The absolute path on the host
      * @param workingDir  The host working directory (mounted as /workspace)
      * @return The container path (e.g., /workspace/.arena/prompt.md)
+     * @throws IllegalArgumentException if hostPath is not under workingDir
      */
     public static String toContainerPath(Path hostPath, Path workingDir) {
-        Path relativePath = workingDir.toAbsolutePath().relativize(hostPath.toAbsolutePath());
+        Path absHost = hostPath.toAbsolutePath().normalize();
+        Path absWorkingDir = workingDir.toAbsolutePath().normalize();
+
+        // Validate that hostPath is under workingDir
+        if (!absHost.startsWith(absWorkingDir)) {
+            throw new IllegalArgumentException(
+                "Path '%s' is not under working directory '%s'"
+                    .formatted(hostPath, workingDir));
+        }
+
+        Path relativePath = absWorkingDir.relativize(absHost);
         // Use forward slashes for container paths (Linux)
         return "/workspace/" + relativePath.toString().replace('\\', '/');
     }
@@ -405,48 +554,90 @@ private DockerConfig loadDockerConfig(SmallRyeConfig config, String prefix) {
 }
 ```
 
+**Error Flow:** ConfigLoader does NOT validate Docker availability—it only parses configuration.
+Docker validation happens at runtime in `AgentExecutor.validateDockerIfNeeded()`:
+
+```
+arena.yaml parsed → DockerConfig created → AgentExecutor constructed
+                                                    │
+                                    validateDockerIfNeeded() called
+                                                    │
+                         ┌──────────────────────────┴──────────────────────────┐
+                         │ Any agent has docker.enabled: true?                 │
+                         └──────────────────────────────────────────────────────┘
+                                    │ YES                          │ NO
+                                    ▼                              ▼
+                    DockerAvailabilityChecker.requireDocker()   (continue)
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │ Docker available?              │
+                    └────────────────────────────────┘
+                         │ YES              │ NO
+                         ▼                  ▼
+                    (continue)     ConfigException thrown with message:
+                                   "Docker is not available: ..."
+```
+
+This design allows arena.yaml files with `docker.enabled: true` to be loaded even when Docker
+isn't installed (useful for CI/CD environments that may skip Docker-enabled agents).
+
 ### 2. AgentProcess Changes
 
 Add `DockerConfig` field to `AgentProcess` and its Builder:
 
 ```java
-// New field in AgentProcess
+// New fields in AgentProcess
 private final DockerConfig dockerConfig;  // May be null if Docker disabled
+private final DockerCommandBuilder dockerCommandBuilder = new DockerCommandBuilder();
 
-// In Builder class - add:
+// In private constructor - add:
+this.dockerConfig = builder.dockerConfig != null
+    ? builder.dockerConfig
+    : DockerConfig.disabled();
+
+// In Builder class - add field:
 private DockerConfig dockerConfig;
 
+// Add builder method:
 public Builder dockerConfig(DockerConfig dockerConfig) {
     this.dockerConfig = dockerConfig;
     return this;
 }
 
-// Update build() to pass dockerConfig to constructor
+// No validation needed in build() - dockerConfig can be null (defaults to disabled)
 ```
 
 Modify `resolveCommand()` in `AgentProcess.java`:
 
 ```java
-private final DockerCommandBuilder dockerCommandBuilder = new DockerCommandBuilder();
-
 /**
  * Resolves command for execution, wrapping with Docker or Windows shell as needed.
  *
- * <p>Note: Docker commands do NOT need Windows cmd /c wrapping because
- * docker.exe is a native executable, not a .cmd script.
+ * <p><b>Order matters:</b> Docker is checked FIRST because:
+ * <ol>
+ *   <li>docker.exe is a native Windows executable, not a .cmd/.bat script</li>
+ *   <li>Docker commands must NOT be wrapped with cmd /c (would break argument parsing)</li>
+ *   <li>The container handles all platform differences internally</li>
+ * </ol>
+ *
+ * <p>Path translation: When Docker is enabled, this method passes the command
+ * (with HOST paths from CommandBuilder) to DockerCommandBuilder, which translates
+ * paths to container paths (/workspace/...).
  */
 private List<String> resolveCommand(List<String> command) {
-    // Check if Docker is enabled for this agent
+    // IMPORTANT: Check Docker FIRST - docker.exe is native and must NOT be wrapped with cmd /c
     if (dockerConfig != null && dockerConfig.enabled()) {
+        // DockerCommandBuilder handles path translation from host paths to container paths
         return dockerCommandBuilder.build(
             agentName,
             dockerConfig,
-            command,
+            command,  // Contains HOST paths from CommandBuilder
             workingDir
         );
     }
 
     // Windows cmd /c wrapping (only for non-Docker execution)
+    // This is needed because CLI tools like 'claude', 'codex' are actually .cmd scripts
     if (isWindows()) {
         var result = new ArrayList<String>();
         result.add("cmd");
@@ -459,6 +650,48 @@ private List<String> resolveCommand(List<String> command) {
 }
 ```
 
+Modify `execute()` to handle stdin redirection for Docker mode:
+
+```java
+public AgentResult execute() {
+    // ... existing setup ...
+
+    List<String> effectiveCommand = resolveCommand(command);
+    log.debug("Effective command: {}", effectiveCommand);
+
+    ProcessBuilder pb = new ProcessBuilder(effectiveCommand)
+        .directory(workingDir.toFile());
+
+    // Stdin redirection: Works for both native and Docker modes
+    // - Native: ProcessBuilder reads file and pipes to process stdin
+    // - Docker: ProcessBuilder reads file, Docker's -i flag keeps stdin open,
+    //           and the file contents flow: file -> ProcessBuilder -> docker stdin -> container stdin
+    // Both modes use the HOST path because ProcessBuilder reads the file on the host
+    if (promptFile != null) {
+        log.debug("Redirecting stdin from: {}", promptFile);
+        pb.redirectInput(promptFile.toFile());  // Always use HOST path
+    }
+
+    process = pb.start();
+    // ... rest of execution ...
+}
+```
+
+**How stdin redirection works:**
+
+| Mode | Flow |
+|------|------|
+| Native | `promptFile` → ProcessBuilder → agent process stdin |
+| Docker | `promptFile` → ProcessBuilder → `docker run -i` stdin → container stdin |
+
+**Key insight:** ProcessBuilder's `redirectInput(file)` reads the file and writes its contents to the spawned process's stdin. When that process is `docker run -i`, Docker forwards its stdin to the container. This is why:
+
+1. We use the **HOST path** for `promptFile` (ProcessBuilder reads it on the host)
+2. We use the **`-i` flag** on `docker run` (keeps stdin open for forwarding)
+3. The prompt file is ALSO mounted at `/workspace/...` for agents that read from file path arguments (not stdin)
+
+**Note:** Docker's `-i` flag means "keep stdin open", not "interactive mode" (that's `-it`). Without `-i`, Docker closes stdin immediately and the prompt content would be lost.
+
 ### 3. AgentExecutor Changes
 
 Update `AgentExecutor.java` to validate Docker and pass config to AgentProcess:
@@ -467,7 +700,17 @@ Update `AgentExecutor.java` to validate Docker and pass config to AgentProcess:
 // Add field
 private final DockerAvailabilityChecker dockerChecker = new DockerAvailabilityChecker();
 
-// Add validation method (call from constructor or first executeRound)
+// Add validation in constructor
+public AgentExecutor(ArenaConfig config, WorkspaceManager workspace) {
+    this.config = config;
+    this.workspace = workspace;
+    this.commandBuilder = new CommandBuilder();
+    this.outputValidator = new OutputValidator(config.maxOutputSizeKb());
+
+    // Validate Docker availability if any agent uses it
+    validateDockerIfNeeded();
+}
+
 private void validateDockerIfNeeded() {
     boolean anyAgentUsesDocker = config.agents().values().stream()
         .filter(AgentConfig::enabled)
@@ -479,24 +722,23 @@ private void validateDockerIfNeeded() {
     }
 }
 
-// In executeAgent() method, update AgentProcess building:
+// In executeAgent() method - SIMPLIFIED (no path translation here):
 private AgentResult executeAgent(AgentConfig agentConfig, int round) {
     Path promptFile = workspace.getRoundPromptPath(round, agentConfig.name());
     Path agentDir = workspace.getAgentDir(round, agentConfig.name());
     Path outputFile = agentDir.resolve("review.md");
     Path projectRoot = workspace.getArenaDir().getParent();
 
-    // Build command with path translation if Docker is enabled
-    List<String> command = buildCommandWithPathTranslation(
-        agentConfig, promptFile, outputFile, projectRoot);
+    // CommandBuilder uses HOST paths - path translation happens in AgentProcess.resolveCommand()
+    List<String> command = commandBuilder.build(agentConfig, promptFile, outputFile);
 
     AgentProcess process = AgentProcess.builder()
         .agentName(agentConfig.name())
         .round(round)
-        .command(command)
+        .command(command)           // HOST paths from CommandBuilder
         .workingDir(projectRoot)
-        .outputFile(outputFile)
-        .promptFile(promptFile)
+        .outputFile(outputFile)     // HOST path for output validation
+        .promptFile(promptFile)     // HOST path for stdin redirection
         .stdoutLog(agentDir.resolve("stdout.log"))
         .stderrLog(agentDir.resolve("stderr.log"))
         .timeoutMs(config.agentTimeoutMs())
@@ -508,47 +750,92 @@ private AgentResult executeAgent(AgentConfig agentConfig, int round) {
 
     return process.execute();
 }
-
-/**
- * Builds command with proper path translation for Docker mode.
- */
-private List<String> buildCommandWithPathTranslation(
-        AgentConfig agentConfig,
-        Path promptFile,
-        Path outputFile,
-        Path projectRoot
-) {
-    if (agentConfig.docker().enabled()) {
-        // Translate paths to container paths before building command
-        Path containerPrompt = Path.of(
-            DockerCommandBuilder.toContainerPath(promptFile, projectRoot));
-        Path containerOutput = Path.of(
-            DockerCommandBuilder.toContainerPath(outputFile, projectRoot));
-        return commandBuilder.build(agentConfig, containerPrompt, containerOutput);
-    }
-    // Non-Docker: use host paths as-is
-    return commandBuilder.build(agentConfig, promptFile, outputFile);
-}
 ```
+
+**Key design:** AgentExecutor does NOT do path translation. It passes HOST paths everywhere:
+- `command` contains HOST paths (from CommandBuilder)
+- `promptFile` and `outputFile` are HOST paths for stdin/validation
+
+Path translation happens inside `AgentProcess.resolveCommand()` → `DockerCommandBuilder.build()` which translates HOST paths in the command to container paths. The `promptFile` for stdin redirection stays as a HOST path (see AgentProcess Changes above).
 
 ### 4. ReviewArenaCli Changes
 
-Add Docker validation at startup in `ReviewArenaCli.call()`:
+No changes required. Docker validation happens automatically in `AgentExecutor` constructor.
+
+### 5. executeSynthesis Changes
+
+Update `AgentExecutor.executeSynthesis()` for Docker support:
 
 ```java
-@Override
-public Integer call() {
-    // ... existing setup ...
+/**
+ * Executes the synthesis step using the specified agent.
+ *
+ * <p>Uses AgentProcess for consistent command resolution across platforms,
+ * particularly for Windows where CLI tools need cmd.exe wrapping, and for
+ * Docker where paths need translation to container paths.
+ *
+ * @param agentName  the name of the agent to use for synthesis (must be "claude")
+ * @param promptPath the path to the synthesis prompt (HOST path)
+ * @param outputPath the path where champion_review.md should be written (HOST path)
+ * @return the synthesis result
+ * @throws AgentException if agent is not found or disabled
+ */
+public SynthesisResult executeSynthesis(String agentName, Path promptPath, Path outputPath) {
+    AgentConfig agentConfig = config.agents().get(agentName);
+    if (agentConfig == null || !agentConfig.enabled()) {
+        throw new AgentException("Synthesizer agent '" + agentName + "' not found or disabled");
+    }
 
-    // Create executor (validates Docker availability if needed)
-    AgentExecutor executor = new AgentExecutor(config, workspaceManager);
+    log.info("[SYNTHESIS] Starting synthesis with agent: {}", agentName);
 
-    // Validate Docker before starting tournament
-    // (This happens inside AgentExecutor constructor or first executeRound call)
+    Path finalDir = workspace.getFinalDir();
+    Path projectRoot = workspace.getArenaDir().getParent();
 
-    // ... rest of tournament flow ...
+    // CommandBuilder uses HOST paths - same as executeAgent()
+    List<String> command = commandBuilder.build(agentConfig, promptPath, outputPath);
+
+    // Use AgentProcess for consistent command resolution
+    // Docker path translation happens in resolveCommand() if Docker is enabled
+    AgentProcess process = AgentProcess.builder()
+        .agentName(agentName + "-synthesis")
+        .round(SYNTHESIS_ROUND)
+        .command(command)             // HOST paths from CommandBuilder
+        .workingDir(projectRoot)
+        .outputFile(outputPath)       // HOST path for output validation
+        .promptFile(promptPath)       // HOST path for stdin redirection
+        .stdoutLog(finalDir.resolve("synthesis-stdout.log"))
+        .stderrLog(finalDir.resolve("synthesis-stderr.log"))
+        .timeoutMs(config.agentTimeoutMs())
+        .gracePeriodMs(config.gracePeriodMs())
+        .outputValidator(outputValidator)
+        .showOutput(config.showAgentOutput())
+        .dockerConfig(agentConfig.docker())  // NEW: pass Docker config
+        .build();
+
+    AgentResult result = process.execute();
+
+    // Convert AgentResult to SynthesisResult (unchanged)
+    return switch (result.status()) {
+        case SUCCESS -> {
+            log.info("[SYNTHESIS] Synthesis completed successfully in {}ms", result.durationMs());
+            yield SynthesisResult.success(agentName, result.durationMs(), outputPath);
+        }
+        case TIMEOUT -> {
+            log.error("[SYNTHESIS] Synthesis timed out after {}ms", result.durationMs());
+            yield SynthesisResult.timeout(agentName, result.durationMs());
+        }
+        case FAILED, INVALID_OUTPUT -> {
+            log.error("[SYNTHESIS] Synthesis failed: {}", result.failureReason());
+            yield SynthesisResult.failed(agentName, result.durationMs(), result.failureReason());
+        }
+    };
 }
 ```
+
+**Note:** Synthesis uses the same pattern as `executeAgent()`:
+- All paths passed are HOST paths
+- `dockerConfig` is passed to AgentProcess
+- Path translation happens in `AgentProcess.resolveCommand()` if Docker is enabled
 
 ## Path Translation
 
@@ -558,20 +845,74 @@ When running in Docker, paths must be translated from host paths to container pa
 |-----------|----------------|
 | `{workingDir}` | `/workspace` |
 | `{workingDir}/.arena/...` | `/workspace/.arena/...` |
-| `{promptFile}` | `/workspace/.arena/rounds/.../prompt.md` |
-| `{outputFile}` | `/workspace/.arena/rounds/.../review.md` |
+| `C:\project\.arena\prompt.md` | `/workspace/.arena/prompt.md` |
+| `/home/user/project/.arena/review.md` | `/workspace/.arena/review.md` |
 
 **Path translation responsibility:**
 
 | Component | Responsibility |
 |-----------|---------------|
-| `AgentExecutor.buildCommandWithPathTranslation()` | Translates paths BEFORE calling CommandBuilder when Docker is enabled |
-| `DockerCommandBuilder.toContainerPath()` | Static utility method for host→container path conversion |
-| `CommandBuilder` | Unchanged - receives already-translated paths |
+| `CommandBuilder` | **Unchanged** - produces commands with HOST paths |
+| `AgentProcess.resolveCommand()` | Detects Docker mode and delegates to DockerCommandBuilder |
+| `DockerCommandBuilder.build()` | Wraps command with `docker run` AND translates HOST paths to container paths |
+| `DockerCommandBuilder.translatePathsInCommand()` | Scans command args for host paths, replaces with `/workspace/...` |
+| `DockerCommandBuilder.toContainerPath()` | Static utility for explicit single-path translation |
 
-This design keeps `CommandBuilder` Docker-agnostic and centralizes path translation in `AgentExecutor`.
+**Design rationale:**
+- `CommandBuilder` remains Docker-agnostic (no changes needed)
+- Path translation is centralized in `DockerCommandBuilder`
+- Translation happens AFTER CommandBuilder runs, so `toAbsolutePath()` works correctly
+- stdin/stdout paths remain as HOST paths (for ProcessBuilder and OutputValidator)
 
 ## Implementation Steps
+
+### Phase 0: Test Migration (MUST DO FIRST)
+
+**Why:** Adding a 5th parameter to `AgentConfig` record breaks 89+ existing constructor calls.
+This phase updates all existing code to be compatible before making the breaking change.
+
+1. **Audit existing AgentConfig usages**
+   ```bash
+   grep -r "new AgentConfig(" src/test --include="*.java" | wc -l  # ~70 usages
+   grep -r "new AgentConfig(" src/main --include="*.java" | wc -l  # ~3 usages
+   ```
+
+2. **Update all test files to use factory methods**
+   Convert `new AgentConfig(name, command, flags, enabled)` to `AgentConfig.of(...)`:
+
+   | File | Approximate Changes |
+   |------|---------------------|
+   | `AgentExecutorIT.java` | 18 |
+   | `AgentExecutorTest.java` | 16 |
+   | `CommandBuilderTest.java` | 11 |
+   | `WorkspaceManagerTest.java` | 13 |
+   | `AgentConfigTest.java` | 6 |
+   | `ReviewAggregatorTest.java` | 2 |
+   | `ReviewArenaCliTest.java` | 3 |
+
+   **Pattern:**
+   ```java
+   // Before:
+   new AgentConfig("claude", List.of("claude", "-p"), Map.of(), true)
+
+   // After (for enabled=true with flags):
+   AgentConfig.of("claude", List.of("claude", "-p"), Map.of())
+
+   // After (for enabled=true without flags):
+   AgentConfig.of("claude", List.of("claude", "-p"))
+
+   // After (for enabled=false - keep constructor, will add 5th param later):
+   new AgentConfig("claude", List.of("claude", "-p"), Map.of(), false)
+   ```
+
+3. **Update ConfigLoader.loadAgentConfig()**
+   - File: `src/main/java/dev/reviewarena/config/ConfigLoader.java`
+   - Change to use factory method (prepare for docker field)
+
+4. **Run all tests to verify no regressions**
+   ```bash
+   mvn verify -Dsurefire.includes="**/*Test*,**/*IT*"
+   ```
 
 ### Phase 1: Core Infrastructure
 
@@ -584,14 +925,20 @@ This design keeps `CommandBuilder` Docker-agnostic and centralizes path translat
    - File: `src/main/java/dev/reviewarena/config/AgentConfig.java`
    - Add `DockerConfig docker` field as 5th parameter
    - Update compact constructor: `docker = docker != null ? docker : DockerConfig.disabled();`
-   - Update static factory methods to include docker parameter
+   - Update static factory methods to pass `DockerConfig.disabled()`
+   - **Note:** Tests using factory methods will continue to work; only tests using
+     constructor with `enabled=false` need the 5th parameter added
 
-3. **Update `ConfigLoader`**
+3. **Update remaining constructor calls**
+   - Search for `new AgentConfig(` and add 5th parameter where needed
+   - These are tests that need `enabled=false` (can't use factory methods)
+
+4. **Update `ConfigLoader`**
    - File: `src/main/java/dev/reviewarena/config/ConfigLoader.java`
    - Add `loadDockerConfig(SmallRyeConfig config, String prefix)` method
    - Update `loadAgentConfig()` to call `loadDockerConfig()` and pass to AgentConfig
 
-4. **Add unit tests for config changes**
+5. **Add unit tests for config changes**
    - File: `src/test/java/dev/reviewarena/config/DockerConfigTest.java`
    - Test DockerConfig parsing with SmallRyeConfig
    - Test default values (disabled when section missing)
@@ -599,50 +946,57 @@ This design keeps `CommandBuilder` Docker-agnostic and centralizes path translat
 
 ### Phase 2: Docker Command Building
 
-5. **Create `DockerCommandBuilder`**
+6. **Create `DockerCommandBuilder`**
    - File: `src/main/java/dev/reviewarena/agent/DockerCommandBuilder.java`
-   - Build `docker run` commands
+   - Build `docker run` commands with `-i` flag for stdin forwarding
    - Handle default images per agent (with error listing available defaults)
    - Add resource limits (memory, cpus)
    - Pass environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY)
-   - Include static `toContainerPath()` utility method
+   - Include `translatePathsInCommand()` for HOST→container path translation
+   - Include `looksLikeAbsolutePath()` to warn about untranslatable paths
+   - Include static `toContainerPath()` utility method with bounds validation
 
-6. **Create `DockerAvailabilityChecker`**
+7. **Create `DockerAvailabilityChecker`**
    - File: `src/main/java/dev/reviewarena/agent/DockerAvailabilityChecker.java`
    - Check Docker daemon status via `docker info`
    - Provide clear error messages for common failures
    - Include `imageExists()` method for optional image pre-check
 
-7. **Add unit tests for command building**
+8. **Add unit tests for command building**
    - File: `src/test/java/dev/reviewarena/agent/DockerCommandBuilderTest.java`
    - Test command generation with various configs
-   - Test path translation (Windows and Linux paths)
+   - Test `translatePathsInCommand()` with Windows and Linux host paths
+   - Test that `-i` flag is included for stdin forwarding
    - Test environment variable passing (only when env vars are set)
-   - Test default image selection and error when no default
+   - Test default image selection and error when no default (Codex)
+   - Test `toContainerPath()` validation (throws for paths outside workingDir)
+   - Test `looksLikeAbsolutePath()` edge cases
 
 ### Phase 3: Integration
 
-8. **Update `AgentProcess`**
-   - File: `src/main/java/dev/reviewarena/agent/AgentProcess.java`
-   - Add `DockerConfig dockerConfig` field
-   - Add `dockerConfig(DockerConfig)` to Builder
-   - Add `DockerCommandBuilder` instance field
-   - Update `resolveCommand()` to check Docker before Windows wrapping
-   - Document that Docker commands don't need cmd /c wrapping
+9. **Update `AgentProcess`**
+    - File: `src/main/java/dev/reviewarena/agent/AgentProcess.java`
+    - Add `DockerConfig dockerConfig` field (defaults to disabled)
+    - Add `DockerCommandBuilder dockerCommandBuilder` instance field
+    - Add `dockerConfig(DockerConfig)` to Builder
+    - Update `resolveCommand()` to call DockerCommandBuilder when Docker enabled (FIRST, before Windows check)
+    - Document that Docker commands don't need cmd /c wrapping
+    - Document stdin redirection works for both native and Docker modes
 
-9. **Update `AgentExecutor`**
-   - File: `src/main/java/dev/reviewarena/agent/AgentExecutor.java`
-   - Add `DockerAvailabilityChecker` field
-   - Add `validateDockerIfNeeded()` method (call from constructor)
-   - Add `buildCommandWithPathTranslation()` method for Docker path handling
-   - Update `executeAgent()` to use path translation and pass `dockerConfig` to builder
-   - Update `executeSynthesis()` similarly
+10. **Update `AgentExecutor`**
+    - File: `src/main/java/dev/reviewarena/agent/AgentExecutor.java`
+    - Add `DockerAvailabilityChecker` field
+    - Add `validateDockerIfNeeded()` method (call from constructor)
+    - Update `executeAgent()` to pass `dockerConfig` to AgentProcess builder
+    - Update `executeSynthesis()` to pass `dockerConfig` to AgentProcess builder
+    - **No path translation needed** - HOST paths flow through, translation in AgentProcess
 
-10. **CommandBuilder - NO CHANGES NEEDED**
+11. **CommandBuilder - NO CHANGES NEEDED**
     - `CommandBuilder.java` remains unchanged
-    - Path translation happens in `AgentExecutor` before calling `CommandBuilder`
+    - Produces commands with HOST paths (as it always has)
+    - Path translation happens in `DockerCommandBuilder` (called from `AgentProcess`)
 
-11. **Add integration tests**
+12. **Add integration tests**
     - File: `src/test/java/dev/reviewarena/agent/DockerAgentExecutionIT.java`
     - Test agent execution in Docker (requires Docker in CI)
     - Use JUnit Assumptions to skip when Docker unavailable
@@ -650,36 +1004,119 @@ This design keeps `CommandBuilder` Docker-agnostic and centralizes path translat
 
 ### Phase 4: Documentation
 
-12. **Update README**
+13. **Update README**
     - Docker setup instructions
     - Example configurations
     - Troubleshooting guide
 
-13. **Update arena.yaml examples**
+14. **Update arena.yaml examples**
     - Show Docker configuration
-    - Document default images
+    - Document default images (note Codex requires manual setup)
 
 ## Testing Strategy
 
-### Unit Tests
+### Unit Tests (No Docker Required)
 
 | Test Class | Coverage |
 |------------|----------|
 | `DockerConfigTest` | Record creation, `disabled()` factory, null handling |
-| `DockerCommandBuilderTest` | Command generation, path translation, env var handling, default images |
-| `DockerAvailabilityCheckerTest` | Mock `docker info` responses, timeout handling |
+| `DockerCommandBuilderTest` | Command generation, path translation, `-i` flag, env vars, default images |
+| `DockerAvailabilityCheckerTest` | **Mocked** - see below |
 | `ConfigLoaderTest` | Extended: parsing docker section from YAML, defaults when missing |
 | `AgentConfigTest` | Extended: docker field null-safety, factory methods |
 | `AgentProcessTest` | Extended: `resolveCommand()` with Docker enabled vs disabled |
 
-### Integration Tests
+### Mocking Strategy for DockerAvailabilityChecker
+
+`DockerAvailabilityChecker` runs actual Docker commands, which makes it hard to unit test.
+**Solution:** Use constructor injection to allow mocking in tests.
+
+```java
+// Production code - add interface for testability
+public interface DockerChecker {
+    void requireDocker();
+    boolean imageExists(String image);
+}
+
+public class DockerAvailabilityChecker implements DockerChecker {
+    // ... existing implementation ...
+}
+
+// In AgentExecutor - allow injection
+public class AgentExecutor {
+    private final DockerChecker dockerChecker;
+
+    // Production constructor
+    public AgentExecutor(ArenaConfig config, WorkspaceManager workspace) {
+        this(config, workspace, new DockerAvailabilityChecker());
+    }
+
+    // Test constructor
+    AgentExecutor(ArenaConfig config, WorkspaceManager workspace, DockerChecker dockerChecker) {
+        this.dockerChecker = dockerChecker;
+        // ...
+    }
+}
+
+// Unit test with mock
+@Test
+void throwsWhenDockerUnavailable() {
+    DockerChecker mockChecker = mock(DockerChecker.class);
+    doThrow(new ConfigException("Docker not available"))
+        .when(mockChecker).requireDocker();
+
+    var config = createConfigWithDockerEnabled();
+    assertThrows(ConfigException.class,
+        () -> new AgentExecutor(config, workspace, mockChecker));
+}
+```
+
+### Unit Test for Path Translation (No Docker Required)
+
+```java
+@Test
+void translatePathsInCommand_windowsPath() {
+    var builder = new DockerCommandBuilder();
+    Path workingDir = Path.of("C:/project");
+
+    List<String> command = List.of(
+        "claude", "-p", "C:/project/.arena/rounds/0/claude/prompt.md"
+    );
+
+    // Use reflection or make method package-private for testing
+    List<String> translated = builder.translatePathsInCommand(command, workingDir);
+
+    assertThat(translated).containsExactly(
+        "claude", "-p", "/workspace/.arena/rounds/0/claude/prompt.md"
+    );
+}
+
+@Test
+void translatePathsInCommand_warnsAboutExternalPath() {
+    var builder = new DockerCommandBuilder();
+    Path workingDir = Path.of("/home/user/project");
+
+    List<String> command = List.of(
+        "claude", "-p", "/etc/passwd"  // External path!
+    );
+
+    // Verify warning is logged (use LogCaptor or similar)
+    List<String> translated = builder.translatePathsInCommand(command, workingDir);
+
+    // Path is NOT translated (still external)
+    assertThat(translated).contains("/etc/passwd");
+    // But warning should be logged
+}
+```
+
+### Integration Tests (Docker Required)
 
 | Test | Requirement | Notes |
 |------|-------------|-------|
 | `DockerAgentExecutionIT` | Docker daemon running | Full agent execution in container |
 | `DockerAvailabilityCheckerIT` | Any environment | Tests real `docker info` call |
 
-Integration tests should be skipped if Docker is not available (use JUnit assumptions).
+**JUnit 5 Assumptions for Docker tests:**
 
 ```java
 class DockerAgentExecutionIT {
@@ -709,8 +1146,48 @@ class DockerAgentExecutionIT {
         // Verify output file is written correctly
         // Verify container is cleaned up after execution
     }
+
+    @Test
+    void dockerModeTranslatesPathsCorrectly() {
+        // Verify that command arguments with host paths
+        // are translated to /workspace/... paths
+    }
+
+    @Test
+    void stdinRedirectionWorksInDocker() {
+        // Verify that prompt file content reaches the container via stdin
+    }
 }
 ```
+
+### CI/CD Configuration
+
+**GitHub Actions example:**
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Run unit tests (no Docker)
+        run: mvn test
+
+      - name: Run integration tests (with Docker)
+        run: mvn verify -Dsurefire.includes="**/*IT*"
+        # Docker is available by default on ubuntu-latest
+```
+
+**For environments without Docker:**
+Integration tests will be automatically skipped via JUnit Assumptions.
+Unit tests will pass because they use mocks or test pure logic.
 
 ## Error Messages
 
@@ -738,7 +1215,6 @@ These are explicitly **not** included in this implementation:
 3. **Custom Dockerfile building** - Users can build their own images
 4. **GPU support** - Would need `--gpus` flag handling
 5. **Container registry authentication** - Users handle via `docker login`
-6. **Stdin piping** - File mount approach is sufficient
 
 ## File Changes Summary
 
@@ -747,11 +1223,11 @@ These are explicitly **not** included in this implementation:
 | `src/main/java/dev/reviewarena/config/DockerConfig.java` | New | Docker configuration record |
 | `src/main/java/dev/reviewarena/config/AgentConfig.java` | Modify | Add `docker` field |
 | `src/main/java/dev/reviewarena/config/ConfigLoader.java` | Modify | Add `loadDockerConfig()` method |
-| `src/main/java/dev/reviewarena/agent/DockerCommandBuilder.java` | New | Builds `docker run` commands |
+| `src/main/java/dev/reviewarena/agent/DockerCommandBuilder.java` | New | Builds `docker run` commands with path translation |
 | `src/main/java/dev/reviewarena/agent/DockerAvailabilityChecker.java` | New | Validates Docker availability |
-| `src/main/java/dev/reviewarena/agent/AgentProcess.java` | Modify | Add `dockerConfig` field and Docker command wrapping |
-| `src/main/java/dev/reviewarena/agent/AgentExecutor.java` | Modify | Add Docker validation and path translation |
-| `src/main/java/dev/reviewarena/agent/CommandBuilder.java` | **No change** | Path translation handled by AgentExecutor |
+| `src/main/java/dev/reviewarena/agent/AgentProcess.java` | Modify | Add `dockerConfig` field, Docker command wrapping in `resolveCommand()` |
+| `src/main/java/dev/reviewarena/agent/AgentExecutor.java` | Modify | Add Docker validation, pass `dockerConfig` to AgentProcess |
+| `src/main/java/dev/reviewarena/agent/CommandBuilder.java` | **No change** | Produces HOST paths; translation in DockerCommandBuilder |
 | `src/test/java/dev/reviewarena/config/DockerConfigTest.java` | New | Unit tests for DockerConfig |
 | `src/test/java/dev/reviewarena/agent/DockerCommandBuilderTest.java` | New | Unit tests for command building |
 | `src/test/java/dev/reviewarena/agent/DockerAvailabilityCheckerTest.java` | New | Unit tests for availability checker |
