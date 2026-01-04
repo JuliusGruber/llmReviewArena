@@ -1,9 +1,9 @@
 # Local arena configuration to enable all agents
 agents:
   claude:
-    # Docker Desktop Sandbox mode: Uses 'docker sandbox run claude' which handles
-    # Claude CLI installation, credentials, and permissions automatically.
-    # Requires Docker Desktop 4.50+ with sandbox support.
+    # Regular Docker mode with credential mounting
+    # Authenticate locally first with: claude /login
+    # Credentials from ~/.claude/ are mounted into the container
     docker:
       enabled: true
       sandbox: false
@@ -15,31 +15,57 @@ agents:
       auto-approve: true
     enabled: true
 
-  codex:
-    # Docker mode requires building Codex image locally:
-    #   git clone https://github.com/openai/codex-universal
-    #   docker build -t codex-universal:latest .
-    # docker:
-    #   enabled: true
-    #   image: "codex-universal:latest"  # Required - no default image
+  claude2:
+    # Second Claude instance
+    docker:
+      enabled: true
+      sandbox: false
+      image: "docker/sandbox-templates:claude-code"
     command:
-      - python
-      - src/main/resources/codex-wrapper.py
-      - "@prompt.md"
-      - "@output"
+      - claude
+      - -p
     flags:
       auto-approve: true
     enabled: true
 
-  gemini:
-    # docker:
-    #   enabled: true
-    #   image: "naoyoshinori/gemini-cli:node"  # Optional, uses default
+  claude3:
+    # Third Claude instance
+    docker:
+      enabled: true
+      sandbox: false
+      image: "docker/sandbox-templates:claude-code"
     command:
-      - gemini
+      - claude
+      - -p
     flags:
       auto-approve: true
     enabled: true
+
+  # codex:
+  #   # Docker mode requires building Codex image locally:
+  #   #   git clone https://github.com/openai/codex-universal
+  #   #   docker build -t codex-universal:latest .
+  #   # docker:
+  #   #   enabled: true
+  #   #   image: "codex-universal:latest"  # Required - no default image
+  #   command:
+  #     - python
+  #     - src/main/resources/codex-wrapper.py
+  #     - "@prompt.md"
+  #     - "@output"
+  #   flags:
+  #     auto-approve: true
+  #   enabled: true
+
+  # gemini:
+  #   # docker:
+  #   #   enabled: true
+  #   #   image: "naoyoshinori/gemini-cli:node"  # Optional, uses default
+  #   command:
+  #     - gemini
+  #   flags:
+  #     auto-approve: true
+  #   enabled: true
 
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)
