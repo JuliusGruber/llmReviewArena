@@ -188,13 +188,14 @@ public class DockerCommandBuilder {
 
         // Mount Claude credentials directory for Pro/Max subscription authentication
         // This allows using `/login` credentials instead of API keys
+        // Note: Must be read-write as Claude CLI writes session data, debug logs, etc.
         if ("claude".equalsIgnoreCase(agentName)) {
             Path claudeCredentials = getClaudeCredentialsPath();
             if (claudeCredentials != null) {
                 result.add("-v");
                 // Mount to /home/agent/.claude for docker/sandbox-templates:claude-code image
                 // which runs as user 'agent' with home /home/agent
-                result.add(claudeCredentials + ":/home/agent/.claude:ro");
+                result.add(claudeCredentials + ":/home/agent/.claude");
                 log.debug("Mounting Claude credentials from: {}", claudeCredentials);
             }
         }
