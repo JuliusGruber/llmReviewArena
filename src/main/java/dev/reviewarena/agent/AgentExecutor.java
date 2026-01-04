@@ -6,8 +6,6 @@ import dev.reviewarena.io.WorkspaceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -262,6 +260,9 @@ public class AgentExecutor {
     /**
      * Executes the synthesis step using the specified agent.
      *
+     * <p>Uses AgentProcess for consistent command resolution across platforms,
+     * particularly for Windows where CLI tools need cmd.exe wrapping.
+     *
      * @param agentName  the name of the agent to use for synthesis (must be "claude")
      * @param promptPath the path to the synthesis prompt
      * @param outputPath the path where champion_review.md should be written
@@ -279,48 +280,38 @@ public class AgentExecutor {
         Path finalDir = workspace.getFinalDir();
         List<String> command = commandBuilder.build(agentConfig, promptPath, outputPath);
 
-        long startTime = System.currentTimeMillis();
+        // Use AgentProcess for consistent command resolution (especially Windows cmd /c wrapping)
+        AgentProcess process = AgentProcess.builder()
+            .agentName(agentName + "-synthesis")
+            .round(-1)  // Special round indicator for synthesis
+            .command(command)
+            .workingDir(workspace.getArenaDir().getParent())
+            .outputFile(outputPath)
+            .promptFile(promptPath)
+            .stdoutLog(finalDir.resolve("synthesis-stdout.log"))
+            .stderrLog(finalDir.resolve("synthesis-stderr.log"))
+            .timeoutMs(config.agentTimeoutMs())
+            .gracePeriodMs(config.gracePeriodMs())
+            .outputValidator(outputValidator)
+            .showOutput(config.showAgentOutput())
+            .build();
 
-        try {
-            ProcessBuilder pb = new ProcessBuilder(command)
-                .directory(workspace.getArenaDir().getParent().toFile())
-                .redirectOutput(finalDir.resolve("synthesis-stdout.log").toFile())
-                .redirectError(finalDir.resolve("synthesis-stderr.log").toFile());
+        AgentResult result = process.execute();
 
-            Process process = pb.start();
-            boolean finished = process.waitFor(config.agentTimeoutMs(), TimeUnit.MILLISECONDS);
-
-            long durationMs = System.currentTimeMillis() - startTime;
-
-            if (!finished) {
-                process.destroyForcibly();
-                log.error("[SYNTHESIS] Synthesis timed out after {}ms", durationMs);
-                return SynthesisResult.timeout(agentName, durationMs);
+        // Convert AgentResult to SynthesisResult
+        return switch (result.status()) {
+            case SUCCESS -> {
+                log.info("[SYNTHESIS] Synthesis completed successfully in {}ms", result.durationMs());
+                yield SynthesisResult.success(agentName, result.durationMs(), outputPath);
             }
-
-            int exitCode = process.exitValue();
-
-            // Validate output
-            if (exitCode != 0) {
-                log.error("[SYNTHESIS] Synthesis failed with exit code {}", exitCode);
-                return SynthesisResult.failed(agentName, durationMs, "Exit code: " + exitCode);
+            case TIMEOUT -> {
+                log.error("[SYNTHESIS] Synthesis timed out after {}ms", result.durationMs());
+                yield SynthesisResult.timeout(agentName, result.durationMs());
             }
-
-            if (!Files.exists(outputPath) || Files.size(outputPath) == 0) {
-                log.error("[SYNTHESIS] Synthesis produced no output");
-                return SynthesisResult.failed(agentName, durationMs, "No output produced");
+            case FAILED, INVALID_OUTPUT -> {
+                log.error("[SYNTHESIS] Synthesis failed: {}", result.failureReason());
+                yield SynthesisResult.failed(agentName, result.durationMs(), result.failureReason());
             }
-
-            log.info("[SYNTHESIS] Synthesis completed successfully in {}ms", durationMs);
-            return SynthesisResult.success(agentName, durationMs, outputPath);
-
-        } catch (IOException | InterruptedException e) {
-            long durationMs = System.currentTimeMillis() - startTime;
-            log.error("[SYNTHESIS] Synthesis execution error: {}", e.getMessage());
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            return SynthesisResult.failed(agentName, durationMs, e.getMessage());
-        }
+        };
     }
 }
