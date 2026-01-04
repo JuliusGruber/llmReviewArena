@@ -17,6 +17,13 @@ public class AgentExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(AgentExecutor.class);
 
+    /**
+     * Round value used for synthesis execution.
+     * Synthesis is not a competitive round, so we use 0 to indicate it's outside
+     * the normal round sequence. The agent name suffix "-synthesis" distinguishes it.
+     */
+    private static final int SYNTHESIS_ROUND = 0;
+
     private final ArenaConfig config;
     private final WorkspaceManager workspace;
     private final CommandBuilder commandBuilder;
@@ -283,7 +290,7 @@ public class AgentExecutor {
         // Use AgentProcess for consistent command resolution (especially Windows cmd /c wrapping)
         AgentProcess process = AgentProcess.builder()
             .agentName(agentName + "-synthesis")
-            .round(-1)  // Special round indicator for synthesis
+            .round(SYNTHESIS_ROUND)
             .command(command)
             .workingDir(workspace.getArenaDir().getParent())
             .outputFile(outputPath)
