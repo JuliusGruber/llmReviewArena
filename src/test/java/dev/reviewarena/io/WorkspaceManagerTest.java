@@ -26,9 +26,9 @@ class WorkspaceManagerTest {
     void setUp() {
         // Create a config with 3 enabled agents and 2 rounds
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), true),
-            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true),
-            "gemini", new AgentConfig("gemini", List.of("gemini", "-p", "@prompt.md"), Map.of(), true)
+            "claude", AgentConfig.of("claude", List.of("claude", "-p", "@prompt.md")),
+            "codex", AgentConfig.of("codex", List.of("codex", "exec", "@prompt.md")),
+            "gemini", AgentConfig.of("gemini", List.of("gemini", "-p", "@prompt.md"))
         );
 
         defaultConfig = new ArenaConfig(
@@ -244,9 +244,9 @@ class WorkspaceManagerTest {
     void testInitialize_onlyCreatesEnabledAgentDirs() {
         // Create config with one disabled agent
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude"), Map.of(), true),
-            "codex", new AgentConfig("codex", List.of("codex"), Map.of(), false),  // disabled
-            "gemini", new AgentConfig("gemini", List.of("gemini"), Map.of(), true)
+            "claude", AgentConfig.of("claude", List.of("claude")),
+            "codex", AgentConfig.disabled("codex", List.of("codex")),  // disabled
+            "gemini", AgentConfig.of("gemini", List.of("gemini"))
         );
 
         ArenaConfig config = new ArenaConfig(
@@ -275,7 +275,7 @@ class WorkspaceManagerTest {
             ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
             ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
             ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-output"),  // custom output dir
-            Map.of("agent1", new AgentConfig("agent1", List.of("cmd"), Map.of(), true))
+            Map.of("agent1", AgentConfig.of("agent1", List.of("cmd")))
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -341,7 +341,7 @@ class WorkspaceManagerTest {
             ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
             ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
             ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"),
-            Map.of("agent1", new AgentConfig("agent1", List.of("cmd"), Map.of(), true))
+            Map.of("agent1", AgentConfig.of("agent1", List.of("cmd")))
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -357,7 +357,7 @@ class WorkspaceManagerTest {
     void testInitialize_noEnabledAgents_createsEmptyRoundDirs() {
         // All agents disabled
         Map<String, AgentConfig> agents = Map.of(
-            "agent1", new AgentConfig("agent1", List.of("cmd"), Map.of(), false)
+            "agent1", AgentConfig.disabled("agent1", List.of("cmd"))
         );
 
         ArenaConfig config = new ArenaConfig(
@@ -384,7 +384,7 @@ class WorkspaceManagerTest {
     void testInitialize_roundsBeyond5_usesRound5Template() throws IOException {
         // Create config with maxRounds > 5
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude"), Map.of(), true)
+            "claude", AgentConfig.of("claude", List.of("claude"))
         );
 
         ArenaConfig config = new ArenaConfig(
@@ -419,7 +419,7 @@ class WorkspaceManagerTest {
     @Test
     void testInitialize_roundsBeyond5_createsCorrectDirectories() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude"), Map.of(), true)
+            "claude", AgentConfig.of("claude", List.of("claude"))
         );
 
         ArenaConfig config = new ArenaConfig(
@@ -509,7 +509,7 @@ class WorkspaceManagerTest {
             ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
             ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
             ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-out"),
-            Map.of("claude", new AgentConfig("claude", List.of("claude"), Map.of(), true))
+            Map.of("claude", AgentConfig.of("claude", List.of("claude")))
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, customConfig);
@@ -544,7 +544,7 @@ class WorkspaceManagerTest {
             ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
             ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
             ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-out"),
-            Map.of("claude", new AgentConfig("claude", List.of("claude"), Map.of(), true))
+            Map.of("claude", AgentConfig.of("claude", List.of("claude")))
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, customConfig);

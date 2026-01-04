@@ -45,4 +45,11 @@ public record AgentConfig(
     public static AgentConfig of(String name, List<String> command, Map<String, Object> flags) {
         return new AgentConfig(name, command, flags, true);
     }
+
+    /**
+     * Creates a disabled AgentConfig (for testing scenarios where agent is configured but disabled).
+     */
+    public static AgentConfig disabled(String name, List<String> command) {
+        return new AgentConfig(name, command, Map.of(), false);
+    }
 }

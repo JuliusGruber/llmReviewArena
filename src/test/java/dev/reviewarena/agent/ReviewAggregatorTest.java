@@ -26,8 +26,8 @@ class ReviewAggregatorTest {
     @BeforeEach
     void setUp() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude"), Map.of(), true),
-            "codex", new AgentConfig("codex", List.of("codex"), Map.of(), true)
+            "claude", AgentConfig.of("claude", List.of("claude")),
+            "codex", AgentConfig.of("codex", List.of("codex"))
         );
         ArenaConfig config = new ArenaConfig(
             2, 500, 0, false, 30_000, 90_000, 1_000, 2,

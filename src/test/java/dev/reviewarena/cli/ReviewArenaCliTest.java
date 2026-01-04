@@ -43,9 +43,9 @@ class ReviewArenaCliTest {
                 // Create a config with mock agents for dry-run testing
                 // For actual execution tests, we use --dry-run mode
                 Map<String, AgentConfig> agents = Map.of(
-                    "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), true),
-                    "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true),
-                    "gemini", new AgentConfig("gemini", List.of("gemini", "-p", "@prompt.md"), Map.of(), true)
+                    "claude", AgentConfig.of("claude", List.of("claude", "-p", "@prompt.md")),
+                    "codex", AgentConfig.of("codex", List.of("codex", "exec", "@prompt.md")),
+                    "gemini", AgentConfig.of("gemini", List.of("gemini", "-p", "@prompt.md"))
                 );
                 return new ArenaConfig(
                     overrides.maxRounds() != null ? overrides.maxRounds() : 5,

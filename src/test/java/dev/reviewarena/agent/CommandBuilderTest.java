@@ -25,8 +25,8 @@ class CommandBuilderTest {
 
     @Test
     void build_replacesPromptPlaceholder() {
-        AgentConfig config = new AgentConfig("test",
-            List.of("agent", "-p", "@prompt.md"), Map.of(), true);
+        AgentConfig config = AgentConfig.of("test",
+            List.of("agent", "-p", "@prompt.md"));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -36,8 +36,8 @@ class CommandBuilderTest {
 
     @Test
     void build_replacesOutputPlaceholder() {
-        AgentConfig config = new AgentConfig("test",
-            List.of("agent", "-p", "@prompt.md", "-o", "@output"), Map.of(), true);
+        AgentConfig config = AgentConfig.of("test",
+            List.of("agent", "-p", "@prompt.md", "-o", "@output"));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -47,9 +47,9 @@ class CommandBuilderTest {
 
     @Test
     void build_claude_addsAutoApproveFlag() {
-        AgentConfig config = new AgentConfig("claude",
+        AgentConfig config = AgentConfig.of("claude",
             List.of("claude", "-p", "@prompt.md"),
-            Map.of("auto-approve", true), true);
+            Map.of("auto-approve", true));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -58,9 +58,9 @@ class CommandBuilderTest {
 
     @Test
     void build_codex_addsAutoApproveFlag() {
-        AgentConfig config = new AgentConfig("codex",
+        AgentConfig config = AgentConfig.of("codex",
             List.of("codex", "exec", "@prompt.md"),
-            Map.of("auto-approve", true), true);
+            Map.of("auto-approve", true));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -69,9 +69,9 @@ class CommandBuilderTest {
 
     @Test
     void build_gemini_addsAutoApproveFlag() {
-        AgentConfig config = new AgentConfig("gemini",
+        AgentConfig config = AgentConfig.of("gemini",
             List.of("gemini", "-p", "@prompt.md"),
-            Map.of("auto-approve", true), true);
+            Map.of("auto-approve", true));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -80,9 +80,9 @@ class CommandBuilderTest {
 
     @Test
     void build_claude_addsAllowedTools() {
-        AgentConfig config = new AgentConfig("claude",
+        AgentConfig config = AgentConfig.of("claude",
             List.of("claude", "-p", "@prompt.md"),
-            Map.of("allowed-tools", List.of("Read", "Write", "Edit")), true);
+            Map.of("allowed-tools", List.of("Read", "Write", "Edit")));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -93,9 +93,9 @@ class CommandBuilderTest {
 
     @Test
     void build_nonClaude_ignoresAllowedTools() {
-        AgentConfig config = new AgentConfig("codex",
+        AgentConfig config = AgentConfig.of("codex",
             List.of("codex", "exec", "@prompt.md"),
-            Map.of("allowed-tools", List.of("Read", "Write")), true);
+            Map.of("allowed-tools", List.of("Read", "Write")));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -104,9 +104,9 @@ class CommandBuilderTest {
 
     @Test
     void build_noAutoApprove_doesNotAddFlag() {
-        AgentConfig config = new AgentConfig("claude",
+        AgentConfig config = AgentConfig.of("claude",
             List.of("claude", "-p", "@prompt.md"),
-            Map.of("auto-approve", false), true);
+            Map.of("auto-approve", false));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -115,9 +115,9 @@ class CommandBuilderTest {
 
     @Test
     void build_unknownAgent_warnsAndContinues() {
-        AgentConfig config = new AgentConfig("custom-agent",
+        AgentConfig config = AgentConfig.of("custom-agent",
             List.of("custom", "@prompt.md"),
-            Map.of("auto-approve", true), true);
+            Map.of("auto-approve", true));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -131,8 +131,8 @@ class CommandBuilderTest {
 
     @Test
     void build_returnsImmutableList() {
-        AgentConfig config = new AgentConfig("test",
-            List.of("test", "@prompt.md"), Map.of(), true);
+        AgentConfig config = AgentConfig.of("test",
+            List.of("test", "@prompt.md"));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 
@@ -141,9 +141,9 @@ class CommandBuilderTest {
 
     @Test
     void build_caseInsensitiveAgentName() {
-        AgentConfig config = new AgentConfig("CLAUDE",
+        AgentConfig config = AgentConfig.of("CLAUDE",
             List.of("claude", "-p", "@prompt.md"),
-            Map.of("auto-approve", true), true);
+            Map.of("auto-approve", true));
 
         List<String> command = builder.build(config, promptFile, outputFile);
 

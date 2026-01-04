@@ -61,7 +61,7 @@ class AgentExecutorTest {
     void executeRound_noEnabledAgents_returnsEmptyMap() {
         // All agents disabled
         Map<String, AgentConfig> agents = Map.of(
-            "agent1", new AgentConfig("agent1", List.of("echo"), Map.of(), false)
+            "agent1", AgentConfig.disabled("agent1", List.of("echo"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -115,9 +115,9 @@ class AgentExecutorTest {
     void executeRound_agentsRunInAlphabeticalOrder() {
         // Create agents with names that would sort differently
         Map<String, AgentConfig> agents = Map.of(
-            "zebra", new AgentConfig("zebra", List.of("nonexistent-cmd"), Map.of(), true),
-            "alpha", new AgentConfig("alpha", List.of("nonexistent-cmd"), Map.of(), true),
-            "middle", new AgentConfig("middle", List.of("nonexistent-cmd"), Map.of(), true)
+            "zebra", AgentConfig.of("zebra", List.of("nonexistent-cmd")),
+            "alpha", AgentConfig.of("alpha", List.of("nonexistent-cmd")),
+            "middle", AgentConfig.of("middle", List.of("nonexistent-cmd"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -133,9 +133,9 @@ class AgentExecutorTest {
     void executeRound_withMaxConcurrent_respectsLimit() {
         // Create several agents that would fail quickly
         Map<String, AgentConfig> agents = Map.of(
-            "a1", new AgentConfig("a1", List.of("nonexistent-cmd"), Map.of(), true),
-            "a2", new AgentConfig("a2", List.of("nonexistent-cmd"), Map.of(), true),
-            "a3", new AgentConfig("a3", List.of("nonexistent-cmd"), Map.of(), true)
+            "a1", AgentConfig.of("a1", List.of("nonexistent-cmd")),
+            "a2", AgentConfig.of("a2", List.of("nonexistent-cmd")),
+            "a3", AgentConfig.of("a3", List.of("nonexistent-cmd"))
         );
         config = createConfigWithConcurrency(agents, 1); // Sequential
         workspace = new WorkspaceManager(tempDir, config);
@@ -155,8 +155,8 @@ class AgentExecutorTest {
     void executeRound_failedAgentsDoNotBlockOthers() {
         // One agent will fail, others should still execute
         Map<String, AgentConfig> agents = Map.of(
-            "agent1", new AgentConfig("agent1", List.of("nonexistent-cmd"), Map.of(), true),
-            "agent2", new AgentConfig("agent2", List.of("nonexistent-cmd"), Map.of(), true)
+            "agent1", AgentConfig.of("agent1", List.of("nonexistent-cmd")),
+            "agent2", AgentConfig.of("agent2", List.of("nonexistent-cmd"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -174,7 +174,7 @@ class AgentExecutorTest {
     @Test
     void executeRound_resultsMapIsImmutable() {
         Map<String, AgentConfig> agents = Map.of(
-            "agent1", new AgentConfig("agent1", List.of("nonexistent-cmd"), Map.of(), false)
+            "agent1", AgentConfig.disabled("agent1", List.of("nonexistent-cmd"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -222,7 +222,7 @@ class AgentExecutorTest {
     @Test
     void validateSynthesizerAvailable_claudeConfiguredAndEnabled_succeeds() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), true)
+            "claude", AgentConfig.of("claude", List.of("claude", "-p", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -237,7 +237,7 @@ class AgentExecutorTest {
     @Test
     void validateSynthesizerAvailable_claudeNotConfigured_throwsAgentException() {
         Map<String, AgentConfig> agents = Map.of(
-            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+            "codex", AgentConfig.of("codex", List.of("codex", "exec", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -254,7 +254,7 @@ class AgentExecutorTest {
     @Test
     void validateSynthesizerAvailable_claudeDisabled_throwsAgentException() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false)
+            "claude", AgentConfig.disabled("claude", List.of("claude", "-p", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -271,8 +271,8 @@ class AgentExecutorTest {
     @Test
     void getSynthesizerAgent_returnsClaude() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), true),
-            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+            "claude", AgentConfig.of("claude", List.of("claude", "-p", "@prompt.md")),
+            "codex", AgentConfig.of("codex", List.of("codex", "exec", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -286,7 +286,7 @@ class AgentExecutorTest {
     @Test
     void getSynthesizerAgent_claudeNotAvailable_throwsAgentException() {
         Map<String, AgentConfig> agents = Map.of(
-            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+            "codex", AgentConfig.of("codex", List.of("codex", "exec", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -300,7 +300,7 @@ class AgentExecutorTest {
     @Test
     void executeSynthesis_agentNotFound_throwsAgentException() {
         Map<String, AgentConfig> agents = Map.of(
-            "codex", new AgentConfig("codex", List.of("codex", "exec", "@prompt.md"), Map.of(), true)
+            "codex", AgentConfig.of("codex", List.of("codex", "exec", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -316,7 +316,7 @@ class AgentExecutorTest {
     @Test
     void executeSynthesis_agentDisabled_throwsAgentException() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", new AgentConfig("claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false)
+            "claude", AgentConfig.disabled("claude", List.of("claude", "-p", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
