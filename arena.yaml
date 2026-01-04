@@ -1,6 +1,12 @@
 # Local arena configuration to enable all agents
 agents:
   claude:
+    # Docker mode (optional): Run agent in a container for isolation
+    # docker:
+    #   enabled: true
+    #   image: "ghcr.io/zeeno-atl/claude-code:latest"  # Optional, uses default
+    #   memory: "4g"  # Optional: memory limit
+    #   cpus: "2"     # Optional: CPU limit
     command:
       - claude
       - -p
@@ -9,6 +15,12 @@ agents:
     enabled: true
 
   codex:
+    # Docker mode requires building Codex image locally:
+    #   git clone https://github.com/openai/codex-universal
+    #   docker build -t codex-universal:latest .
+    # docker:
+    #   enabled: true
+    #   image: "codex-universal:latest"  # Required - no default image
     command:
       - python
       - src/main/resources/codex-wrapper.py
@@ -19,6 +31,9 @@ agents:
     enabled: true
 
   gemini:
+    # docker:
+    #   enabled: true
+    #   image: "naoyoshinori/gemini-cli:node"  # Optional, uses default
     command:
       - gemini
     flags:

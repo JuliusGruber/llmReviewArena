@@ -93,6 +93,119 @@ tournament:
   min-agents: 1
 ```
 
+## Docker Support
+
+Run agents inside Docker containers for improved isolation, security, and reproducibility. This is especially useful for:
+
+- **CI/CD environments** where agents may not be installed locally
+- **Reproducible reviews** with consistent agent versions
+- **Isolation** to prevent agents from accessing files outside the project
+
+### Prerequisites
+
+- Docker or Docker Desktop installed and running
+- `docker` command available in your PATH
+
+Verify Docker installation:
+
+```bash
+docker info
+```
+
+### Enabling Docker Mode
+
+Add `docker` configuration to your agents in `arena.yaml`:
+
+```yaml
+agents:
+  claude:
+    docker:
+      enabled: true
+      # image: "ghcr.io/zeeno-atl/claude-code:latest"  # Optional, uses default
+      # memory: "4g"  # Optional: memory limit
+      # cpus: "2"     # Optional: CPU limit
+    command: ["claude", "-p"]
+    flags:
+      auto-approve: true
+    enabled: true
+
+  gemini:
+    docker:
+      enabled: true
+    command: ["gemini"]
+    enabled: true
+```
+
+### Default Images
+
+| Agent | Default Image | Notes |
+|-------|---------------|-------|
+| Claude | `ghcr.io/zeeno-atl/claude-code:latest` | Always installs latest CLI |
+| Gemini | `naoyoshinori/gemini-cli:node` | Community-maintained image |
+| Codex | *None - must be configured* | Requires local build (see below) |
+
+### Codex Docker Setup
+
+OpenAI does not publish pre-built Docker images for Codex CLI. You must either:
+
+1. **Build locally:**
+   ```bash
+   git clone https://github.com/openai/codex-universal
+   cd codex-universal
+   docker build -t codex-universal:latest .
+   ```
+
+2. **Then configure in arena.yaml:**
+   ```yaml
+   agents:
+     codex:
+       docker:
+         enabled: true
+         image: "codex-universal:latest"
+       command: ["codex", "--sandbox", "danger-full-access"]
+       enabled: true
+   ```
+
+### Environment Variables
+
+API keys are automatically passed to containers when set in your environment:
+
+| Variable | Agent |
+|----------|-------|
+| `ANTHROPIC_API_KEY` | Claude |
+| `OPENAI_API_KEY` | Codex |
+| `GEMINI_API_KEY` | Gemini |
+| `GOOGLE_API_KEY` | Gemini (alternate) |
+
+### How Docker Mode Works
+
+1. The project directory is mounted as `/workspace` in the container
+2. All paths in commands are automatically translated (e.g., `C:\project\.arena\...` → `/workspace/.arena/...`)
+3. Containers are ephemeral (`--rm`) and cleaned up after each agent run
+4. Stdin is forwarded to containers for prompt delivery
+
+### Isolation Notes
+
+Docker with `--network host` provides **convenience isolation**, not security isolation:
+
+| Provides | Does NOT Provide |
+|----------|------------------|
+| Filesystem isolation (only `/workspace` accessible) | Network isolation |
+| Process isolation | Protection from localhost services |
+| Clean environment | Full sandboxing |
+
+For stricter isolation, consider running in a network-restricted environment.
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Docker is not installed or not in PATH" | Install Docker Desktop and ensure `docker` is in your PATH |
+| "Docker daemon is not running" | Start Docker Desktop or run `sudo systemctl start docker` |
+| "No Docker image specified for agent 'codex'" | Build Codex image locally (see above) or specify custom image |
+| Container can't find files | Ensure files are under the project directory (mounted at `/workspace`) |
+| API key not working in container | Verify the env var is set in your shell: `echo $ANTHROPIC_API_KEY` |
+
 ## Inspiration
 
 This project is a vibe coding experiment inspired by Jeffrey Emanuel's work on multi-round LLM collaboration:
