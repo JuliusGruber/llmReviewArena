@@ -1,5 +1,6 @@
 package dev.reviewarena.agent;
 
+import dev.reviewarena.config.DockerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +42,8 @@ public class AgentProcess {
     private final long gracePeriodMs;
     private final OutputValidator outputValidator;
     private final boolean showOutput;
+    private final DockerConfig dockerConfig;
+    private final DockerCommandBuilder dockerCommandBuilder;
 
     private Process process;
     private Instant startTime;
@@ -57,6 +61,8 @@ public class AgentProcess {
         this.gracePeriodMs = builder.gracePeriodMs;
         this.outputValidator = Objects.requireNonNull(builder.outputValidator);
         this.showOutput = builder.showOutput;
+        this.dockerConfig = Objects.requireNonNull(builder.dockerConfig);
+        this.dockerCommandBuilder = new DockerCommandBuilder();
     }
 
     /**
@@ -79,10 +85,14 @@ public class AgentProcess {
             ProcessBuilder pb = new ProcessBuilder(effectiveCommand)
                 .directory(workingDir.toFile());
 
-            // Redirect stdin from prompt file if provided
+            // Stdin redirection: Works for both native and Docker modes
+            // - Native: ProcessBuilder reads file and pipes to process stdin
+            // - Docker: ProcessBuilder reads file, Docker's -i flag keeps stdin open,
+            //           and the file contents flow: file -> ProcessBuilder -> docker stdin -> container stdin
+            // Both modes use the HOST path because ProcessBuilder reads the file on the host
             if (promptFile != null) {
                 log.debug("Redirecting stdin from: {}", promptFile);
-                pb.redirectInput(promptFile.toFile());
+                pb.redirectInput(promptFile.toFile());  // Always use HOST path
             }
 
             process = pb.start();
@@ -262,21 +272,42 @@ public class AgentProcess {
     }
 
     /**
-     * Resolves command for Windows execution.
-     * On Windows, commands like 'claude' are actually 'claude.cmd' scripts
-     * that require cmd.exe to execute properly.
+     * Resolves command for execution, wrapping with Docker or Windows shell as needed.
+     *
+     * <p><b>Order matters:</b> Docker is checked FIRST because:
+     * <ol>
+     *   <li>docker.exe is a native Windows executable, not a .cmd/.bat script</li>
+     *   <li>Docker commands must NOT be wrapped with cmd /c (would break argument parsing)</li>
+     *   <li>The container handles all platform differences internally</li>
+     * </ol>
+     *
+     * <p>Path translation: When Docker is enabled, this method passes the command
+     * (with HOST paths from CommandBuilder) to DockerCommandBuilder, which translates
+     * paths to container paths (/workspace/...).
      */
     private List<String> resolveCommand(List<String> command) {
-        if (!isWindows()) {
-            return command;
+        // IMPORTANT: Check Docker FIRST - docker.exe is native and must NOT be wrapped with cmd /c
+        if (dockerConfig.enabled()) {
+            // DockerCommandBuilder handles path translation from host paths to container paths
+            return dockerCommandBuilder.build(
+                agentName,
+                dockerConfig,
+                command,  // Contains HOST paths from CommandBuilder
+                workingDir
+            );
         }
 
-        // Wrap with cmd /c to resolve .cmd/.bat files in PATH
-        var result = new java.util.ArrayList<String>();
-        result.add("cmd");
-        result.add("/c");
-        result.addAll(command);
-        return result;
+        // Windows cmd /c wrapping (only for non-Docker execution)
+        // This is needed because CLI tools like 'claude', 'codex' are actually .cmd scripts
+        if (isWindows()) {
+            var result = new ArrayList<String>();
+            result.add("cmd");
+            result.add("/c");
+            result.addAll(command);
+            return result;
+        }
+
+        return command;
     }
 
     private static boolean isWindows() {
@@ -302,6 +333,7 @@ public class AgentProcess {
         private long gracePeriodMs = 5_000; // 5 sec default
         private OutputValidator outputValidator;
         private boolean showOutput = true; // Default to showing output
+        private DockerConfig dockerConfig;
 
         public Builder agentName(String agentName) {
             this.agentName = agentName;
@@ -370,6 +402,15 @@ public class AgentProcess {
             return this;
         }
 
+        /**
+         * Sets the Docker configuration for this agent process.
+         * Docker config is required and determines whether the agent runs in a container.
+         */
+        public Builder dockerConfig(DockerConfig dockerConfig) {
+            this.dockerConfig = dockerConfig;
+            return this;
+        }
+
         public AgentProcess build() {
             // Explicit validation of required fields
             if (agentName == null || agentName.isBlank()) {
@@ -398,6 +439,9 @@ public class AgentProcess {
             }
             if (gracePeriodMs < 0) {
                 throw new IllegalStateException("gracePeriodMs must be non-negative");
+            }
+            if (dockerConfig == null) {
+                throw new IllegalStateException("dockerConfig is required");
             }
             return new AgentProcess(this);
         }

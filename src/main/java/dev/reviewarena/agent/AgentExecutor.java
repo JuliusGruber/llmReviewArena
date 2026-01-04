@@ -28,12 +28,44 @@ public class AgentExecutor {
     private final WorkspaceManager workspace;
     private final CommandBuilder commandBuilder;
     private final OutputValidator outputValidator;
+    private final DockerChecker dockerChecker;
 
+    /**
+     * Production constructor.
+     * Uses DockerAvailabilityChecker for Docker validation.
+     */
     public AgentExecutor(ArenaConfig config, WorkspaceManager workspace) {
+        this(config, workspace, new DockerAvailabilityChecker());
+    }
+
+    /**
+     * Package-private constructor for testing.
+     * Allows mock DockerChecker injection.
+     */
+    AgentExecutor(ArenaConfig config, WorkspaceManager workspace, DockerChecker dockerChecker) {
         this.config = config;
         this.workspace = workspace;
         this.commandBuilder = new CommandBuilder();
         this.outputValidator = new OutputValidator(config.maxOutputSizeKb());
+        this.dockerChecker = dockerChecker;
+
+        // Validate Docker availability if any agent uses it
+        validateDockerIfNeeded();
+    }
+
+    /**
+     * Validates Docker availability if any enabled agent has Docker configured.
+     * Called once at construction time to fail fast if Docker is required but unavailable.
+     */
+    private void validateDockerIfNeeded() {
+        boolean anyAgentUsesDocker = config.agents().values().stream()
+            .filter(AgentConfig::enabled)
+            .anyMatch(a -> a.docker().enabled());
+
+        if (anyAgentUsesDocker) {
+            dockerChecker.requireDocker();
+            log.info("Docker mode enabled for container-based agent execution");
+        }
     }
 
     /**
@@ -156,22 +188,25 @@ public class AgentExecutor {
         Path promptFile = workspace.getRoundPromptPath(round, agentConfig.name());
         Path agentDir = workspace.getAgentDir(round, agentConfig.name());
         Path outputFile = agentDir.resolve("review.md");
+        Path projectRoot = workspace.getArenaDir().getParent();
 
+        // CommandBuilder uses HOST paths - path translation happens in AgentProcess.resolveCommand()
         List<String> command = commandBuilder.build(agentConfig, promptFile, outputFile);
 
         AgentProcess process = AgentProcess.builder()
             .agentName(agentConfig.name())
             .round(round)
-            .command(command)
-            .workingDir(workspace.getArenaDir().getParent()) // project root
-            .outputFile(outputFile)
-            .promptFile(promptFile)  // Redirect stdin from prompt file
+            .command(command)           // HOST paths from CommandBuilder
+            .workingDir(projectRoot)
+            .outputFile(outputFile)     // HOST path for output validation
+            .promptFile(promptFile)     // HOST path for stdin redirection
             .stdoutLog(agentDir.resolve("stdout.log"))
             .stderrLog(agentDir.resolve("stderr.log"))
             .timeoutMs(config.agentTimeoutMs())
             .gracePeriodMs(config.gracePeriodMs())
             .outputValidator(outputValidator)
             .showOutput(config.showAgentOutput())
+            .dockerConfig(agentConfig.docker())  // Pass Docker config
             .build();
 
         return process.execute();
@@ -268,11 +303,12 @@ public class AgentExecutor {
      * Executes the synthesis step using the specified agent.
      *
      * <p>Uses AgentProcess for consistent command resolution across platforms,
-     * particularly for Windows where CLI tools need cmd.exe wrapping.
+     * particularly for Windows where CLI tools need cmd.exe wrapping, and for
+     * Docker where paths need translation to container paths.
      *
      * @param agentName  the name of the agent to use for synthesis (must be "claude")
-     * @param promptPath the path to the synthesis prompt
-     * @param outputPath the path where champion_review.md should be written
+     * @param promptPath the path to the synthesis prompt (HOST path)
+     * @param outputPath the path where champion_review.md should be written (HOST path)
      * @return the synthesis result
      * @throws AgentException if agent is not found or disabled
      */
@@ -285,22 +321,27 @@ public class AgentExecutor {
         log.info("[SYNTHESIS] Starting synthesis with agent: {}", agentName);
 
         Path finalDir = workspace.getFinalDir();
+        Path projectRoot = workspace.getArenaDir().getParent();
+
+        // CommandBuilder uses HOST paths - same as executeAgent()
         List<String> command = commandBuilder.build(agentConfig, promptPath, outputPath);
 
-        // Use AgentProcess for consistent command resolution (especially Windows cmd /c wrapping)
+        // Use AgentProcess for consistent command resolution
+        // Docker path translation happens in resolveCommand() if Docker is enabled
         AgentProcess process = AgentProcess.builder()
             .agentName(agentName + "-synthesis")
             .round(SYNTHESIS_ROUND)
-            .command(command)
-            .workingDir(workspace.getArenaDir().getParent())
-            .outputFile(outputPath)
-            .promptFile(promptPath)
+            .command(command)             // HOST paths from CommandBuilder
+            .workingDir(projectRoot)
+            .outputFile(outputPath)       // HOST path for output validation
+            .promptFile(promptPath)       // HOST path for stdin redirection
             .stdoutLog(finalDir.resolve("synthesis-stdout.log"))
             .stderrLog(finalDir.resolve("synthesis-stderr.log"))
             .timeoutMs(config.agentTimeoutMs())
             .gracePeriodMs(config.gracePeriodMs())
             .outputValidator(outputValidator)
             .showOutput(config.showAgentOutput())
+            .dockerConfig(agentConfig.docker())  // Pass Docker config
             .build();
 
         AgentResult result = process.execute();

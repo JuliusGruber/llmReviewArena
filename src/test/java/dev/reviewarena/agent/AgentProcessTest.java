@@ -1,5 +1,6 @@
 package dev.reviewarena.agent;
 
+import dev.reviewarena.config.DockerConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -57,6 +58,7 @@ class AgentProcessTest {
             .timeoutMs(10_000)
             .gracePeriodMs(1_000)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -90,6 +92,7 @@ class AgentProcessTest {
             .timeoutMs(10_000)
             .gracePeriodMs(1_000)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -114,6 +117,7 @@ class AgentProcessTest {
             .timeoutMs(10_000)
             .gracePeriodMs(1_000)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -137,6 +141,7 @@ class AgentProcessTest {
             .timeoutMs(10_000)
             .gracePeriodMs(1_000)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -161,6 +166,7 @@ class AgentProcessTest {
             .timeoutMs(500)  // Very short timeout
             .gracePeriodMs(100)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -183,6 +189,7 @@ class AgentProcessTest {
             .timeoutMs(500)  // Very short timeout
             .gracePeriodMs(100)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -210,6 +217,7 @@ class AgentProcessTest {
             .timeoutMs(10_000)
             .gracePeriodMs(1_000)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -237,6 +245,7 @@ class AgentProcessTest {
             .timeoutMs(10_000)
             .gracePeriodMs(1_000)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         AgentResult result = agent.execute();
@@ -273,6 +282,7 @@ class AgentProcessTest {
             .timeoutMs(10_000)
             .gracePeriodMs(1_000)
             .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
             .build();
 
         agent.execute();
@@ -295,6 +305,7 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .build());
     }
 
@@ -308,6 +319,7 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .build());
     }
 
@@ -321,6 +333,7 @@ class AgentProcessTest {
                 .outputFile(outputFile)
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
+                .dockerConfig(DockerConfig.disabled())
                 // Missing outputValidator
                 .build());
     }
@@ -335,6 +348,7 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .build());
     }
 
@@ -348,6 +362,7 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .build());
     }
 
@@ -361,6 +376,7 @@ class AgentProcessTest {
                 .outputFile(outputFile)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .build());
     }
 
@@ -374,6 +390,7 @@ class AgentProcessTest {
                 .outputFile(outputFile)
                 .stdoutLog(stdoutLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .build());
     }
 
@@ -388,6 +405,7 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .timeoutMs(0)
                 .build());
     }
@@ -403,6 +421,7 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .gracePeriodMs(-1)
                 .build());
     }
@@ -418,6 +437,7 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
                 .build());
     }
 
@@ -432,6 +452,22 @@ class AgentProcessTest {
                 .stdoutLog(stdoutLog)
                 .stderrLog(stderrLog)
                 .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
+                .build());
+    }
+
+    @Test
+    void builder_missingDockerConfig_throws() {
+        assertThrows(IllegalStateException.class, () ->
+            AgentProcess.builder()
+                .agentName("test")
+                .command(List.of("echo", "test"))
+                .workingDir(tempDir)
+                .outputFile(outputFile)
+                .stdoutLog(stdoutLog)
+                .stderrLog(stderrLog)
+                .outputValidator(validator)
+                // Missing dockerConfig
                 .build());
     }
 }
