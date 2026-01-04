@@ -14,12 +14,4 @@ public interface DockerChecker {
      * @throws ConfigException if Docker is not available
      */
     void requireDocker();
-
-    /**
-     * Checks if a Docker image exists locally.
-     *
-     * @param image the image name (e.g., "ghcr.io/zeeno-atl/claude-code:latest")
-     * @return true if the image exists locally, false otherwise
-     */
-    boolean imageExists(String image);
 }

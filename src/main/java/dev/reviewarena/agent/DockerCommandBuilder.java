@@ -5,10 +5,15 @@ import dev.reviewarena.config.DockerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * Builds Docker run commands for containerized agent execution.
@@ -40,6 +45,11 @@ public class DockerCommandBuilder {
         "GOOGLE_API_KEY"  // Gemini CLI may use either GEMINI_API_KEY or GOOGLE_API_KEY
     );
 
+    // Validation patterns for Docker resource limits (case-insensitive)
+    private static final Pattern MEMORY_PATTERN = Pattern.compile("^\\d+[bkmgBKMG]?$");
+    private static final Pattern CPUS_PATTERN = Pattern.compile("^\\d+(\\.\\d+)?$");
+    private static final Set<String> VALID_NETWORK_MODES = Set.of("bridge", "host", "none");
+
     /**
      * Wraps an agent command with docker run, translating host paths to container paths.
      *
@@ -59,20 +69,31 @@ public class DockerCommandBuilder {
             List<String> command,
             Path workingDir
     ) {
+        // Validate resource limits before building command
+        validateResourceLimits(docker);
+
         var result = new ArrayList<String>();
 
         result.add("docker");
         result.add("run");
         result.add("--rm");                    // Ephemeral container
         result.add("-i");                      // Keep stdin open for prompt redirection
-        result.add("--network");
-        result.add("host");                    // Host networking (see Platform Notes)
+
+        // Network configuration (defaults to bridge if not specified)
+        addNetworkConfig(result, docker);
 
         // Mount project directory as /workspace
         result.add("-v");
         result.add(workingDir.toAbsolutePath() + ":/workspace");
         result.add("-w");
         result.add("/workspace");
+
+        // Add user mapping for file ownership (Linux/macOS only)
+        String userMapping = getHostUserMapping();
+        if (userMapping != null) {
+            result.add("--user");
+            result.add(userMapping);
+        }
 
         // Pass API keys from host environment (only if set)
         // Note: Env vars must be set in the shell that launches the arena
@@ -83,7 +104,7 @@ public class DockerCommandBuilder {
             }
         }
 
-        // Optional resource limits
+        // Optional resource limits (already validated)
         if (docker.memory() != null) {
             result.add("--memory");
             result.add(docker.memory());
@@ -117,14 +138,96 @@ public class DockerCommandBuilder {
     }
 
     /**
+     * Validates Docker resource limits to prevent command injection.
+     *
+     * @param docker Docker configuration to validate
+     * @throws ConfigException if memory or cpus format is invalid
+     */
+    private void validateResourceLimits(DockerConfig docker) {
+        if (docker.memory() != null && !MEMORY_PATTERN.matcher(docker.memory()).matches()) {
+            throw new ConfigException(
+                "Invalid Docker memory format: '%s'. Expected format: <number>[b|k|m|g] (e.g., '4g', '512m', '1024M')"
+                .formatted(docker.memory()));
+        }
+        if (docker.cpus() != null && !CPUS_PATTERN.matcher(docker.cpus()).matches()) {
+            throw new ConfigException(
+                "Invalid Docker cpus format: '%s'. Expected format: <number> or <number.decimal> (e.g., '2', '1.5')"
+                .formatted(docker.cpus()));
+        }
+        if (docker.networkMode() != null && !docker.networkMode().isBlank()
+                && !VALID_NETWORK_MODES.contains(docker.networkMode().toLowerCase())) {
+            throw new ConfigException(
+                "Invalid Docker networkMode: '%s'. Valid values: bridge, host, none"
+                .formatted(docker.networkMode()));
+        }
+    }
+
+    /**
+     * Adds network configuration to the Docker command.
+     * Defaults to bridge networking if not specified.
+     */
+    private void addNetworkConfig(List<String> result, DockerConfig docker) {
+        if (docker.networkMode() != null && !docker.networkMode().isBlank()) {
+            String osName = System.getProperty("os.name").toLowerCase();
+            if ("host".equalsIgnoreCase(docker.networkMode()) && !osName.contains("linux")) {
+                log.warn("Host networking is not supported on {}. Using default bridge networking.", osName);
+                // Don't add --network flag, let Docker use its default (bridge)
+            } else {
+                result.add("--network");
+                result.add(docker.networkMode().toLowerCase());
+            }
+        }
+        // else: omit --network flag, Docker defaults to bridge
+    }
+
+    /**
+     * Gets the current user's UID:GID for container user mapping.
+     * This ensures files created in the container are owned by the host user.
+     *
+     * @return UID:GID string (e.g., "1000:1000"), or null on Windows or if unavailable
+     */
+    private String getHostUserMapping() {
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("win")) {
+            return null; // Windows doesn't use Unix-style uid/gid
+        }
+
+        try {
+            ProcessBuilder uidPb = new ProcessBuilder("id", "-u");
+            ProcessBuilder gidPb = new ProcessBuilder("id", "-g");
+
+            Process uidProcess = uidPb.start();
+            Process gidProcess = gidPb.start();
+
+            String uid = new String(uidProcess.getInputStream().readAllBytes()).trim();
+            String gid = new String(gidProcess.getInputStream().readAllBytes()).trim();
+
+            boolean uidCompleted = uidProcess.waitFor(5, TimeUnit.SECONDS);
+            boolean gidCompleted = gidProcess.waitFor(5, TimeUnit.SECONDS);
+
+            if (uidCompleted && gidCompleted
+                    && !uid.isEmpty() && !gid.isEmpty()
+                    && uid.matches("\\d+") && gid.matches("\\d+")) {
+                return uid + ":" + gid;
+            }
+        } catch (IOException | InterruptedException e) {
+            log.warn("Could not determine host UID/GID. Container files may be owned by root.", e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Translates host paths in command arguments to container paths.
      *
-     * <p>Scans each argument for paths that are under workingDir and replaces
-     * them with container-relative paths (/workspace/...).
+     * <p>Uses proper path-prefix checking via {@link Path#startsWith} to avoid
+     * substring matching bugs (e.g., /tmp/proj matching /tmp/project2).
      *
-     * <p><b>Fail-fast behavior:</b> Paths outside workingDir cannot be translated and will
-     * cause this method to throw ConfigException immediately, rather than allowing the
-     * container to fail later with a cryptic "file not found" error.
+     * <p><b>Fail-fast behavior:</b> Absolute paths outside workingDir cannot be
+     * translated and will cause this method to throw ConfigException immediately,
+     * rather than allowing the container to fail later with a cryptic "file not found" error.
      *
      * @param command    Command with host paths
      * @param workingDir Host working directory (mounted as /workspace)
@@ -133,52 +236,34 @@ public class DockerCommandBuilder {
      */
     List<String> translatePathsInCommand(List<String> command, Path workingDir) {
         Path absWorkingDir = workingDir.toAbsolutePath().normalize();
-        String workingDirStr = absWorkingDir.toString();
-
-        // Also handle forward-slash version for cross-platform compatibility
-        String workingDirForward = workingDirStr.replace('\\', '/');
-
         List<String> translated = new ArrayList<>();
+
         for (String arg : command) {
-            String translatedArg = arg;
-
-            // Check if argument contains the working directory path
-            if (arg.contains(workingDirStr)) {
-                // Replace host path prefix with /workspace
-                translatedArg = arg.replace(workingDirStr, "/workspace");
-                // Normalize to forward slashes for Linux container
-                translatedArg = translatedArg.replace('\\', '/');
-            } else if (arg.contains(workingDirForward)) {
-                translatedArg = arg.replace(workingDirForward, "/workspace");
-            } else if (looksLikeAbsolutePath(arg)) {
-                // Fail fast for absolute paths outside workingDir - these won't work in container
-                throw new ConfigException(
-                    ("Command argument '%s' is an absolute path outside the project directory '%s'. "
-                    + "Docker containers can only access files mounted at /workspace. "
-                    + "Move the file under the project directory or use a relative path.")
-                    .formatted(arg, workingDir));
+            try {
+                Path argPath = Path.of(arg);
+                if (argPath.isAbsolute()) {
+                    Path absArg = argPath.toAbsolutePath().normalize();
+                    if (absArg.startsWith(absWorkingDir)) {
+                        // Path is under working directory - translate to container path
+                        Path relative = absWorkingDir.relativize(absArg);
+                        String containerPath = "/workspace/" + relative.toString().replace('\\', '/');
+                        translated.add(containerPath);
+                        continue;
+                    } else {
+                        // Absolute path outside working directory - fail fast
+                        throw new ConfigException(
+                            ("Command argument '%s' is an absolute path outside the project directory '%s'. "
+                            + "Docker containers can only access files mounted at /workspace. "
+                            + "Move the file under the project directory or use a relative path.")
+                            .formatted(arg, workingDir));
+                    }
+                }
+            } catch (InvalidPathException e) {
+                // Not a valid path syntax (e.g., contains invalid characters) - pass through
             }
-
-            translated.add(translatedArg);
+            translated.add(arg);
         }
         return translated;
-    }
-
-    /**
-     * Heuristic check for absolute paths (Windows or Unix style).
-     */
-    boolean looksLikeAbsolutePath(String arg) {
-        // Windows: C:\... or D:\...
-        if (arg.length() >= 3 && Character.isLetter(arg.charAt(0))
-                && arg.charAt(1) == ':' && (arg.charAt(2) == '\\' || arg.charAt(2) == '/')) {
-            return true;
-        }
-        // Unix: /home/... /tmp/... etc (but not flags like --foo)
-        if (arg.startsWith("/") && !arg.startsWith("--") && arg.length() > 1
-                && Character.isLetterOrDigit(arg.charAt(1))) {
-            return true;
-        }
-        return false;
     }
 
     /**

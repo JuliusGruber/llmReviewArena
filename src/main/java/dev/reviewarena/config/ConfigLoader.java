@@ -251,8 +251,10 @@ public class ConfigLoader {
             .orElse(null);
         String cpus = config.getOptionalValue(prefix + ".cpus", String.class)
             .orElse(null);
+        String networkMode = config.getOptionalValue(prefix + ".network-mode", String.class)
+            .orElse(null);
 
-        return new DockerConfig(true, image, memory, cpus);
+        return new DockerConfig(true, image, memory, cpus, networkMode);
     }
 
     private Map<String, Object> loadAgentFlags(SmallRyeConfig config, String prefix) {

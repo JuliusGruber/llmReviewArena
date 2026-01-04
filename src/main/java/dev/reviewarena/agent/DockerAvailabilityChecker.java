@@ -50,19 +50,4 @@ public class DockerAvailabilityChecker implements DockerChecker {
             throw new ConfigException("Docker check was interrupted");
         }
     }
-
-    /**
-     * Checks if a Docker image exists locally.
-     */
-    @Override
-    public boolean imageExists(String image) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "image", "inspect", image)
-                .redirectErrorStream(true);
-            Process process = pb.start();
-            return process.waitFor(10, TimeUnit.SECONDS) && process.exitValue() == 0;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 }

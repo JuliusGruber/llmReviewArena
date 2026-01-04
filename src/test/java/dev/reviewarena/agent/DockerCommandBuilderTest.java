@@ -4,6 +4,8 @@ import dev.reviewarena.config.ConfigException;
 import dev.reviewarena.config.DockerConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
@@ -25,7 +27,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_includesDockerRunWithRequiredFlags() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null);
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
         List<String> command = List.of("agent", "-p", "prompt.md");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -34,13 +36,54 @@ class DockerCommandBuilderTest {
         assertTrue(result.contains("run"));
         assertTrue(result.contains("--rm"));
         assertTrue(result.contains("-i"));  // stdin forwarding
-        assertTrue(result.contains("--network"));
-        assertTrue(result.contains("host"));
+    }
+
+    @Test
+    void build_usesDefaultBridgeNetworkWhenNotConfigured() {
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        List<String> command = List.of("agent");
+
+        List<String> result = builder.build("test", docker, command, tempDir);
+
+        // Bridge is Docker's default - we omit --network flag
+        assertFalse(result.contains("--network"));
+    }
+
+    @Test
+    void build_usesConfiguredNetworkMode() {
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, "host");
+        List<String> command = List.of("agent");
+
+        // On non-Linux, host networking falls back to bridge (no --network flag)
+        // On Linux, it would add --network host
+        List<String> result = builder.build("test", docker, command, tempDir);
+
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("linux")) {
+            assertTrue(result.contains("--network"));
+            int networkIdx = result.indexOf("--network");
+            assertEquals("host", result.get(networkIdx + 1));
+        } else {
+            // On Windows/macOS, host networking is not supported
+            assertFalse(result.contains("--network"));
+        }
+    }
+
+    @Test
+    void build_rejectsInvalidNetworkMode() {
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, "custom-invalid");
+        List<String> command = List.of("agent");
+
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> builder.build("test", docker, command, tempDir));
+
+        assertTrue(ex.getMessage().contains("Invalid Docker networkMode"));
+        assertTrue(ex.getMessage().contains("custom-invalid"));
     }
 
     @Test
     void build_mountsWorkingDirectoryAsWorkspace() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null);
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -56,7 +99,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesConfiguredImage() {
-        DockerConfig docker = new DockerConfig(true, "custom-image:v1.0", null, null);
+        DockerConfig docker = new DockerConfig(true, "custom-image:v1.0", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("claude", docker, command, tempDir);
@@ -67,7 +110,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesDefaultImageForClaude() {
-        DockerConfig docker = new DockerConfig(true, null, null, null);
+        DockerConfig docker = new DockerConfig(true, null, null, null, null);
         List<String> command = List.of("claude", "-p", "prompt.md");
 
         List<String> result = builder.build("claude", docker, command, tempDir);
@@ -77,7 +120,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_usesDefaultImageForGemini() {
-        DockerConfig docker = new DockerConfig(true, null, null, null);
+        DockerConfig docker = new DockerConfig(true, null, null, null, null);
         List<String> command = List.of("gemini", "-p", "prompt.md");
 
         List<String> result = builder.build("gemini", docker, command, tempDir);
@@ -87,7 +130,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_throwsForCodexWithoutConfiguredImage() {
-        DockerConfig docker = new DockerConfig(true, null, null, null);
+        DockerConfig docker = new DockerConfig(true, null, null, null, null);
         List<String> command = List.of("codex", "exec", "prompt.md");
 
         ConfigException ex = assertThrows(ConfigException.class,
@@ -100,7 +143,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_addsMemoryLimit() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", "4g", null);
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", "4g", null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -111,7 +154,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_addsCpuLimit() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, "2");
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, "2", null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -122,7 +165,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_addsResourceLimits() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", "8g", "4");
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", "8g", "4", null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -135,7 +178,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_returnsImmutableList() {
-        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null);
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", docker, command, tempDir);
@@ -145,12 +188,100 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_agentNameIsCaseInsensitive() {
-        DockerConfig docker = new DockerConfig(true, null, null, null);
+        DockerConfig docker = new DockerConfig(true, null, null, null, null);
         List<String> command = List.of("claude");
 
         List<String> result = builder.build("CLAUDE", docker, command, tempDir);
 
         assertTrue(result.contains("ghcr.io/zeeno-atl/claude-code:latest"));
+    }
+
+    // Input validation tests (Issue 1: Command injection prevention)
+
+    @Test
+    void build_rejectsMemoryWithInjectedFlags() {
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", "4g --privileged", null, null);
+        List<String> command = List.of("agent");
+
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> builder.build("test", docker, command, tempDir));
+
+        assertTrue(ex.getMessage().contains("Invalid Docker memory format"));
+        assertTrue(ex.getMessage().contains("4g --privileged"));
+    }
+
+    @Test
+    void build_rejectsCpusWithInjectedCommands() {
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, "2; rm -rf /", null);
+        List<String> command = List.of("agent");
+
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> builder.build("test", docker, command, tempDir));
+
+        assertTrue(ex.getMessage().contains("Invalid Docker cpus format"));
+    }
+
+    @Test
+    void build_acceptsValidMemoryFormats() {
+        // Lowercase
+        assertDoesNotThrow(() -> builder.build("test",
+            new DockerConfig(true, "test-image:latest", "512m", null, null),
+            List.of("agent"), tempDir));
+
+        // Uppercase
+        assertDoesNotThrow(() -> builder.build("test",
+            new DockerConfig(true, "test-image:latest", "4G", null, null),
+            List.of("agent"), tempDir));
+
+        // No suffix (bytes)
+        assertDoesNotThrow(() -> builder.build("test",
+            new DockerConfig(true, "test-image:latest", "1073741824", null, null),
+            List.of("agent"), tempDir));
+    }
+
+    @Test
+    void build_acceptsValidCpuFormats() {
+        // Integer
+        assertDoesNotThrow(() -> builder.build("test",
+            new DockerConfig(true, "test-image:latest", null, "2", null),
+            List.of("agent"), tempDir));
+
+        // Decimal
+        assertDoesNotThrow(() -> builder.build("test",
+            new DockerConfig(true, "test-image:latest", null, "1.5", null),
+            List.of("agent"), tempDir));
+
+        // Small fraction
+        assertDoesNotThrow(() -> builder.build("test",
+            new DockerConfig(true, "test-image:latest", null, "0.5", null),
+            List.of("agent"), tempDir));
+    }
+
+    // User mapping tests (Issue 4: File ownership)
+
+    @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void build_addsUserMappingOnUnix() {
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        List<String> command = List.of("agent");
+
+        List<String> result = builder.build("test", docker, command, tempDir);
+
+        assertTrue(result.contains("--user"));
+        int userIdx = result.indexOf("--user");
+        String userMapping = result.get(userIdx + 1);
+        assertTrue(userMapping.matches("\\d+:\\d+"), "Expected uid:gid format");
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void build_omitsUserMappingOnWindows() {
+        DockerConfig docker = new DockerConfig(true, "test-image:latest", null, null, null);
+        List<String> command = List.of("agent");
+
+        List<String> result = builder.build("test", docker, command, tempDir);
+
+        assertFalse(result.contains("--user"));
     }
 
     // Path translation tests
@@ -178,7 +309,8 @@ class DockerCommandBuilderTest {
     }
 
     @Test
-    void translatePathsInCommand_throwsForExternalAbsolutePath() {
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void translatePathsInCommand_throwsForUnixExternalAbsolutePath() {
         // Use a path that's clearly outside tempDir
         List<String> command = List.of("agent", "-p", "/etc/passwd");
 
@@ -190,6 +322,7 @@ class DockerCommandBuilderTest {
     }
 
     @Test
+    @EnabledOnOs(OS.WINDOWS)
     void translatePathsInCommand_throwsForWindowsExternalPath() {
         List<String> command = List.of("agent", "-p", "C:\\Windows\\System32\\config");
 
@@ -200,42 +333,23 @@ class DockerCommandBuilderTest {
         assertTrue(ex.getMessage().contains("outside the project directory"));
     }
 
-    // looksLikeAbsolutePath tests
-
     @Test
-    void looksLikeAbsolutePath_detectsUnixPaths() {
-        assertTrue(builder.looksLikeAbsolutePath("/home/user/file.txt"));
-        assertTrue(builder.looksLikeAbsolutePath("/etc/passwd"));
-        assertTrue(builder.looksLikeAbsolutePath("/tmp/test"));
+    void translatePathsInCommand_passesRelativePathsThrough() {
+        List<String> command = List.of("agent", "./src/main", "--auto-approve", "../parent");
+
+        List<String> result = builder.translatePathsInCommand(command, tempDir);
+
+        assertEquals(List.of("agent", "./src/main", "--auto-approve", "../parent"), result);
     }
 
     @Test
-    void looksLikeAbsolutePath_detectsWindowsPaths() {
-        assertTrue(builder.looksLikeAbsolutePath("C:\\Users\\test"));
-        assertTrue(builder.looksLikeAbsolutePath("D:/projects/app"));
-        assertTrue(builder.looksLikeAbsolutePath("E:\\"));
-    }
+    void translatePathsInCommand_handlesInvalidPathSyntax() {
+        // Arguments with characters that aren't valid path syntax should pass through
+        List<String> command = List.of("agent", "--option=value", "some:text", "flag");
 
-    @Test
-    void looksLikeAbsolutePath_ignoresFlags() {
-        assertFalse(builder.looksLikeAbsolutePath("--flag"));
-        assertFalse(builder.looksLikeAbsolutePath("--option=value"));
-        assertFalse(builder.looksLikeAbsolutePath("-p"));
-    }
+        List<String> result = builder.translatePathsInCommand(command, tempDir);
 
-    @Test
-    void looksLikeAbsolutePath_ignoresRelativePaths() {
-        assertFalse(builder.looksLikeAbsolutePath("relative/path.md"));
-        assertFalse(builder.looksLikeAbsolutePath("./local/file"));
-        assertFalse(builder.looksLikeAbsolutePath("../parent/file"));
-        assertFalse(builder.looksLikeAbsolutePath("filename.txt"));
-    }
-
-    @Test
-    void looksLikeAbsolutePath_ignoresPlainStrings() {
-        assertFalse(builder.looksLikeAbsolutePath("value"));
-        assertFalse(builder.looksLikeAbsolutePath(""));
-        assertFalse(builder.looksLikeAbsolutePath("agent"));
+        assertEquals(command, result);
     }
 
     // toContainerPath tests
