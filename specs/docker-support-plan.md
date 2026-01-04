@@ -980,41 +980,43 @@ This phase updates all existing code to be compatible before making the breaking
    ~~- Test default values (disabled when section missing)~~
    ~~- Test AgentConfig with docker field~~
 
-### Phase 2: Docker Command Building
+### ~~Phase 2: Docker Command Building~~ ✅ COMPLETED
 
-6. **Create `DockerCommandBuilder`**
-   - File: `src/main/java/dev/reviewarena/agent/DockerCommandBuilder.java`
-   - Build `docker run` commands with `-i` flag for stdin forwarding
-   - Handle default images per agent (with detailed error for Codex)
-   - Add resource limits (memory, cpus)
-   - Pass environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY)
-   - Include `translatePathsInCommand()` for HOST→container path translation
-   - **Fail-fast:** Throw `ConfigException` for paths outside workingDir (not just warn)
-   - Include `looksLikeAbsolutePath()` heuristic for path detection
-   - Include static `toContainerPath()` utility method with bounds validation
+> **Commit:** `0760446` - Implement Phase 2: Docker command building infrastructure
 
-7. **Create `DockerChecker` interface**
-   - File: `src/main/java/dev/reviewarena/agent/DockerChecker.java`
-   - Define `requireDocker()` and `imageExists()` methods
-   - Enables dependency injection for testing
+~~6. **Create `DockerCommandBuilder`**~~
+   ~~- File: `src/main/java/dev/reviewarena/agent/DockerCommandBuilder.java`~~
+   ~~- Build `docker run` commands with `-i` flag for stdin forwarding~~
+   ~~- Handle default images per agent (with detailed error for Codex)~~
+   ~~- Add resource limits (memory, cpus)~~
+   ~~- Pass environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY)~~
+   ~~- Include `translatePathsInCommand()` for HOST→container path translation~~
+   ~~- **Fail-fast:** Throw `ConfigException` for paths outside workingDir (not just warn)~~
+   ~~- Include `looksLikeAbsolutePath()` heuristic for path detection~~
+   ~~- Include static `toContainerPath()` utility method with bounds validation~~
 
-8. **Create `DockerAvailabilityChecker`**
-   - File: `src/main/java/dev/reviewarena/agent/DockerAvailabilityChecker.java`
-   - Implements `DockerChecker` interface
-   - Check Docker daemon status via `docker info`
-   - Provide clear error messages for common failures
-   - Include `imageExists()` method for optional image pre-check
+~~7. **Create `DockerChecker` interface**~~
+   ~~- File: `src/main/java/dev/reviewarena/agent/DockerChecker.java`~~
+   ~~- Define `requireDocker()` and `imageExists()` methods~~
+   ~~- Enables dependency injection for testing~~
 
-9. **Add unit tests for command building**
-   - File: `src/test/java/dev/reviewarena/agent/DockerCommandBuilderTest.java`
-   - Test command generation with various configs
-   - Test `translatePathsInCommand()` with Windows and Linux host paths
-   - Test that `-i` flag is included for stdin forwarding
-   - Test environment variable passing (only when env vars are set)
-   - Test default image selection and error when no default (Codex)
-   - Test `toContainerPath()` validation (throws for paths outside workingDir)
-   - Test `translatePathsInCommand()` throws ConfigException for external paths
-   - Test `looksLikeAbsolutePath()` edge cases
+~~8. **Create `DockerAvailabilityChecker`**~~
+   ~~- File: `src/main/java/dev/reviewarena/agent/DockerAvailabilityChecker.java`~~
+   ~~- Implements `DockerChecker` interface~~
+   ~~- Check Docker daemon status via `docker info`~~
+   ~~- Provide clear error messages for common failures~~
+   ~~- Include `imageExists()` method for optional image pre-check~~
+
+~~9. **Add unit tests for command building**~~
+   ~~- File: `src/test/java/dev/reviewarena/agent/DockerCommandBuilderTest.java`~~
+   ~~- Test command generation with various configs~~
+   ~~- Test `translatePathsInCommand()` with Windows and Linux host paths~~
+   ~~- Test that `-i` flag is included for stdin forwarding~~
+   ~~- Test environment variable passing (only when env vars are set)~~
+   ~~- Test default image selection and error when no default (Codex)~~
+   ~~- Test `toContainerPath()` validation (throws for paths outside workingDir)~~
+   ~~- Test `translatePathsInCommand()` throws ConfigException for external paths~~
+   ~~- Test `looksLikeAbsolutePath()` edge cases~~
 
 ### Phase 3: Integration
 
