@@ -189,7 +189,7 @@ public class DockerCommandBuilder {
         // Mount Claude credentials directory for Pro/Max subscription authentication
         // This allows using `/login` credentials instead of API keys
         // Note: Must be read-write as Claude CLI writes session data, debug logs, etc.
-        if ("claude".equalsIgnoreCase(agentName)) {
+        if (isClaudeAgent(agentName)) {
             Path claudeCredentials = getClaudeCredentialsPath();
             if (claudeCredentials != null) {
                 result.add("-v");
@@ -345,6 +345,14 @@ public class DockerCommandBuilder {
 
         log.debug("Claude credentials not found at {}. Use 'claude' and '/login' to authenticate.", claudeDir);
         return null;
+    }
+
+    /**
+     * Checks if the agent name represents a Claude agent (prefix matching).
+     * Matches "claude", "claude2", "claude3", etc.
+     */
+    private boolean isClaudeAgent(String agentName) {
+        return agentName.toLowerCase().startsWith("claude");
     }
 
     /**
