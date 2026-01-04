@@ -36,7 +36,7 @@ class AgentConfigTest {
     @Test
     void testValidation_nullName_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig(null, List.of("cmd"), Map.of(), true));
+            () -> new AgentConfig(null, List.of("cmd"), Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("name must not be null or blank"));
     }
@@ -44,7 +44,7 @@ class AgentConfigTest {
     @Test
     void testValidation_blankName_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig("   ", List.of("cmd"), Map.of(), true));
+            () -> new AgentConfig("   ", List.of("cmd"), Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("name must not be null or blank"));
     }
@@ -52,7 +52,7 @@ class AgentConfigTest {
     @Test
     void testValidation_nullCommand_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig("agent", null, Map.of(), true));
+            () -> new AgentConfig("agent", null, Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("command must not be null or empty"));
     }
@@ -60,7 +60,7 @@ class AgentConfigTest {
     @Test
     void testValidation_emptyCommand_throws() {
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> new AgentConfig("agent", List.of(), Map.of(), true));
+            () -> new AgentConfig("agent", List.of(), Map.of(), true, null));
 
         assertTrue(ex.getMessage().contains("command must not be null or empty"));
     }
@@ -96,9 +96,33 @@ class AgentConfigTest {
 
     @Test
     void testFlags_nullBecomesEmptyMap() {
-        AgentConfig config = new AgentConfig("agent", List.of("cmd"), null, true);
+        AgentConfig config = new AgentConfig("agent", List.of("cmd"), null, true, null);
 
         assertNotNull(config.flags());
         assertTrue(config.flags().isEmpty());
+    }
+
+    @Test
+    void testDocker_nullBecomesDisabled() {
+        AgentConfig config = new AgentConfig("agent", List.of("cmd"), Map.of(), true, null);
+
+        assertNotNull(config.docker());
+        assertFalse(config.docker().enabled());
+    }
+
+    @Test
+    void testOf_hasDockerDisabled() {
+        AgentConfig config = AgentConfig.of("agent", List.of("cmd"));
+
+        assertNotNull(config.docker());
+        assertFalse(config.docker().enabled());
+    }
+
+    @Test
+    void testDisabled_hasDockerDisabled() {
+        AgentConfig config = AgentConfig.disabled("agent", List.of("cmd"));
+
+        assertNotNull(config.docker());
+        assertFalse(config.docker().enabled());
     }
 }

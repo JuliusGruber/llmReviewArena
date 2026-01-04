@@ -364,4 +364,109 @@ class ConfigLoaderTest {
 
         assertFalse(config.showAgentOutput()); // CLI wins
     }
+
+    // ===== Docker config loading =====
+
+    @Test
+    void testLoad_agentWithoutDocker_defaultsToDisabled() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              myagent:
+                command:
+                  - myagent
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        AgentConfig agent = config.agents().get("myagent");
+        assertNotNull(agent.docker());
+        assertFalse(agent.docker().enabled());
+    }
+
+    @Test
+    void testLoad_agentWithDockerEnabled_loadsConfig() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              dockeragent:
+                command:
+                  - agent
+                docker:
+                  enabled: true
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        AgentConfig agent = config.agents().get("dockeragent");
+        assertNotNull(agent.docker());
+        assertTrue(agent.docker().enabled());
+    }
+
+    @Test
+    void testLoad_agentWithDockerDisabled_remainsDisabled() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              dockeragent:
+                command:
+                  - agent
+                docker:
+                  enabled: false
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        AgentConfig agent = config.agents().get("dockeragent");
+        assertNotNull(agent.docker());
+        assertFalse(agent.docker().enabled());
+    }
+
+    @Test
+    void testLoad_agentWithFullDockerConfig_loadsAllFields() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              fullconfig:
+                command:
+                  - agent
+                docker:
+                  enabled: true
+                  image: my-image:latest
+                  memory: 4g
+                  cpus: "2"
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        AgentConfig agent = config.agents().get("fullconfig");
+        assertNotNull(agent.docker());
+        assertTrue(agent.docker().enabled());
+        assertEquals("my-image:latest", agent.docker().image());
+        assertEquals("4g", agent.docker().memory());
+        assertEquals("2", agent.docker().cpus());
+    }
+
+    @Test
+    void testLoad_agentWithPartialDockerConfig_loadsSpecifiedFields() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            agents:
+              partialconfig:
+                command:
+                  - agent
+                docker:
+                  enabled: true
+                  memory: 2g
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        AgentConfig agent = config.agents().get("partialconfig");
+        assertNotNull(agent.docker());
+        assertTrue(agent.docker().enabled());
+        assertNull(agent.docker().image()); // Not specified
+        assertEquals("2g", agent.docker().memory());
+        assertNull(agent.docker().cpus()); // Not specified
+    }
 }

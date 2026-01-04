@@ -227,7 +227,32 @@ public class ConfigLoader {
         // Load flags as map
         Map<String, Object> flags = loadAgentFlags(config, prefix + ".flags");
 
-        return new AgentConfig(agentName, command, flags, enabled);
+        // Load docker config
+        DockerConfig docker = loadDockerConfig(config, prefix + ".docker");
+
+        return new AgentConfig(agentName, command, flags, enabled, docker);
+    }
+
+    /**
+     * Loads Docker configuration for an agent using SmallRyeConfig.
+     */
+    private DockerConfig loadDockerConfig(SmallRyeConfig config, String prefix) {
+        // Check if docker.enabled exists and is true
+        boolean enabled = config.getOptionalValue(prefix + ".enabled", Boolean.class)
+            .orElse(false);
+
+        if (!enabled) {
+            return DockerConfig.disabled();
+        }
+
+        String image = config.getOptionalValue(prefix + ".image", String.class)
+            .orElse(null);
+        String memory = config.getOptionalValue(prefix + ".memory", String.class)
+            .orElse(null);
+        String cpus = config.getOptionalValue(prefix + ".cpus", String.class)
+            .orElse(null);
+
+        return new DockerConfig(true, image, memory, cpus);
     }
 
     private Map<String, Object> loadAgentFlags(SmallRyeConfig config, String prefix) {
