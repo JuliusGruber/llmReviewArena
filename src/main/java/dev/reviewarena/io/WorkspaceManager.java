@@ -225,10 +225,9 @@ public class WorkspaceManager {
                 .sorted()
                 .collect(Collectors.joining(", "));
 
-            // Get task.md content to prepend
-            String taskContent = templateLoader.render(TASK_TEMPLATE, TemplateContext.forTask());
-
             // Render synthesis template using SynthesisContext
+            // Note: Synthesis uses a standalone prompt (not prepended with task.md)
+            // to clearly establish the synthesizer role upfront
             SynthesisContext ctx = new SynthesisContext(
                 outputRelative,
                 allReviewsRelative,
@@ -236,10 +235,7 @@ public class WorkspaceManager {
                 crossPollinationRounds,
                 agentsList
             );
-            String synthContent = templateLoader.render(SYNTHESIS_TEMPLATE, ctx);
-
-            // Combine task + synthesis into complete prompt
-            String fullPrompt = taskContent + "\n\n---\n\n" + synthContent;
+            String fullPrompt = templateLoader.render(SYNTHESIS_TEMPLATE, ctx);
 
             Files.writeString(promptPath, fullPrompt, StandardCharsets.UTF_8);
 
