@@ -948,35 +948,37 @@ This phase updates all existing code to be compatible before making the breaking
 
 ~~4. **Run all tests to verify no regressions**~~ ✅ All 145 tests pass
 
-### Phase 1: Core Infrastructure
+### ~~Phase 1: Core Infrastructure~~ ✅ COMPLETED
 
-1. **Create `DockerConfig` record**
-   - File: `src/main/java/dev/reviewarena/config/DockerConfig.java`
-   - Simple record with enabled, image, memory, cpus fields
-   - Include `disabled()` factory method
+> **Commit:** `1d7673b` - Implement Phase 1: DockerConfig record and AgentConfig integration
 
-2. **Update `AgentConfig` record**
-   - File: `src/main/java/dev/reviewarena/config/AgentConfig.java`
-   - Add `DockerConfig docker` field as 5th parameter
-   - Update compact constructor: `docker = docker != null ? docker : DockerConfig.disabled();`
-   - Update static factory methods to pass `DockerConfig.disabled()`
-   - **Note:** Tests using factory methods will continue to work; only tests using
-     constructor with `enabled=false` need the 5th parameter added
+~~1. **Create `DockerConfig` record**~~
+   ~~- File: `src/main/java/dev/reviewarena/config/DockerConfig.java`~~
+   ~~- Simple record with enabled, image, memory, cpus fields~~
+   ~~- Include `disabled()` factory method~~
 
-3. **Update remaining constructor calls**
-   - Search for `new AgentConfig(` and add 5th parameter where needed
-   - These are tests that need `enabled=false` (can't use factory methods)
+~~2. **Update `AgentConfig` record**~~
+   ~~- File: `src/main/java/dev/reviewarena/config/AgentConfig.java`~~
+   ~~- Add `DockerConfig docker` field as 5th parameter~~
+   ~~- Update compact constructor: `docker = docker != null ? docker : DockerConfig.disabled();`~~
+   ~~- Update static factory methods to pass `DockerConfig.disabled()`~~
+   ~~- **Note:** Tests using factory methods will continue to work; only tests using
+     constructor with `enabled=false` need the 5th parameter added~~
 
-4. **Update `ConfigLoader`**
-   - File: `src/main/java/dev/reviewarena/config/ConfigLoader.java`
-   - Add `loadDockerConfig(SmallRyeConfig config, String prefix)` method
-   - Update `loadAgentConfig()` to call `loadDockerConfig()` and pass to AgentConfig
+~~3. **Update remaining constructor calls**~~
+   ~~- Search for `new AgentConfig(` and add 5th parameter where needed~~
+   ~~- These are tests that need `enabled=false` (can't use factory methods)~~
 
-5. **Add unit tests for config changes**
-   - File: `src/test/java/dev/reviewarena/config/DockerConfigTest.java`
-   - Test DockerConfig parsing with SmallRyeConfig
-   - Test default values (disabled when section missing)
-   - Test AgentConfig with docker field
+~~4. **Update `ConfigLoader`**~~
+   ~~- File: `src/main/java/dev/reviewarena/config/ConfigLoader.java`~~
+   ~~- Add `loadDockerConfig(SmallRyeConfig config, String prefix)` method~~
+   ~~- Update `loadAgentConfig()` to call `loadDockerConfig()` and pass to AgentConfig~~
+
+~~5. **Add unit tests for config changes**~~
+   ~~- File: `src/test/java/dev/reviewarena/config/DockerConfigTest.java`~~
+   ~~- Test DockerConfig parsing with SmallRyeConfig~~
+   ~~- Test default values (disabled when section missing)~~
+   ~~- Test AgentConfig with docker field~~
 
 ### Phase 2: Docker Command Building
 
