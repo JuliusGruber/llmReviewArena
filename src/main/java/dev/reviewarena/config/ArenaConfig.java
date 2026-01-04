@@ -39,7 +39,7 @@ public record ArenaConfig(
     public static final int DEFAULT_MAX_OUTPUT_SIZE_KB = 500;
     public static final int DEFAULT_MAX_CONCURRENT = 0; // unlimited
     public static final boolean DEFAULT_SHOW_AGENT_OUTPUT = true;
-    public static final long DEFAULT_AGENT_TIMEOUT_MS = 300_000; // 5 minutes
+    public static final long DEFAULT_AGENT_TIMEOUT_MS = 600_000; // 10 minutes
     public static final long DEFAULT_ROUND_TIMEOUT_MS = 900_000; // 15 minutes
     public static final long DEFAULT_GRACE_PERIOD_MS = 5_000; // 5 seconds
     public static final int DEFAULT_MIN_AGENTS = 2;
