@@ -3,7 +3,7 @@
 **Issue:** #83
 **Status:** Ready for Review
 **Created:** 2026-01-04
-**Reviewed:** 2026-01-04 (v3 - fixed test migration, stdin docs, security claims, path validation)
+**Reviewed:** 2026-01-04 (v4 - fixed test counts, path validation fail-fast, DockerChecker interface, factory methods)
 
 ## Summary
 
@@ -72,16 +72,19 @@ Add the ability to run agents (Claude, Codex, Gemini) inside Docker containers f
 | Prompt passing | Host stdin + file mount | ProcessBuilder pipes file to Docker stdin via `-i` flag |
 | Path translation | In DockerCommandBuilder | All path translation centralized in one place, after CommandBuilder runs |
 
-### Security Notes
+### Isolation Notes
 
-**What Docker isolation provides:**
+**What Docker provides:**
 - **Filesystem isolation** - Containers can only access the mounted `/workspace` directory
 - **Process isolation** - Container processes are isolated from host processes
 - **Clean environment** - No access to host user files, SSH keys, or credentials outside env vars
 
 **What `--network host` does NOT provide:**
 - **Network isolation** - Containers share the host network namespace and can access localhost services
-- This is acceptable for our use case (outbound API calls only) but means containers could theoretically access local services running on the host
+- Containers could theoretically access local services running on the host (databases, APIs, etc.)
+- This is acceptable for our use case (outbound LLM API calls only) but is NOT a security sandbox
+
+**Important:** Docker with `--network host` provides **convenience isolation** (clean filesystem, reproducible environment) rather than **security isolation**. Do not run untrusted code in this configuration.
 
 **Future enhancement:** Add `--network none` or custom bridge network option for stricter isolation when API keys are passed via environment variables (no network access needed for credential retrieval).
 
@@ -150,8 +153,9 @@ src/main/java/dev/reviewarena/
 ├── config/
 │   └── DockerConfig.java          # New: Docker configuration record
 ├── agent/
-│   ├── DockerCommandBuilder.java  # New: Builds docker run commands
-│   └── DockerAvailabilityChecker.java  # New: Validates Docker is available
+│   ├── DockerChecker.java         # New: Interface for Docker availability (enables testing)
+│   ├── DockerAvailabilityChecker.java  # New: Implements DockerChecker, validates Docker
+│   └── DockerCommandBuilder.java  # New: Builds docker run commands
 ```
 
 ### DockerConfig Record
@@ -233,6 +237,13 @@ public record AgentConfig(
      */
     public static AgentConfig of(String name, List<String> command, Map<String, Object> flags) {
         return new AgentConfig(name, command, flags, true, DockerConfig.disabled());
+    }
+
+    /**
+     * Creates a disabled AgentConfig (for testing scenarios where agent is configured but disabled).
+     */
+    public static AgentConfig disabled(String name, List<String> command) {
+        return new AgentConfig(name, command, Map.of(), false, DockerConfig.disabled());
     }
 }
 ```
@@ -341,8 +352,12 @@ public class DockerCommandBuilder {
             : DEFAULT_IMAGES.get(agentName.toLowerCase());
         if (image == null) {
             throw new ConfigException(
-                "No Docker image specified for agent '%s' and no default available. " +
-                "Available defaults: %s".formatted(agentName, DEFAULT_IMAGES.keySet()));
+                "No Docker image specified for agent '%s' and no default available. ".formatted(agentName) +
+                "For Codex, you must build or specify an image:\n" +
+                "  Option 1: Build locally: git clone https://github.com/openai/codex-universal && " +
+                "docker build -t codex-universal:latest .\n" +
+                "  Option 2: Specify in arena.yaml: agents.codex.docker.image: \"your-image:tag\"\n" +
+                "Available default images: " + DEFAULT_IMAGES.keySet());
         }
         result.add(image);
 
@@ -360,13 +375,14 @@ public class DockerCommandBuilder {
      * <p>Scans each argument for paths that are under workingDir and replaces
      * them with container-relative paths (/workspace/...).
      *
-     * <p><b>Important:</b> Paths outside workingDir cannot be translated and will
-     * cause container execution to fail. This method logs warnings for such paths
-     * to help users diagnose configuration issues.
+     * <p><b>Fail-fast behavior:</b> Paths outside workingDir cannot be translated and will
+     * cause this method to throw ConfigException immediately, rather than allowing the
+     * container to fail later with a cryptic "file not found" error.
      *
      * @param command    Command with host paths
      * @param workingDir Host working directory (mounted as /workspace)
      * @return Command with translated container paths
+     * @throws ConfigException if command contains absolute paths outside workingDir
      */
     private List<String> translatePathsInCommand(List<String> command, Path workingDir) {
         Path absWorkingDir = workingDir.toAbsolutePath().normalize();
@@ -388,10 +404,12 @@ public class DockerCommandBuilder {
             } else if (arg.contains(workingDirForward)) {
                 translatedArg = arg.replace(workingDirForward, "/workspace");
             } else if (looksLikeAbsolutePath(arg)) {
-                // Warn about absolute paths outside workingDir - these won't work in container
-                log.warn("Command argument '{}' appears to be an absolute path outside the " +
-                    "project directory. This path will not be accessible inside the Docker " +
-                    "container. Consider moving the file under the project directory.", arg);
+                // Fail fast for absolute paths outside workingDir - these won't work in container
+                throw new ConfigException(
+                    "Command argument '%s' is an absolute path outside the project directory '%s'. "
+                    + "Docker containers can only access files mounted at /workspace. "
+                    + "Move the file under the project directory or use a relative path."
+                    .formatted(arg, workingDir));
             }
 
             translated.add(translatedArg);
@@ -442,6 +460,34 @@ public class DockerCommandBuilder {
 }
 ```
 
+### DockerChecker Interface
+
+```java
+package dev.reviewarena.agent;
+
+/**
+ * Interface for Docker availability checking.
+ * Enables dependency injection for testing.
+ */
+public interface DockerChecker {
+
+    /**
+     * Verifies Docker is installed and the daemon is running.
+     *
+     * @throws ConfigException if Docker is not available
+     */
+    void requireDocker();
+
+    /**
+     * Checks if a Docker image exists locally.
+     *
+     * @param image the image name (e.g., "ghcr.io/zeeno-atl/claude-code:latest")
+     * @return true if the image exists locally, false otherwise
+     */
+    boolean imageExists(String image);
+}
+```
+
 ### DockerAvailabilityChecker
 
 ```java
@@ -456,8 +502,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Checks if Docker is available and running.
+ * Implements DockerChecker for production use.
  */
-public class DockerAvailabilityChecker {
+public class DockerAvailabilityChecker implements DockerChecker {
 
     private static final Logger log = LoggerFactory.getLogger(DockerAvailabilityChecker.class);
 
@@ -466,6 +513,7 @@ public class DockerAvailabilityChecker {
      *
      * @throws ConfigException if Docker is not available
      */
+    @Override
     public void requireDocker() {
         try {
             ProcessBuilder pb = new ProcessBuilder("docker", "info")
@@ -499,6 +547,7 @@ public class DockerAvailabilityChecker {
     /**
      * Checks if a Docker image exists locally.
      */
+    @Override
     public boolean imageExists(String image) {
         try {
             ProcessBuilder pb = new ProcessBuilder("docker", "image", "inspect", image)
@@ -587,13 +636,11 @@ Add `DockerConfig` field to `AgentProcess` and its Builder:
 
 ```java
 // New fields in AgentProcess
-private final DockerConfig dockerConfig;  // May be null if Docker disabled
+private final DockerConfig dockerConfig;  // Never null (AgentConfig guarantees non-null)
 private final DockerCommandBuilder dockerCommandBuilder = new DockerCommandBuilder();
 
 // In private constructor - add:
-this.dockerConfig = builder.dockerConfig != null
-    ? builder.dockerConfig
-    : DockerConfig.disabled();
+this.dockerConfig = builder.dockerConfig;  // Already non-null from AgentConfig
 
 // In Builder class - add field:
 private DockerConfig dockerConfig;
@@ -604,7 +651,10 @@ public Builder dockerConfig(DockerConfig dockerConfig) {
     return this;
 }
 
-// No validation needed in build() - dockerConfig can be null (defaults to disabled)
+// Validation in build() - dockerConfig should come from AgentConfig (always non-null)
+if (dockerConfig == null) {
+    throw new IllegalStateException("dockerConfig is required");
+}
 ```
 
 Modify `resolveCommand()` in `AgentProcess.java`:
@@ -626,7 +676,7 @@ Modify `resolveCommand()` in `AgentProcess.java`:
  */
 private List<String> resolveCommand(List<String> command) {
     // IMPORTANT: Check Docker FIRST - docker.exe is native and must NOT be wrapped with cmd /c
-    if (dockerConfig != null && dockerConfig.enabled()) {
+    if (dockerConfig.enabled()) {
         // DockerCommandBuilder handles path translation from host paths to container paths
         return dockerCommandBuilder.build(
             agentName,
@@ -697,15 +747,21 @@ public AgentResult execute() {
 Update `AgentExecutor.java` to validate Docker and pass config to AgentProcess:
 
 ```java
-// Add field
-private final DockerAvailabilityChecker dockerChecker = new DockerAvailabilityChecker();
+// Add field - use interface for testability
+private final DockerChecker dockerChecker;
 
-// Add validation in constructor
+// Production constructor
 public AgentExecutor(ArenaConfig config, WorkspaceManager workspace) {
+    this(config, workspace, new DockerAvailabilityChecker());
+}
+
+// Package-private constructor for testing (allows mock injection)
+AgentExecutor(ArenaConfig config, WorkspaceManager workspace, DockerChecker dockerChecker) {
     this.config = config;
     this.workspace = workspace;
     this.commandBuilder = new CommandBuilder();
     this.outputValidator = new OutputValidator(config.maxOutputSizeKb());
+    this.dockerChecker = dockerChecker;
 
     // Validate Docker availability if any agent uses it
     validateDockerIfNeeded();
@@ -868,27 +924,28 @@ When running in Docker, paths must be translated from host paths to container pa
 
 ### Phase 0: Test Migration (MUST DO FIRST)
 
-**Why:** Adding a 5th parameter to `AgentConfig` record breaks 89+ existing constructor calls.
+**Why:** Adding a 5th parameter to `AgentConfig` record breaks 70 existing constructor calls (67 in tests + 3 in main).
 This phase updates all existing code to be compatible before making the breaking change.
 
 1. **Audit existing AgentConfig usages**
    ```bash
-   grep -r "new AgentConfig(" src/test --include="*.java" | wc -l  # ~70 usages
-   grep -r "new AgentConfig(" src/main --include="*.java" | wc -l  # ~3 usages
+   grep -r "new AgentConfig(" src/test --include="*.java" | wc -l  # 67 usages
+   grep -r "new AgentConfig(" src/main --include="*.java" | wc -l  # 3 usages
    ```
 
 2. **Update all test files to use factory methods**
-   Convert `new AgentConfig(name, command, flags, enabled)` to `AgentConfig.of(...)`:
+   Convert `new AgentConfig(name, command, flags, enabled)` to `AgentConfig.of(...)` or `AgentConfig.disabled(...)`:
 
-   | File | Approximate Changes |
-   |------|---------------------|
-   | `AgentExecutorIT.java` | 18 |
-   | `AgentExecutorTest.java` | 16 |
-   | `CommandBuilderTest.java` | 11 |
+   | File | Usages |
+   |------|--------|
+   | `AgentExecutorTest.java` | 18 |
+   | `AgentExecutorIT.java` | 15 |
    | `WorkspaceManagerTest.java` | 13 |
-   | `AgentConfigTest.java` | 6 |
-   | `ReviewAggregatorTest.java` | 2 |
+   | `CommandBuilderTest.java` | 11 |
+   | `AgentConfigTest.java` | 5 |
    | `ReviewArenaCliTest.java` | 3 |
+   | `ReviewAggregatorTest.java` | 2 |
+   | **Total** | **67** |
 
    **Pattern:**
    ```java
@@ -901,8 +958,11 @@ This phase updates all existing code to be compatible before making the breaking
    // After (for enabled=true without flags):
    AgentConfig.of("claude", List.of("claude", "-p"))
 
-   // After (for enabled=false - keep constructor, will add 5th param later):
-   new AgentConfig("claude", List.of("claude", "-p"), Map.of(), false)
+   // After (for enabled=false without flags - use new factory method):
+   AgentConfig.disabled("claude", List.of("claude", "-p"))
+
+   // After (for enabled=false WITH flags - use full constructor, will add 5th param later):
+   new AgentConfig("claude", List.of("claude", "-p"), Map.of("auto-approve", true), false)
    ```
 
 3. **Update ConfigLoader.loadAgentConfig()**
@@ -949,20 +1009,27 @@ This phase updates all existing code to be compatible before making the breaking
 6. **Create `DockerCommandBuilder`**
    - File: `src/main/java/dev/reviewarena/agent/DockerCommandBuilder.java`
    - Build `docker run` commands with `-i` flag for stdin forwarding
-   - Handle default images per agent (with error listing available defaults)
+   - Handle default images per agent (with detailed error for Codex)
    - Add resource limits (memory, cpus)
    - Pass environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY)
    - Include `translatePathsInCommand()` for HOST→container path translation
-   - Include `looksLikeAbsolutePath()` to warn about untranslatable paths
+   - **Fail-fast:** Throw `ConfigException` for paths outside workingDir (not just warn)
+   - Include `looksLikeAbsolutePath()` heuristic for path detection
    - Include static `toContainerPath()` utility method with bounds validation
 
-7. **Create `DockerAvailabilityChecker`**
+7. **Create `DockerChecker` interface**
+   - File: `src/main/java/dev/reviewarena/agent/DockerChecker.java`
+   - Define `requireDocker()` and `imageExists()` methods
+   - Enables dependency injection for testing
+
+8. **Create `DockerAvailabilityChecker`**
    - File: `src/main/java/dev/reviewarena/agent/DockerAvailabilityChecker.java`
+   - Implements `DockerChecker` interface
    - Check Docker daemon status via `docker info`
    - Provide clear error messages for common failures
    - Include `imageExists()` method for optional image pre-check
 
-8. **Add unit tests for command building**
+9. **Add unit tests for command building**
    - File: `src/test/java/dev/reviewarena/agent/DockerCommandBuilderTest.java`
    - Test command generation with various configs
    - Test `translatePathsInCommand()` with Windows and Linux host paths
@@ -970,33 +1037,35 @@ This phase updates all existing code to be compatible before making the breaking
    - Test environment variable passing (only when env vars are set)
    - Test default image selection and error when no default (Codex)
    - Test `toContainerPath()` validation (throws for paths outside workingDir)
+   - Test `translatePathsInCommand()` throws ConfigException for external paths
    - Test `looksLikeAbsolutePath()` edge cases
 
 ### Phase 3: Integration
 
-9. **Update `AgentProcess`**
+10. **Update `AgentProcess`**
     - File: `src/main/java/dev/reviewarena/agent/AgentProcess.java`
-    - Add `DockerConfig dockerConfig` field (defaults to disabled)
+    - Add `DockerConfig dockerConfig` field (never null, from AgentConfig)
     - Add `DockerCommandBuilder dockerCommandBuilder` instance field
-    - Add `dockerConfig(DockerConfig)` to Builder
+    - Add `dockerConfig(DockerConfig)` to Builder with validation
     - Update `resolveCommand()` to call DockerCommandBuilder when Docker enabled (FIRST, before Windows check)
     - Document that Docker commands don't need cmd /c wrapping
     - Document stdin redirection works for both native and Docker modes
 
-10. **Update `AgentExecutor`**
+11. **Update `AgentExecutor`**
     - File: `src/main/java/dev/reviewarena/agent/AgentExecutor.java`
-    - Add `DockerAvailabilityChecker` field
+    - Add `DockerChecker` field (interface for testability)
+    - Add package-private constructor for test injection
     - Add `validateDockerIfNeeded()` method (call from constructor)
     - Update `executeAgent()` to pass `dockerConfig` to AgentProcess builder
     - Update `executeSynthesis()` to pass `dockerConfig` to AgentProcess builder
     - **No path translation needed** - HOST paths flow through, translation in AgentProcess
 
-11. **CommandBuilder - NO CHANGES NEEDED**
+12. **CommandBuilder - NO CHANGES NEEDED**
     - `CommandBuilder.java` remains unchanged
     - Produces commands with HOST paths (as it always has)
     - Path translation happens in `DockerCommandBuilder` (called from `AgentProcess`)
 
-12. **Add integration tests**
+13. **Add integration tests**
     - File: `src/test/java/dev/reviewarena/agent/DockerAgentExecutionIT.java`
     - Test agent execution in Docker (requires Docker in CI)
     - Use JUnit Assumptions to skip when Docker unavailable
@@ -1004,12 +1073,12 @@ This phase updates all existing code to be compatible before making the breaking
 
 ### Phase 4: Documentation
 
-13. **Update README**
+14. **Update README**
     - Docker setup instructions
     - Example configurations
     - Troubleshooting guide
 
-14. **Update arena.yaml examples**
+15. **Update arena.yaml examples**
     - Show Docker configuration
     - Document default images (note Codex requires manual setup)
 
@@ -1020,29 +1089,23 @@ This phase updates all existing code to be compatible before making the breaking
 | Test Class | Coverage |
 |------------|----------|
 | `DockerConfigTest` | Record creation, `disabled()` factory, null handling |
-| `DockerCommandBuilderTest` | Command generation, path translation, `-i` flag, env vars, default images |
+| `DockerCommandBuilderTest` | Command generation, path translation, `-i` flag, env vars, default images, **fail-fast for external paths** |
 | `DockerAvailabilityCheckerTest` | **Mocked** - see below |
 | `ConfigLoaderTest` | Extended: parsing docker section from YAML, defaults when missing |
-| `AgentConfigTest` | Extended: docker field null-safety, factory methods |
+| `AgentConfigTest` | Extended: docker field null-safety, factory methods, `disabled()` factory |
 | `AgentProcessTest` | Extended: `resolveCommand()` with Docker enabled vs disabled |
+| `AgentExecutorTest` | Extended: mock DockerChecker injection, validation skipped when Docker disabled |
 
 ### Mocking Strategy for DockerAvailabilityChecker
 
 `DockerAvailabilityChecker` runs actual Docker commands, which makes it hard to unit test.
-**Solution:** Use constructor injection to allow mocking in tests.
+**Solution:** The `DockerChecker` interface (created in Phase 2) enables constructor injection for mocking.
 
 ```java
-// Production code - add interface for testability
-public interface DockerChecker {
-    void requireDocker();
-    boolean imageExists(String image);
-}
+// DockerChecker interface already defined in Phase 2
+// DockerAvailabilityChecker implements DockerChecker
 
-public class DockerAvailabilityChecker implements DockerChecker {
-    // ... existing implementation ...
-}
-
-// In AgentExecutor - allow injection
+// AgentExecutor uses interface for testability (see Phase 3)
 public class AgentExecutor {
     private final DockerChecker dockerChecker;
 
@@ -1051,7 +1114,7 @@ public class AgentExecutor {
         this(config, workspace, new DockerAvailabilityChecker());
     }
 
-    // Test constructor
+    // Package-private constructor for testing
     AgentExecutor(ArenaConfig config, WorkspaceManager workspace, DockerChecker dockerChecker) {
         this.dockerChecker = dockerChecker;
         // ...
@@ -1068,6 +1131,18 @@ void throwsWhenDockerUnavailable() {
     var config = createConfigWithDockerEnabled();
     assertThrows(ConfigException.class,
         () -> new AgentExecutor(config, workspace, mockChecker));
+}
+
+@Test
+void skipsDockerValidationWhenNoAgentUsesDocker() {
+    DockerChecker mockChecker = mock(DockerChecker.class);
+
+    var config = createConfigWithDockerDisabled();
+    // Should NOT throw - Docker not needed
+    new AgentExecutor(config, workspace, mockChecker);
+
+    // Verify requireDocker() was never called
+    verify(mockChecker, never()).requireDocker();
 }
 ```
 
@@ -1092,7 +1167,7 @@ void translatePathsInCommand_windowsPath() {
 }
 
 @Test
-void translatePathsInCommand_warnsAboutExternalPath() {
+void translatePathsInCommand_throwsForExternalPath() {
     var builder = new DockerCommandBuilder();
     Path workingDir = Path.of("/home/user/project");
 
@@ -1100,12 +1175,12 @@ void translatePathsInCommand_warnsAboutExternalPath() {
         "claude", "-p", "/etc/passwd"  // External path!
     );
 
-    // Verify warning is logged (use LogCaptor or similar)
-    List<String> translated = builder.translatePathsInCommand(command, workingDir);
+    // Fail-fast: throws ConfigException for paths outside workingDir
+    ConfigException ex = assertThrows(ConfigException.class,
+        () -> builder.translatePathsInCommand(command, workingDir));
 
-    // Path is NOT translated (still external)
-    assertThat(translated).contains("/etc/passwd");
-    // But warning should be logged
+    assertThat(ex.getMessage()).contains("/etc/passwd");
+    assertThat(ex.getMessage()).contains("outside the project directory");
 }
 ```
 
@@ -1196,7 +1271,8 @@ Unit tests will pass because they use mocks or test pure logic.
 | Docker not installed | `Docker is not installed or not in PATH. Install Docker Desktop or ensure 'docker' command is available.` |
 | Docker daemon not running | `Docker daemon is not running. Start Docker Desktop or run 'sudo systemctl start docker'.` |
 | Image not found | `Docker image '{image}' not found. Run 'docker pull {image}' or check the image name.` |
-| No default image | `No Docker image specified for agent '{name}' and no default available. Add 'image' to docker config.` |
+| No default image (Codex) | `No Docker image specified for agent 'codex' and no default available. For Codex, you must build or specify an image: Option 1: Build locally... Option 2: Specify in arena.yaml...` |
+| Path outside project | `Command argument '{path}' is an absolute path outside the project directory '{workingDir}'. Docker containers can only access files mounted at /workspace.` |
 
 ## Rollback Strategy
 
@@ -1221,19 +1297,21 @@ These are explicitly **not** included in this implementation:
 | File | Change Type | Description |
 |------|-------------|-------------|
 | `src/main/java/dev/reviewarena/config/DockerConfig.java` | New | Docker configuration record |
-| `src/main/java/dev/reviewarena/config/AgentConfig.java` | Modify | Add `docker` field |
+| `src/main/java/dev/reviewarena/config/AgentConfig.java` | Modify | Add `docker` field, add `disabled()` factory method |
 | `src/main/java/dev/reviewarena/config/ConfigLoader.java` | Modify | Add `loadDockerConfig()` method |
+| `src/main/java/dev/reviewarena/agent/DockerChecker.java` | New | Interface for Docker availability (enables testing) |
+| `src/main/java/dev/reviewarena/agent/DockerAvailabilityChecker.java` | New | Implements DockerChecker, validates Docker availability |
 | `src/main/java/dev/reviewarena/agent/DockerCommandBuilder.java` | New | Builds `docker run` commands with path translation |
-| `src/main/java/dev/reviewarena/agent/DockerAvailabilityChecker.java` | New | Validates Docker availability |
 | `src/main/java/dev/reviewarena/agent/AgentProcess.java` | Modify | Add `dockerConfig` field, Docker command wrapping in `resolveCommand()` |
-| `src/main/java/dev/reviewarena/agent/AgentExecutor.java` | Modify | Add Docker validation, pass `dockerConfig` to AgentProcess |
+| `src/main/java/dev/reviewarena/agent/AgentExecutor.java` | Modify | Add Docker validation with interface injection, pass `dockerConfig` to AgentProcess |
 | `src/main/java/dev/reviewarena/agent/CommandBuilder.java` | **No change** | Produces HOST paths; translation in DockerCommandBuilder |
 | `src/test/java/dev/reviewarena/config/DockerConfigTest.java` | New | Unit tests for DockerConfig |
 | `src/test/java/dev/reviewarena/agent/DockerCommandBuilderTest.java` | New | Unit tests for command building |
-| `src/test/java/dev/reviewarena/agent/DockerAvailabilityCheckerTest.java` | New | Unit tests for availability checker |
+| `src/test/java/dev/reviewarena/agent/DockerAvailabilityCheckerTest.java` | New | Unit tests for availability checker (mocked) |
 | `src/test/java/dev/reviewarena/agent/DockerAgentExecutionIT.java` | New | Integration tests (requires Docker) |
 | `src/test/java/dev/reviewarena/config/ConfigLoaderTest.java` | Modify | Add tests for docker config parsing |
 | `src/test/java/dev/reviewarena/agent/AgentProcessTest.java` | Modify | Add tests for Docker command resolution |
+| `src/test/java/dev/reviewarena/agent/AgentExecutorTest.java` | Modify | Add tests using mock DockerChecker |
 | `README.md` | Modify | Add Docker setup instructions |
 | `arena.yaml` | Modify | Add Docker configuration examples |
 
