@@ -389,4 +389,57 @@ class DockerCommandBuilderTest {
 
         assertEquals("/workspace/", containerPath);
     }
+
+    // Security tests (Issue 86: API key exposure prevention)
+
+    @Test
+    void build_doesNotExposeApiKeyValuesInCommand() {
+        // This test verifies that API keys are passed using "-e VAR" (without value)
+        // instead of "-e VAR=value", preventing exposure in /proc/<pid>/cmdline
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
+        List<String> command = List.of("agent");
+
+        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+
+        // Check that no command argument contains "=" after an API key name
+        List<String> apiKeyEnvVars = List.of(
+            "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
+        );
+
+        for (String arg : result) {
+            for (String keyName : apiKeyEnvVars) {
+                // Verify the pattern "KEY=value" doesn't appear
+                assertFalse(arg.startsWith(keyName + "="),
+                    "API key value should not be exposed in command: " + arg);
+            }
+        }
+
+        // If any API key is set in the environment, verify it's passed as just the name
+        for (String keyName : apiKeyEnvVars) {
+            if (System.getenv(keyName) != null) {
+                assertTrue(result.contains(keyName),
+                    "API key " + keyName + " should be passed without value");
+            }
+        }
+    }
+
+    @Test
+    void buildSandbox_doesNotExposeApiKeyValuesInCommand() {
+        // Same security check for sandbox mode
+        DockerConfig docker = new DockerConfig(true, true, null, null, null, null);
+        List<String> command = List.of("claude", "-p", "prompt.md");
+
+        List<String> result = builder.build("claude", "claude", docker, command, tempDir);
+
+        List<String> apiKeyEnvVars = List.of(
+            "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
+        );
+
+        for (String arg : result) {
+            for (String keyName : apiKeyEnvVars) {
+                assertFalse(arg.startsWith(keyName + "="),
+                    "API key value should not be exposed in sandbox command: " + arg);
+            }
+        }
+    }
 }

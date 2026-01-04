@@ -111,10 +111,12 @@ public class DockerCommandBuilder {
         result.add(workingDir.toAbsolutePath() + ":/workspace");
 
         // Pass API keys from host environment (only if set)
+        // Security: Use "-e VAR" without value so Docker inherits from parent environment.
+        // This prevents API keys from being visible in /proc/<pid>/cmdline or ps output.
         for (String envVar : API_KEY_ENV_VARS) {
             if (System.getenv(envVar) != null) {
                 result.add("-e");
-                result.add(envVar + "=" + System.getenv(envVar));
+                result.add(envVar);
             }
         }
 
@@ -213,11 +215,14 @@ public class DockerCommandBuilder {
         }
 
         // Pass API keys from host environment (only if set)
-        // Note: Explicitly pass value to avoid subprocess environment inheritance issues
+        // Security: Use "-e VAR" without value so Docker inherits from parent environment.
+        // This prevents API keys from being visible in /proc/<pid>/cmdline or ps output.
+        // ProcessBuilder inherits environment from the parent Java process, so Docker CLI
+        // can read the values from its parent environment without command-line exposure.
         for (String envVar : API_KEY_ENV_VARS) {
             if (System.getenv(envVar) != null) {
                 result.add("-e");
-                result.add(envVar + "=" + System.getenv(envVar));
+                result.add(envVar);
             }
         }
 
