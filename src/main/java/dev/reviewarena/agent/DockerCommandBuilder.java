@@ -186,12 +186,24 @@ public class DockerCommandBuilder {
             result.add(userMapping);
         }
 
+        // Mount Claude credentials directory for Pro/Max subscription authentication
+        // This allows using `/login` credentials instead of API keys
+        if ("claude".equalsIgnoreCase(agentName)) {
+            Path claudeCredentials = getClaudeCredentialsPath();
+            if (claudeCredentials != null) {
+                result.add("-v");
+                // Mount to /root/.claude since container runs as root
+                result.add(claudeCredentials + ":/root/.claude:ro");
+                log.debug("Mounting Claude credentials from: {}", claudeCredentials);
+            }
+        }
+
         // Pass API keys from host environment (only if set)
-        // Note: Env vars must be set in the shell that launches the arena
+        // Note: Explicitly pass value to avoid subprocess environment inheritance issues
         for (String envVar : API_KEY_ENV_VARS) {
             if (System.getenv(envVar) != null) {
                 result.add("-e");
-                result.add(envVar);
+                result.add(envVar + "=" + System.getenv(envVar));
             }
         }
 
@@ -307,6 +319,29 @@ public class DockerCommandBuilder {
                 Thread.currentThread().interrupt();
             }
         }
+        return null;
+    }
+
+    /**
+     * Gets the Claude Code credentials directory path if it exists.
+     * Claude stores credentials in ~/.claude/ directory.
+     *
+     * @return Path to credentials directory, or null if not found
+     */
+    private Path getClaudeCredentialsPath() {
+        String userHome = System.getProperty("user.home");
+        if (userHome == null) {
+            return null;
+        }
+
+        Path claudeDir = Path.of(userHome, ".claude");
+        Path credentialsFile = claudeDir.resolve(".credentials.json");
+
+        if (java.nio.file.Files.exists(credentialsFile)) {
+            return claudeDir;
+        }
+
+        log.debug("Claude credentials not found at {}. Use 'claude' and '/login' to authenticate.", claudeDir);
         return null;
     }
 
