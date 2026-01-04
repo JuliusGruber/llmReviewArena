@@ -192,8 +192,9 @@ public class DockerCommandBuilder {
             Path claudeCredentials = getClaudeCredentialsPath();
             if (claudeCredentials != null) {
                 result.add("-v");
-                // Mount to /root/.claude since container runs as root
-                result.add(claudeCredentials + ":/root/.claude:ro");
+                // Mount to /home/agent/.claude for docker/sandbox-templates:claude-code image
+                // which runs as user 'agent' with home /home/agent
+                result.add(claudeCredentials + ":/home/agent/.claude:ro");
                 log.debug("Mounting Claude credentials from: {}", claudeCredentials);
             }
         }
