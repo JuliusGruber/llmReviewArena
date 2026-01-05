@@ -32,42 +32,42 @@ agents:
       output-format: json  # Single JSON output with .result field
     enabled: true
 
-  claude3:
-    type: claude
-    # Third Claude instance
-    docker:
-      enabled: true
-      sandbox: false
-      image: "docker/sandbox-templates:claude-code"
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-      output-format: json  # Single JSON output with .result field
-    enabled: true
+  # claude3:
+  #   type: claude
+  #   # Third Claude instance
+  #   docker:
+  #     enabled: true
+  #     sandbox: false
+  #     image: "docker/sandbox-templates:claude-code"
+  #   command:
+  #     - claude
+  #     - -p
+  #   flags:
+  #     auto-approve: true
+  #     output-format: json  # Single JSON output with .result field
+  #   enabled: true
 
   # Disable default claude agent from application.yaml (we use claude1/2/3 instead)
   claude:
     enabled: false
 
-  # Codex - Docker mode enabled (temporarily disabled)
-  # codex:
-  #   type: codex
-  #   # Docker mode requires building Codex image locally:
-  #   #   git clone https://github.com/openai/codex-universal
-  #   #   docker build -t codex-universal:latest .
-  #   docker:
-  #     enabled: true
-  #     image: "codex-universal:latest"  # Required - no default image
-  #   command:
-  #     - python
-  #     - src/main/resources/codex-wrapper.py
-  #     - "@prompt.md"
-  #     - "@output"
-  #   flags:
-  #     auto-approve: true
-  #   enabled: true
+  # Codex - Docker mode enabled
+  codex:
+    type: codex
+    # Docker mode requires building Codex image locally:
+    #   git clone https://github.com/openai/codex-universal
+    #   docker build -t codex-universal:latest .
+    docker:
+      enabled: true
+      image: "codex-universal:latest"  # Required - no default image
+    command:
+      - python
+      - src/main/resources/codex-wrapper.py
+      - "@prompt.md"
+      - "@output"
+    flags:
+      auto-approve: true
+    enabled: true
 
   # Gemini - temporarily disabled
   # gemini:
