@@ -51,13 +51,16 @@ agents:
   claude:
     enabled: false
 
-  # Codex - native mode (Docker image requires interactive TTY)
+  # Codex - uses Python wrapper for non-interactive execution
   codex:
     type: codex
     docker:
       enabled: false
     command:
-      - codex
+      - python
+      - src/main/resources/codex-wrapper.py
+      - "@prompt.md"
+      - "@output"
     flags:
       auto-approve: true
     enabled: true
