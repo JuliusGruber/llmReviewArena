@@ -59,7 +59,6 @@ agents:
       image: "diablotin74/codex-cli:latest"
     command:
       - codex
-      - "@prompt.md"
     flags:
       auto-approve: true
     enabled: true
