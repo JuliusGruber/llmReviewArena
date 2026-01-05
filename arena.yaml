@@ -51,17 +51,16 @@ agents:
   claude:
     enabled: false
 
-  # Codex - disabled (diablotin74/codex-cli requires interactive TTY)
+  # Codex - native mode (Docker image requires interactive TTY)
   codex:
     type: codex
     docker:
-      enabled: true
-      image: "diablotin74/codex-cli:latest"
+      enabled: false
     command:
       - codex
     flags:
       auto-approve: true
-    enabled: false
+    enabled: true
 
   # Gemini - temporarily disabled
   # gemini:
