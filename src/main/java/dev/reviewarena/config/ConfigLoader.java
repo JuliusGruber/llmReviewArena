@@ -247,9 +247,12 @@ public class ConfigLoader {
                 "Add 'type: <type>' to the agent configuration. Valid types are: " + KNOWN_TYPES);
         }
 
-        // Load enabled flag (default true)
+        // Load enabled flag (default from agent-defaults)
+        boolean defaultEnabled = config.getOptionalValue("agent-defaults.enabled", Boolean.class)
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'agent-defaults.enabled' in application.yaml"));
         boolean enabled = config.getOptionalValue(prefix + ".enabled", Boolean.class)
-            .orElse(true);
+            .orElse(defaultEnabled);
 
         // Load flags as map
         Map<String, Object> flags = loadAgentFlags(config, prefix + ".flags");
@@ -282,9 +285,17 @@ public class ConfigLoader {
      * Loads Docker configuration for an agent using SmallRyeConfig.
      */
     private DockerConfig loadDockerConfig(SmallRyeConfig config, String prefix) {
+        // Get defaults from agent-defaults.docker
+        boolean defaultEnabled = config.getOptionalValue("agent-defaults.docker.enabled", Boolean.class)
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'agent-defaults.docker.enabled' in application.yaml"));
+        boolean defaultSandbox = config.getOptionalValue("agent-defaults.docker.sandbox", Boolean.class)
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'agent-defaults.docker.sandbox' in application.yaml"));
+
         // Check if docker.enabled exists and is true
         boolean enabled = config.getOptionalValue(prefix + ".enabled", Boolean.class)
-            .orElse(false);
+            .orElse(defaultEnabled);
 
         if (!enabled) {
             return DockerConfig.disabled();
@@ -292,7 +303,7 @@ public class ConfigLoader {
 
         // Sandbox mode uses 'docker sandbox run' (Docker Desktop feature)
         boolean sandbox = config.getOptionalValue(prefix + ".sandbox", Boolean.class)
-            .orElse(false);
+            .orElse(defaultSandbox);
 
         String image = config.getOptionalValue(prefix + ".image", String.class)
             .orElse(null);
