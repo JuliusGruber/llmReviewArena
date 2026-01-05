@@ -403,41 +403,37 @@ class DockerCommandBuilderTest {
         assertEquals("/workspace/", containerPath);
     }
 
-    // Security tests (Issue 86: API key exposure prevention)
+    // API key passing tests
 
     @Test
-    void build_doesNotExposeApiKeyValuesInCommand() {
-        // This test verifies that API keys are passed via --env-file (not exposed in cmdline)
-        // instead of "-e VAR=value", preventing exposure in /proc/<pid>/cmdline
+    void build_passesApiKeysViaEnvFlags() {
+        // This test verifies that API keys are passed via -e flags
+        // Note: Using -e VAR=value instead of --env-file due to Windows path translation issues
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
         List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
-        // Check that no command argument contains "=" after an API key name
+        // Check that -e flags are used for API keys that are set
         List<String> apiKeyEnvVars = List.of(
             "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
         );
 
-        for (String arg : result) {
-            for (String keyName : apiKeyEnvVars) {
-                // Verify the pattern "KEY=value" doesn't appear
-                assertFalse(arg.startsWith(keyName + "="),
-                    "API key value should not be exposed in command: " + arg);
+        for (String keyName : apiKeyEnvVars) {
+            String value = EnvLoader.getEnv(keyName);
+            if (value != null) {
+                // Verify -e flag is present for this key
+                assertTrue(result.contains("-e"),
+                    "Should use -e flag for environment variables");
+                assertTrue(result.contains(keyName + "=" + value),
+                    "API key " + keyName + " should be passed via -e flag");
             }
-        }
-
-        // If any API key is set in the environment, verify --env-file is used
-        boolean anyKeySet = apiKeyEnvVars.stream().anyMatch(k -> EnvLoader.getEnv(k) != null);
-        if (anyKeySet) {
-            assertTrue(result.contains("--env-file"),
-                "API keys should be passed via --env-file for security");
         }
     }
 
     @Test
-    void buildSandbox_doesNotExposeApiKeyValuesInCommand() {
-        // Same security check for sandbox mode
+    void buildSandbox_passesApiKeysViaEnvFlags() {
+        // Same check for sandbox mode
         DockerConfig docker = new DockerConfig(true, true, null, null, null, null);
         List<String> command = List.of("claude", "-p", "prompt.md");
 
@@ -448,10 +444,13 @@ class DockerCommandBuilderTest {
             "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
         );
 
-        for (String arg : result) {
-            for (String keyName : apiKeyEnvVars) {
-                assertFalse(arg.startsWith(keyName + "="),
-                    "API key value should not be exposed in sandbox command: " + arg);
+        for (String keyName : apiKeyEnvVars) {
+            String value = EnvLoader.getEnv(keyName);
+            if (value != null) {
+                assertTrue(result.contains("-e"),
+                    "Sandbox should use -e flag for environment variables");
+                assertTrue(result.contains(keyName + "=" + value),
+                    "API key " + keyName + " should be passed via -e flag in sandbox mode");
             }
         }
     }

@@ -32,8 +32,15 @@ RUN npm install -g @openai/codex && \
 # Create non-root user for security
 RUN useradd -m -s /bin/bash codex
 
-# Switch to non-root user
+# Switch to non-root user BEFORE creating config directory
+# This ensures all files are owned by the codex user
 USER codex
+
+# Create codex config and session directories with proper ownership
+# This config enables API key auth via OPENAI_API_KEY env var
+# instead of requiring browser-based OAuth login
+RUN mkdir -p /home/codex/.codex/sessions
+COPY --chown=codex:codex config.toml /home/codex/.codex/config.toml
 
 # Set working directory (will be mounted from host)
 WORKDIR /workspace

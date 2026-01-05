@@ -57,9 +57,6 @@ public class DockerCommandBuilder {
     private static final Pattern CPUS_PATTERN = Pattern.compile("^\\d+(\\.\\d+)?$");
     private static final Set<String> VALID_NETWORK_MODES = Set.of("bridge", "host", "none");
 
-    // Pattern to match Windows drive letter paths (C:\, D:\, etc.)
-    private static final Pattern WINDOWS_PATH_PATTERN = Pattern.compile("^([A-Za-z]):\\\\(.*)$");
-
     /**
      * Generates a unique container name by appending the current process ID.
      *
@@ -133,13 +130,9 @@ public class DockerCommandBuilder {
         result.add("-v");
         result.add(workingDir.toAbsolutePath() + ":/workspace");
 
-        // Pass API keys via --env-file to avoid exposing them in command line.
-        // This is secure (not visible in ps/cmdline) and works cross-platform.
-        Path envFile = createEnvFile(workingDir);
-        if (envFile != null) {
-            result.add("--env-file");
-            result.add(toDockerHostPath(envFile));
-        }
+        // Pass API keys directly via -e flags.
+        // Note: --env-file has path translation issues on Windows with Docker Desktop.
+        addApiKeyEnvVars(result);
 
         // Agent type (claude or gemini) for sandbox mode
         if (!SANDBOX_AGENTS.contains(agentType)) {
@@ -236,13 +229,9 @@ public class DockerCommandBuilder {
             }
         }
 
-        // Pass API keys via --env-file to avoid exposing them in command line.
-        // This is secure (not visible in ps/cmdline) and works cross-platform.
-        Path envFile = createEnvFile(workingDir);
-        if (envFile != null) {
-            result.add("--env-file");
-            result.add(toDockerHostPath(envFile));
-        }
+        // Pass API keys directly via -e flags.
+        // Note: --env-file has path translation issues on Windows with Docker Desktop.
+        addApiKeyEnvVars(result);
 
         // Optional resource limits (already validated)
         if (docker.memory() != null) {
@@ -380,45 +369,21 @@ public class DockerCommandBuilder {
     }
 
     /**
-     * Creates a temporary env file containing API keys for Docker --env-file.
+     * Adds API key environment variables to the Docker command using -e flags.
      *
-     * <p>This approach avoids exposing API keys in the command line (which would
-     * be visible in ps output and /proc/&lt;pid&gt;/cmdline on Linux). The file is
-     * marked for deletion on JVM exit.
+     * <p>This adds flags like {@code -e OPENAI_API_KEY=sk-...} for each API key
+     * that is set in the environment. Using -e flags instead of --env-file avoids
+     * path translation issues on Windows with Docker Desktop (WSL2 backend).
      *
-     * @param workingDir The working directory (used for temp file location)
-     * @return Path to the env file, or null if no API keys are set
+     * @param command The Docker command list to add flags to
      */
-    private Path createEnvFile(Path workingDir) {
-        var envContent = new StringBuilder();
-
+    private void addApiKeyEnvVars(List<String> command) {
         for (String envVar : API_KEY_ENV_VARS) {
             String value = EnvLoader.getEnv(envVar);
             if (value != null) {
-                envContent.append(envVar).append("=").append(value).append("\n");
+                command.add("-e");
+                command.add(envVar + "=" + value);
             }
-        }
-
-        if (envContent.isEmpty()) {
-            return null;
-        }
-
-        try {
-            // Create temp file in project's .arena/ directory (not system temp).
-            // This ensures Docker can access it on Windows where Docker Desktop
-            // (WSL2 backend) may have issues reading from system temp directory.
-            // The .arena/ directory is already used for arena files and is mounted
-            // as /workspace/.arena/ in the container.
-            Path arenaDir = workingDir.resolve(".arena");
-            Files.createDirectories(arenaDir);  // Ensure .arena exists
-            Path envFile = Files.createTempFile(arenaDir, "docker-env-", ".env");
-            envFile.toFile().deleteOnExit();  // Clean up on JVM exit
-            Files.writeString(envFile, envContent.toString(), StandardCharsets.UTF_8);
-            log.debug("Created env file for Docker: {}", envFile);
-            return envFile;
-        } catch (IOException e) {
-            log.warn("Failed to create env file, API keys may not be passed to container: {}", e.getMessage());
-            return null;
         }
     }
 
@@ -491,34 +456,5 @@ public class DockerCommandBuilder {
         Path relativePath = absWorkingDir.relativize(absHost);
         // Use forward slashes for container paths (Linux)
         return "/workspace/" + relativePath.toString().replace('\\', '/');
-    }
-
-    /**
-     * Converts a Windows path to Docker-compatible format for host paths.
-     *
-     * <p>Docker CLI on Windows (especially with WSL2 backend) may have issues
-     * with Windows-style paths like {@code C:\Users\...}. This method converts
-     * them to Unix-style paths like {@code /c/Users/...}.
-     *
-     * <p>Examples:
-     * <ul>
-     *   <li>{@code C:\Users\foo\file.txt} → {@code /c/Users/foo/file.txt}</li>
-     *   <li>{@code D:\project\.arena\env.txt} → {@code /d/project/.arena/env.txt}</li>
-     *   <li>{@code /home/user/file.txt} → {@code /home/user/file.txt} (unchanged)</li>
-     * </ul>
-     *
-     * @param path the path to convert
-     * @return Docker-compatible path string
-     */
-    static String toDockerHostPath(Path path) {
-        String pathStr = path.toAbsolutePath().toString();
-        var matcher = WINDOWS_PATH_PATTERN.matcher(pathStr);
-        if (matcher.matches()) {
-            String driveLetter = matcher.group(1).toLowerCase();
-            String rest = matcher.group(2).replace('\\', '/');
-            return "/" + driveLetter + "/" + rest;
-        }
-        // Not a Windows path, return as-is with forward slashes
-        return pathStr.replace('\\', '/');
     }
 }
