@@ -54,12 +54,9 @@ agents:
   # Codex - Docker mode enabled
   codex:
     type: codex
-    # Docker mode requires building Codex image locally:
-    #   git clone https://github.com/openai/codex-universal
-    #   docker build -t codex-universal:latest .
     docker:
       enabled: true
-      image: "codex-universal:latest"  # Required - no default image
+      image: "diablotin74/codex-cli:latest"
     command:
       - python
       - src/main/resources/codex-wrapper.py
