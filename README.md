@@ -140,31 +140,9 @@ agents:
 
 | Agent | Default Image | Notes |
 |-------|---------------|-------|
-| Claude | `ghcr.io/zeeno-atl/claude-code:latest` | Always installs latest CLI |
+| Claude | `ghcr.io/zeeno-atl/claude-code:latest` | Community-maintained image |
+| Codex | `diablotin74/codex-cli:latest` | Community-maintained image |
 | Gemini | `tgagor/gemini-cli:latest` | Community-maintained image |
-| Codex | *None - must be configured* | Requires local build (see below) |
-
-### Codex Docker Setup
-
-OpenAI does not publish pre-built Docker images for Codex CLI. You must either:
-
-1. **Build locally:**
-   ```bash
-   git clone https://github.com/openai/codex-universal
-   cd codex-universal
-   docker build -t codex-universal:latest .
-   ```
-
-2. **Then configure in arena.yaml:**
-   ```yaml
-   agents:
-     codex:
-       docker:
-         enabled: true
-         image: "codex-universal:latest"
-       command: ["codex", "--sandbox", "danger-full-access"]
-       enabled: true
-   ```
 
 ### Environment Variables
 
@@ -202,7 +180,6 @@ For stricter isolation, consider running in a network-restricted environment.
 |-------|----------|
 | "Docker is not installed or not in PATH" | Install Docker Desktop and ensure `docker` is in your PATH |
 | "Docker daemon is not running" | Start Docker Desktop or run `sudo systemctl start docker` |
-| "No Docker image specified for agent 'codex'" | Build Codex image locally (see above) or specify custom image |
 | Container can't find files | Ensure files are under the project directory (mounted at `/workspace`) |
 | API key not working in container | Verify the env var is set in your shell: `echo $ANTHROPIC_API_KEY` |
 

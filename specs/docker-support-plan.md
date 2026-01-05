@@ -135,14 +135,8 @@ agents:
 | Agent | Default Image | Source | Notes |
 |-------|---------------|--------|-------|
 | Claude | `ghcr.io/zeeno-atl/claude-code:latest` | [GitHub](https://github.com/Zeeno-atl/claude-code) | Always installs latest CLI |
-| Codex | *None - must be configured* | [GitHub](https://github.com/openai/codex-universal) | No published image; requires local build or custom image |
+| Codex | `diablotin74/codex-cli:latest` | [Docker Hub](https://hub.docker.com/r/diablotin74/codex-cli) | Community-maintained image |
 | Gemini | `tgagor/gemini-cli:latest` | [Docker Hub](https://hub.docker.com/r/tgagor/gemini-cli) | Actively maintained, tracks latest CLI |
-
-> **Codex Docker Setup:** OpenAI does not publish pre-built Docker images for Codex CLI. Users must either:
-> 1. Build locally: `git clone https://github.com/openai/codex-universal && docker build -t codex-universal:latest .`
-> 2. Use a community image and specify it in `arena.yaml`: `docker.image: "your-image:tag"`
->
-> If `docker.enabled: true` is set for Codex without specifying an image, the arena will fail fast with a clear error message listing available options.
 
 ## Architecture
 
@@ -280,9 +274,9 @@ public class DockerCommandBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(DockerCommandBuilder.class);
 
-    // Note: Codex has no default - OpenAI doesn't publish pre-built images
     private static final Map<String, String> DEFAULT_IMAGES = Map.of(
         "claude", "ghcr.io/zeeno-atl/claude-code:latest",
+        "codex", "diablotin74/codex-cli:latest",
         "gemini", "tgagor/gemini-cli:latest"
     );
 
@@ -353,10 +347,7 @@ public class DockerCommandBuilder {
         if (image == null) {
             throw new ConfigException(
                 "No Docker image specified for agent '%s' and no default available. ".formatted(agentName) +
-                "For Codex, you must build or specify an image:\n" +
-                "  Option 1: Build locally: git clone https://github.com/openai/codex-universal && " +
-                "docker build -t codex-universal:latest .\n" +
-                "  Option 2: Specify in arena.yaml: agents.codex.docker.image: \"your-image:tag\"\n" +
+                "Specify an image in arena.yaml: agents.<name>.docker.image: \"your-image:tag\"\n" +
                 "Available default images: " + DEFAULT_IMAGES.keySet());
         }
         result.add(image);
@@ -1253,7 +1244,7 @@ Unit tests will pass because they use mocks or test pure logic.
 | Docker not installed | `Docker is not installed or not in PATH. Install Docker Desktop or ensure 'docker' command is available.` |
 | Docker daemon not running | `Docker daemon is not running. Start Docker Desktop or run 'sudo systemctl start docker'.` |
 | Image not found | `Docker image '{image}' not found. Run 'docker pull {image}' or check the image name.` |
-| No default image (Codex) | `No Docker image specified for agent 'codex' and no default available. For Codex, you must build or specify an image: Option 1: Build locally... Option 2: Specify in arena.yaml...` |
+| No default image | `No Docker image specified for agent '<name>' and no default available. Specify an image in arena.yaml...` |
 | Path outside project | `Command argument '{path}' is an absolute path outside the project directory '{workingDir}'. Docker containers can only access files mounted at /workspace.` |
 
 ## Rollback Strategy

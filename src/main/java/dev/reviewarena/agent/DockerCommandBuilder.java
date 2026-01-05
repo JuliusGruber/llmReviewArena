@@ -33,9 +33,9 @@ public class DockerCommandBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(DockerCommandBuilder.class);
 
-    // Note: Codex has no default - OpenAI doesn't publish pre-built images
     private static final Map<String, String> DEFAULT_IMAGES = Map.of(
         "claude", "ghcr.io/zeeno-atl/claude-code:latest",
+        "codex", "diablotin74/codex-cli:latest",
         "gemini", "tgagor/gemini-cli:latest"
     );
 
@@ -272,10 +272,7 @@ public class DockerCommandBuilder {
             throw new ConfigException(
                 "No Docker image specified for agent '%s' (type '%s') and no default available. "
                     .formatted(agentName, agentType) +
-                "For Codex, you must build or specify an image:\n" +
-                "  Option 1: Build locally: git clone https://github.com/openai/codex-universal && " +
-                "docker build -t codex-universal:latest .\n" +
-                "  Option 2: Specify in arena.yaml: agents.codex.docker.image: \"your-image:tag\"\n" +
+                "Specify an image in arena.yaml: agents.<name>.docker.image: \"your-image:tag\"\n" +
                 "Available default images: " + DEFAULT_IMAGES.keySet());
         }
         result.add(image);

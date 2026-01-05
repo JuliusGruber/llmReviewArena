@@ -129,16 +129,13 @@ class DockerCommandBuilderTest {
     }
 
     @Test
-    void build_throwsForCodexWithoutConfiguredImage() {
+    void build_usesDefaultImageForCodex() {
         DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("codex", "exec", "prompt.md");
 
-        ConfigException ex = assertThrows(ConfigException.class,
-            () -> builder.build("codex", "codex", docker, command, tempDir, "codex-container"));
+        List<String> result = builder.build("codex", "codex", docker, command, tempDir, "codex-container");
 
-        assertTrue(ex.getMessage().contains("No Docker image specified for agent 'codex'"));
-        assertTrue(ex.getMessage().contains("no default available"));
-        assertTrue(ex.getMessage().contains("Build locally"));
+        assertTrue(result.contains("diablotin74/codex-cli:latest"));
     }
 
     @Test
