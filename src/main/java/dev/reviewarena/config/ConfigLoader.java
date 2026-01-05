@@ -261,19 +261,19 @@ public class ConfigLoader {
     }
 
     /**
-     * Infers agent type from agent name for backward compatibility.
+     * Infers agent type from agent name using type-aliases from config.
      *
      * @param agentName the agent name
      * @return inferred type, or null if not recognizable
      */
     private String inferTypeFromName(String agentName) {
         String lowerName = agentName.toLowerCase();
-        if (lowerName.startsWith("claude")) {
-            return "claude";
-        } else if (lowerName.startsWith("codex")) {
-            return "codex";
-        } else if (lowerName.startsWith("gemini")) {
-            return "gemini";
+        for (var entry : typeAliases.entrySet()) {
+            for (String prefix : entry.getValue()) {
+                if (lowerName.startsWith(prefix.toLowerCase())) {
+                    return entry.getKey();
+                }
+            }
         }
         return null;
     }
