@@ -343,14 +343,13 @@ public class ReviewArenaCli implements Callable<Integer> {
     }
 
     private CliOverrides buildCliOverrides(int effectiveConcurrency) {
-        // Only override if CLI value differs from default
-        Integer roundsOverride = maxRounds != ArenaConfig.DEFAULT_MAX_ROUNDS ? maxRounds : null;
-        Integer concurrentOverride = effectiveConcurrency != ArenaConfig.DEFAULT_MAX_CONCURRENT
-                                     ? effectiveConcurrency : null;
+        // Only override if CLI value differs from picocli default
+        // These values must match the defaultValue in @Option annotations above
+        Integer roundsOverride = maxRounds != 5 ? maxRounds : null;
+        Integer concurrentOverride = effectiveConcurrency != 0 ? effectiveConcurrency : null;
         // --quiet flag overrides show-agent-output to false
         Boolean showAgentOutputOverride = quiet ? Boolean.FALSE : null;
-        Path outputOverride = !outputDir.equals(Path.of(ArenaConfig.DEFAULT_OUTPUT_DIR))
-                              ? outputDir : null;
+        Path outputOverride = !outputDir.equals(Path.of(".arena")) ? outputDir : null;
 
         return new CliOverrides(roundsOverride, concurrentOverride, showAgentOutputOverride, outputOverride);
     }

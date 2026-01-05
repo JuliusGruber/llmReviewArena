@@ -33,13 +33,13 @@ class WorkspaceManagerTest {
 
         defaultConfig = new ArenaConfig(
             2,  // maxRounds (rounds 0, 1, 2)
-            ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB,
-            ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT,
-            ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS,
+            500,    // maxOutputSizeKb
+            0,      // maxConcurrent (unlimited)
+            true,   // showAgentOutput
+            600000, // agentTimeoutMs (10 min)
+            900000, // roundTimeoutMs (15 min)
+            5000,   // gracePeriodMs
+            1,      // minAgents
             Path.of(".arena"),
             agents
         );
@@ -250,10 +250,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
+            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -271,10 +268,7 @@ class WorkspaceManagerTest {
     @Test
     void testInitialize_usesCustomOutputDir() {
         ArenaConfig config = new ArenaConfig(
-            1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-output"),  // custom output dir
+            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of("custom-output"),
             Map.of("agent1", AgentConfig.of("agent1", List.of("cmd")))
         );
 
@@ -336,11 +330,7 @@ class WorkspaceManagerTest {
     @Test
     void testInitialize_oneRound_createsRound0AndRound1() {
         ArenaConfig config = new ArenaConfig(
-            1,  // maxRounds = 1 (minimum: round-0 + one cross-pollination round)
-            ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"),
+            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"),
             Map.of("agent1", AgentConfig.of("agent1", List.of("cmd")))
         );
 
@@ -361,10 +351,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            1, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
+            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -388,11 +375,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            7, // maxRounds = 7 (rounds 0-7, with 6 and 7 using round-5 template)
-            ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
+            7, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -423,11 +406,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            8, // maxRounds = 8
-            ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of(".arena"), agents
+            8, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -505,10 +484,7 @@ class WorkspaceManagerTest {
     @Test
     void testGenerateSynthesisPrompt_usesConfigOutputDir() throws IOException {
         ArenaConfig customConfig = new ArenaConfig(
-            2, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-out"),
+            2, 500, 0, true, 600000, 900000, 5000, 1, Path.of("custom-out"),
             Map.of("claude", AgentConfig.of("claude", List.of("claude")))
         );
 
@@ -540,10 +516,7 @@ class WorkspaceManagerTest {
     @Test
     void testRegenerateRoundPrompts_usesConfigOutputDir() throws IOException {
         ArenaConfig customConfig = new ArenaConfig(
-            2, ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, ArenaConfig.DEFAULT_MAX_CONCURRENT,
-            ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS,
-            ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, ArenaConfig.DEFAULT_GRACE_PERIOD_MS,
-            ArenaConfig.DEFAULT_MIN_AGENTS, Path.of("custom-out"),
+            2, 500, 0, true, 600000, 900000, 5000, 1, Path.of("custom-out"),
             Map.of("claude", AgentConfig.of("claude", List.of("claude")))
         );
 

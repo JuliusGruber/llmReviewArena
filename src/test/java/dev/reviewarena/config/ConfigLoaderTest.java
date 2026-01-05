@@ -30,10 +30,11 @@ class ConfigLoaderTest {
         // Load from non-existent arena.yaml - should use application.yaml defaults
         ArenaConfig config = loader.load(tempDir.resolve("nonexistent.yaml"), CliOverrides.none());
 
-        assertEquals(ArenaConfig.DEFAULT_MAX_ROUNDS, config.maxRounds());
-        assertEquals(ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, config.maxOutputSizeKb());
-        assertEquals(ArenaConfig.DEFAULT_MAX_CONCURRENT, config.maxConcurrent());
-        assertEquals(ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, config.agentTimeoutMs());
+        // Values from application.yaml (single source of truth)
+        assertEquals(5, config.maxRounds());
+        assertEquals(500, config.maxOutputSizeKb());
+        assertEquals(0, config.maxConcurrent());
+        assertEquals(600_000, config.agentTimeoutMs());
     }
 
     @Test
@@ -75,7 +76,8 @@ class ConfigLoaderTest {
 
         ArenaConfig config = loader.load(nonExistent, CliOverrides.none());
 
-        assertEquals(ArenaConfig.DEFAULT_MAX_ROUNDS, config.maxRounds());
+        // Value from application.yaml (single source of truth)
+        assertEquals(5, config.maxRounds());
     }
 
     @Test
@@ -326,7 +328,8 @@ class ConfigLoaderTest {
         ArenaConfig config = loader.load();
 
         assertNotNull(config);
-        assertEquals(ArenaConfig.DEFAULT_MAX_ROUNDS, config.maxRounds());
+        // Value from application.yaml (single source of truth)
+        assertEquals(5, config.maxRounds());
     }
 
     @Test
