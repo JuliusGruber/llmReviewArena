@@ -24,6 +24,15 @@ meta:
       - gemini
       - google
 
+#==============================================================================
+# AGENT-DEFAULTS: Applied when agent properties not specified
+#==============================================================================
+agent-defaults:
+  enabled: true
+  docker:
+    enabled: false
+    sandbox: false
+
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)
   max-output-size-kb: 500
