@@ -50,6 +50,7 @@ public class AgentProcess implements AutoCloseable {
     private final DockerConfig dockerConfig;
     private final DockerCommandBuilder dockerCommandBuilder;
     private final String dockerContainerName;  // null if not Docker mode or sandbox
+    private final boolean synthesis;
 
     private Process process;
     private Instant startTime;
@@ -77,6 +78,7 @@ public class AgentProcess implements AutoCloseable {
         this.dockerContainerName = dockerConfig.enabled() && !dockerConfig.sandbox()
             ? agentName
             : null;
+        this.synthesis = builder.synthesis;
     }
 
     /**
@@ -89,7 +91,11 @@ public class AgentProcess implements AutoCloseable {
      * @return the execution result
      */
     public AgentResult execute() {
-        log.info("Starting agent '{}' for round {}", agentName, round);
+        if (synthesis) {
+            log.info("Starting agent '{}'", agentName);
+        } else {
+            log.info("Starting agent '{}' for round {}", agentName, round);
+        }
         log.debug("Command: {}", command);
         log.debug("Working directory: {}", workingDir);
 
@@ -484,6 +490,7 @@ public class AgentProcess implements AutoCloseable {
         private OutputValidator outputValidator;
         private boolean showOutput = true; // Default to showing output
         private DockerConfig dockerConfig;
+        private boolean synthesis = false; // Default to false (regular round)
 
         public Builder agentName(String agentName) {
             this.agentName = agentName;
@@ -563,6 +570,15 @@ public class AgentProcess implements AutoCloseable {
          */
         public Builder dockerConfig(DockerConfig dockerConfig) {
             this.dockerConfig = dockerConfig;
+            return this;
+        }
+
+        /**
+         * Sets whether this is a synthesis process (not part of a competitive round).
+         * When true, the log message will not include the round number.
+         */
+        public Builder synthesis(boolean synthesis) {
+            this.synthesis = synthesis;
             return this;
         }
 

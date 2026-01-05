@@ -349,6 +349,7 @@ public class AgentExecutor {
             .outputValidator(outputValidator)
             .showOutput(config.showAgentOutput())
             .dockerConfig(agentConfig.docker())  // Pass Docker config
+            .synthesis(true)                     // Mark as synthesis (not a competitive round)
             .build()) {
 
             AgentResult result = process.execute();
