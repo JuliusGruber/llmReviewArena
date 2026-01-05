@@ -12,8 +12,10 @@ Implement JVM shutdown hook to clean up Docker containers when the application i
 
 ### Current Behavior
 
-1. **Container creation** (`DockerCommandBuilder.java:174-177`):
+1. **Container creation** (`DockerCommandBuilder.java:173-177`):
    ```java
+   result.add("docker");
+   result.add("run");
    result.add("--rm");                    // Ephemeral container
    result.add("--name");
    result.add(agentName);                 // Container named after agent
@@ -99,6 +101,7 @@ JVM Shutdown Signal (Ctrl+C, SIGTERM, terminal close)
 | Sandbox mode | No tracking needed | `docker sandbox run` handles cleanup automatically |
 | `close()` calls `docker stop` | Yes, before destroying process tree | Ensures cleanup even if shutdown hook doesn't run; `docker stop` is idempotent so duplicate calls are safe |
 | `stopContainer()` visibility | `public static` | Allows `AgentProcess.close()` to reuse the same logic as the shutdown hook |
+| Blocking behavior in `close()` | Up to 8 seconds per container | `STOP_TIMEOUT_SECONDS` (5s) + `COMMAND_TIMEOUT_SECONDS` (3s) is acceptable for reliable cleanup |
 
 ### Why Not Track by Docker Container ID?
 
@@ -140,6 +143,16 @@ import java.util.concurrent.TimeUnit;
  *
  * <p><b>Note:</b> Only containers started with {@code docker run} (not sandbox mode)
  * need to be tracked. Sandbox mode handles cleanup automatically.
+ *
+ * <p><b>Blocking behavior:</b> The {@link #stopContainer(String)} method may block
+ * for up to {@code STOP_TIMEOUT_SECONDS + COMMAND_TIMEOUT_SECONDS} (8 seconds by default)
+ * per container. When called from {@code AgentProcess.close()}, this ensures reliable
+ * container cleanup but adds latency to the close operation. This is acceptable because:
+ * <ul>
+ *   <li>Reliable cleanup is more important than fast close() in Docker mode</li>
+ *   <li>The timeout is bounded and predictable</li>
+ *   <li>Normal (non-Docker) execution is unaffected</li>
+ * </ul>
  */
 public final class DockerContainerRegistry {
 
@@ -362,6 +375,9 @@ if (dockerContainerName != null) {
 // Stop and unregister Docker container
 // This ensures cleanup even if shutdown hook doesn't run (e.g., normal exit path)
 // docker stop is idempotent, so it's safe if shutdown hook also calls it
+//
+// NOTE: stopContainer() may block for up to 8 seconds (STOP_TIMEOUT + COMMAND_TIMEOUT).
+// This is acceptable because reliable container cleanup is more important than fast close().
 if (dockerContainerName != null) {
     DockerContainerRegistry.stopContainer(dockerContainerName);
     DockerContainerRegistry.unregister(dockerContainerName);
@@ -421,6 +437,9 @@ if (dockerContainerName != null) {
 +        // Stop and unregister Docker container BEFORE destroying process tree.
 +        // This ensures graceful container shutdown via SIGTERM -> SIGKILL.
 +        // docker stop is idempotent, so it's safe if shutdown hook also calls it.
++        //
++        // NOTE: stopContainer() may block for up to 8 seconds (STOP_TIMEOUT + COMMAND_TIMEOUT).
++        // This is acceptable because reliable container cleanup is more important than fast close().
 +        if (dockerContainerName != null) {
 +            DockerContainerRegistry.stopContainer(dockerContainerName);
 +            DockerContainerRegistry.unregister(dockerContainerName);
@@ -644,43 +663,62 @@ class DockerContainerCleanupIT {
 
 ### AgentProcessTest Extensions
 
+**Note:** These tests verify Docker registration behavior via the `DockerContainerRegistry` API.
+Testing actual Docker container lifecycle requires integration tests (see `DockerContainerCleanupIT`).
+The approach follows existing `AgentProcessTest` patterns which run real processes rather than mocking.
+
 ```java
 @Test
-void execute_dockerEnabled_registersContainer() {
-    // Given: Docker-enabled config
-    DockerConfig dockerConfig = new DockerConfig(true, false, "test-image", null, null, null);
+void execute_dockerDisabled_doesNotRegisterContainer() {
+    // Given: Docker disabled
+    DockerContainerRegistry.clearForTesting();
+    DockerConfig dockerConfig = DockerConfig.disabled();
 
-    // When: AgentProcess is built and started (mocked)
-    // Then: Container should be registered with DockerContainerRegistry
+    // When: AgentProcess executes with a simple script (same pattern as existing tests)
+    // ... build and execute agent with dockerConfig ...
 
-    // Note: This test requires mocking ProcessBuilder or using a test double
-}
-
-@Test
-void close_dockerEnabled_stopsAndUnregistersContainer() {
-    // Given: A started AgentProcess with Docker enabled
-    // When: close() is called
-    // Then: DockerContainerRegistry.stopContainer() should be called
-    // And: Container should be unregistered from DockerContainerRegistry
-}
-
-@Test
-void close_dockerEnabled_stopsContainerBeforeDestroyingProcess() {
-    // Given: A running AgentProcess with Docker enabled
-    // When: close() is called
-    // Then: docker stop should complete BEFORE destroyProcessTree() is called
-    // This ensures graceful container shutdown
+    // Then: No container should be registered
+    assertThat(DockerContainerRegistry.getActiveCount()).isEqualTo(0);
 }
 
 @Test
 void execute_sandboxMode_doesNotRegisterContainer() {
     // Given: Docker sandbox mode config
+    DockerContainerRegistry.clearForTesting();
     DockerConfig dockerConfig = new DockerConfig(true, true, null, null, null, null);
 
-    // When: AgentProcess executes
-    // Then: No container should be registered (sandbox handles cleanup)
+    // When: AgentProcess is built
+    // Then: dockerContainerName should be null (sandbox handles cleanup)
+    // Note: Cannot easily test execute() without actual Docker sandbox available
+    // The field initialization logic is tested via the disabled test above
+}
+
+@Test
+void dockerContainerName_regularDockerMode_matchesAgentName() {
+    // Given: Regular Docker mode (enabled=true, sandbox=false)
+    DockerConfig dockerConfig = new DockerConfig(true, false, "test-image", null, null, null);
+
+    // When: AgentProcess is built with agentName="claude"
+    // Then: dockerContainerName field should equal "claude"
+    // This is verified by inspecting registration behavior in integration tests
+}
+
+@Test
+void close_isIdempotent_dockerMode() {
+    // Given: An AgentProcess with Docker config (using disabled for unit test)
+    DockerContainerRegistry.clearForTesting();
+    // ... build agent ...
+
+    // When: close() is called multiple times
+    agent.close();
+    agent.close();
+
+    // Then: No errors (idempotent behavior preserved)
+    assertThat(DockerContainerRegistry.getActiveCount()).isEqualTo(0);
 }
 ```
+
+**Full Docker registration/unregistration tests** are in `DockerContainerCleanupIT.java` which requires Docker to be available.
 
 ## Implementation Steps
 
