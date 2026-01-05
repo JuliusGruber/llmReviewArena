@@ -102,6 +102,7 @@ JVM Shutdown Signal (Ctrl+C, SIGTERM, terminal close)
 | `close()` calls `docker stop` | Yes, before destroying process tree | Ensures cleanup even if shutdown hook doesn't run; `docker stop` is idempotent so duplicate calls are safe |
 | `stopContainer()` visibility | `public static` | Allows `AgentProcess.close()` to reuse the same logic as the shutdown hook |
 | Blocking behavior in `close()` | Up to 8 seconds per container | `STOP_TIMEOUT_SECONDS` (5s) + `COMMAND_TIMEOUT_SECONDS` (3s) is acceptable for reliable cleanup |
+| `close()` vs shutdown hook stopping | Serial in `close()`, parallel in shutdown hook | `close()` stops one container (the one it owns); shutdown hook stops all remaining containers in parallel via virtual threads. Serial `close()` is acceptable since each AgentProcess owns exactly one container. |
 
 ### Why Not Track by Docker Container ID?
 
