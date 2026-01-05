@@ -42,14 +42,14 @@ execution:
   show-agent-output: true  # Stream agent output to console with prefixes
 
 timeouts:
-  # agent-timeout-ms uses ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS (600000 / 10 min)
+  agent-timeout-ms: 600000    # 10 minutes per agent
   round-timeout-ms: 900000    # 15 minutes
   grace-period-ms: 5000       # 5 seconds
   on-timeout: kill-and-skip
   preserve-partial-output: false
 
 tournament:
-  min-agents: 2
+  min-agents: 1  # Changed from 2 - self-consistent with only claude enabled
 
 output:
   dir: .arena
