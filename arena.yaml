@@ -54,29 +54,29 @@ agents:
   # Codex - runs in Docker with native Rust CLI
   # Build the image first: docker build -t codex-cli:latest docker/codex/
   # Note: Docker entrypoint is "codex exec", so command only needs the arguments
-  codex:
-    type: codex
-    docker:
-      enabled: true
-      image: "codex-cli:latest"
-    command:
-      - --full-auto
-      - -o
-      - "@output"
-      - "-"   # Read prompt from stdin
-    enabled: true
-
-  # Gemini - temporarily disabled
-  # gemini:
-  #   type: gemini
+  # codex:
+  #   type: codex
   #   docker:
   #     enabled: true
-  #     image: "tgagor/gemini-cli:latest"
+  #     image: "codex-cli:latest"
   #   command:
-  #     - gemini
-  #   flags:
-  #     auto-approve: true
+  #     - --full-auto
+  #     - -o
+  #     - "@output"
+  #     - "-"   # Read prompt from stdin
   #   enabled: true
+
+  # Gemini
+  gemini:
+    type: gemini
+    docker:
+      enabled: true
+      image: "tgagor/gemini-cli:latest"
+    command:
+      - gemini
+    flags:
+      auto-approve: true
+    enabled: true
 
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)
