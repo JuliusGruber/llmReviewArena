@@ -47,15 +47,15 @@ agents:
   #     output-format: json  # Single JSON output with .result field
   #   enabled: true
 
-  # Codex - temporarily disabled
+  # Codex - Docker mode enabled
   codex:
     type: codex
     # Docker mode requires building Codex image locally:
     #   git clone https://github.com/openai/codex-universal
     #   docker build -t codex-universal:latest .
-    # docker:
-    #   enabled: true
-    #   image: "codex-universal:latest"  # Required - no default image
+    docker:
+      enabled: true
+      image: "codex-universal:latest"  # Required - no default image
     command:
       - python
       - src/main/resources/codex-wrapper.py
@@ -63,19 +63,19 @@ agents:
       - "@output"
     flags:
       auto-approve: true
-    enabled: false  # Explicitly disabled
-
-  # Gemini - Docker mode enabled for testing
-  gemini:
-    type: gemini
-    docker:
-      enabled: true
-      image: "tgagor/gemini-cli:latest"
-    command:
-      - gemini
-    flags:
-      auto-approve: true
     enabled: true
+
+  # Gemini - temporarily disabled
+  # gemini:
+  #   type: gemini
+  #   docker:
+  #     enabled: true
+  #     image: "tgagor/gemini-cli:latest"
+  #   command:
+  #     - gemini
+  #   flags:
+  #     auto-approve: true
+  #   enabled: true
 
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)
