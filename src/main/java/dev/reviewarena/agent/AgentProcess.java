@@ -74,9 +74,9 @@ public class AgentProcess implements AutoCloseable {
         this.dockerConfig = Objects.requireNonNull(builder.dockerConfig);
         this.dockerCommandBuilder = new DockerCommandBuilder();
         // Track container name for cleanup - only for regular Docker mode (not sandbox)
-        // Container name matches agentName because DockerCommandBuilder uses --name {agentName}
+        // Container name includes PID suffix to prevent conflicts when running multiple instances
         this.dockerContainerName = dockerConfig.enabled() && !dockerConfig.sandbox()
-            ? agentName
+            ? DockerCommandBuilder.generateContainerName(agentName)
             : null;
         this.synthesis = builder.synthesis;
     }
@@ -448,7 +448,8 @@ public class AgentProcess implements AutoCloseable {
                 agentType,
                 dockerConfig,
                 command,  // Contains HOST paths from CommandBuilder
-                workingDir
+                workingDir,
+                dockerContainerName  // Unique name with PID suffix (null for sandbox mode)
             );
         }
 

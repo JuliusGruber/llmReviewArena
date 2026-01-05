@@ -30,7 +30,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent", "-p", "prompt.md");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertTrue(result.contains("docker"));
         assertTrue(result.contains("run"));
@@ -43,7 +43,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         // Bridge is Docker's default - we omit --network flag
         assertFalse(result.contains("--network"));
@@ -56,7 +56,7 @@ class DockerCommandBuilderTest {
 
         // On non-Linux, host networking falls back to bridge (no --network flag)
         // On Linux, it would add --network host
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("linux")) {
@@ -75,7 +75,7 @@ class DockerCommandBuilderTest {
         List<String> command = List.of("agent");
 
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> builder.build("test", "claude", docker, command, tempDir));
+            () -> builder.build("test", "claude", docker, command, tempDir, "test-container"));
 
         assertTrue(ex.getMessage().contains("Invalid Docker networkMode"));
         assertTrue(ex.getMessage().contains("custom-invalid"));
@@ -86,7 +86,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertTrue(result.contains("-v"));
         String volumeMount = result.get(result.indexOf("-v") + 1);
@@ -102,7 +102,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "custom-image:v1.0", null, null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("claude", "claude", docker, command, tempDir);
+        List<String> result = builder.build("claude", "claude", docker, command, tempDir, "claude-container");
 
         assertTrue(result.contains("custom-image:v1.0"));
         assertFalse(result.contains("ghcr.io/zeeno-atl/claude-code:latest"));
@@ -113,7 +113,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("claude", "-p", "prompt.md");
 
-        List<String> result = builder.build("claude", "claude", docker, command, tempDir);
+        List<String> result = builder.build("claude", "claude", docker, command, tempDir, "claude-container");
 
         assertTrue(result.contains("ghcr.io/zeeno-atl/claude-code:latest"));
     }
@@ -123,7 +123,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("gemini", "-p", "prompt.md");
 
-        List<String> result = builder.build("gemini", "gemini", docker, command, tempDir);
+        List<String> result = builder.build("gemini", "gemini", docker, command, tempDir, "gemini-container");
 
         assertTrue(result.contains("tgagor/gemini-cli:latest"));
     }
@@ -134,7 +134,7 @@ class DockerCommandBuilderTest {
         List<String> command = List.of("codex", "exec", "prompt.md");
 
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> builder.build("codex", "codex", docker, command, tempDir));
+            () -> builder.build("codex", "codex", docker, command, tempDir, "codex-container"));
 
         assertTrue(ex.getMessage().contains("No Docker image specified for agent 'codex'"));
         assertTrue(ex.getMessage().contains("no default available"));
@@ -146,7 +146,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", "4g", null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertTrue(result.contains("--memory"));
         assertEquals("4g", result.get(result.indexOf("--memory") + 1));
@@ -157,7 +157,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, "2", null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertTrue(result.contains("--cpus"));
         assertEquals("2", result.get(result.indexOf("--cpus") + 1));
@@ -168,7 +168,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", "8g", "4", null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertTrue(result.contains("--memory"));
         assertEquals("8g", result.get(result.indexOf("--memory") + 1));
@@ -181,7 +181,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertThrows(UnsupportedOperationException.class, () -> result.add("extra"));
     }
@@ -192,7 +192,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
         List<String> command = List.of("claude");
 
-        List<String> result = builder.build("fast-reviewer", "claude", docker, command, tempDir);
+        List<String> result = builder.build("fast-reviewer", "claude", docker, command, tempDir, "fast-reviewer-container");
 
         assertTrue(result.contains("ghcr.io/zeeno-atl/claude-code:latest"));
     }
@@ -205,7 +205,7 @@ class DockerCommandBuilderTest {
         List<String> command = List.of("agent");
 
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> builder.build("test", "claude", docker, command, tempDir));
+            () -> builder.build("test", "claude", docker, command, tempDir, "test-container"));
 
         assertTrue(ex.getMessage().contains("Invalid Docker memory format"));
         assertTrue(ex.getMessage().contains("4g --privileged"));
@@ -217,7 +217,7 @@ class DockerCommandBuilderTest {
         List<String> command = List.of("agent");
 
         ConfigException ex = assertThrows(ConfigException.class,
-            () -> builder.build("test", "claude", docker, command, tempDir));
+            () -> builder.build("test", "claude", docker, command, tempDir, "test-container"));
 
         assertTrue(ex.getMessage().contains("Invalid Docker cpus format"));
     }
@@ -227,17 +227,17 @@ class DockerCommandBuilderTest {
         // Lowercase
         assertDoesNotThrow(() -> builder.build("test", "claude",
             new DockerConfig(true, false, "test-image:latest", "512m", null, null),
-            List.of("agent"), tempDir));
+            List.of("agent"), tempDir, "test-container"));
 
         // Uppercase
         assertDoesNotThrow(() -> builder.build("test", "claude",
             new DockerConfig(true, false, "test-image:latest", "4G", null, null),
-            List.of("agent"), tempDir));
+            List.of("agent"), tempDir, "test-container"));
 
         // No suffix (bytes)
         assertDoesNotThrow(() -> builder.build("test", "claude",
             new DockerConfig(true, false, "test-image:latest", "1073741824", null, null),
-            List.of("agent"), tempDir));
+            List.of("agent"), tempDir, "test-container"));
     }
 
     @Test
@@ -245,17 +245,17 @@ class DockerCommandBuilderTest {
         // Integer
         assertDoesNotThrow(() -> builder.build("test", "claude",
             new DockerConfig(true, false, "test-image:latest", null, "2", null),
-            List.of("agent"), tempDir));
+            List.of("agent"), tempDir, "test-container"));
 
         // Decimal
         assertDoesNotThrow(() -> builder.build("test", "claude",
             new DockerConfig(true, false, "test-image:latest", null, "1.5", null),
-            List.of("agent"), tempDir));
+            List.of("agent"), tempDir, "test-container"));
 
         // Small fraction
         assertDoesNotThrow(() -> builder.build("test", "claude",
             new DockerConfig(true, false, "test-image:latest", null, "0.5", null),
-            List.of("agent"), tempDir));
+            List.of("agent"), tempDir, "test-container"));
     }
 
     // User mapping tests (Issue 4: File ownership)
@@ -266,7 +266,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertTrue(result.contains("--user"));
         int userIdx = result.indexOf("--user");
@@ -280,7 +280,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         assertFalse(result.contains("--user"));
     }
@@ -399,7 +399,7 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
 
-        List<String> result = builder.build("test", "claude", docker, command, tempDir);
+        List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
         // Check that no command argument contains "=" after an API key name
         List<String> apiKeyEnvVars = List.of(
@@ -429,7 +429,8 @@ class DockerCommandBuilderTest {
         DockerConfig docker = new DockerConfig(true, true, null, null, null, null);
         List<String> command = List.of("claude", "-p", "prompt.md");
 
-        List<String> result = builder.build("claude", "claude", docker, command, tempDir);
+        // containerName is ignored for sandbox mode
+        List<String> result = builder.build("claude", "claude", docker, command, tempDir, null);
 
         List<String> apiKeyEnvVars = List.of(
             "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
@@ -441,5 +442,41 @@ class DockerCommandBuilderTest {
                     "API key value should not be exposed in sandbox command: " + arg);
             }
         }
+    }
+
+    // Container name uniqueness tests (Issue 89)
+
+    @Test
+    void generateContainerName_appendsPidToBaseName() {
+        String baseName = "claude";
+        long expectedPid = ProcessHandle.current().pid();
+
+        String containerName = DockerCommandBuilder.generateContainerName(baseName);
+
+        assertEquals(baseName + "-" + expectedPid, containerName);
+    }
+
+    @Test
+    void generateContainerName_worksWithSynthesisSuffix() {
+        String baseName = "claude-synthesis";
+        long expectedPid = ProcessHandle.current().pid();
+
+        String containerName = DockerCommandBuilder.generateContainerName(baseName);
+
+        assertEquals(baseName + "-" + expectedPid, containerName);
+    }
+
+    @Test
+    void build_usesProvidedContainerName() {
+        DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
+        List<String> command = List.of("agent");
+        String uniqueContainerName = "claude-12345";
+
+        List<String> result = builder.build("claude", "claude", docker, command, tempDir, uniqueContainerName);
+
+        // Verify the unique container name is used in --name
+        int nameIdx = result.indexOf("--name");
+        assertTrue(nameIdx >= 0, "Should contain --name flag");
+        assertEquals(uniqueContainerName, result.get(nameIdx + 1));
     }
 }

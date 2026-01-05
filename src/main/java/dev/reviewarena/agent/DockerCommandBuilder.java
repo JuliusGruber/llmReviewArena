@@ -55,17 +55,32 @@ public class DockerCommandBuilder {
     private static final Set<String> VALID_NETWORK_MODES = Set.of("bridge", "host", "none");
 
     /**
+     * Generates a unique container name by appending the current process ID.
+     *
+     * <p>This prevents container name conflicts when running multiple instances
+     * of the application simultaneously (e.g., reviewing different projects
+     * in parallel).
+     *
+     * @param baseName Base container name (typically the agent name)
+     * @return Unique container name with PID suffix (e.g., "claude-12345")
+     */
+    public static String generateContainerName(String baseName) {
+        return baseName + "-" + ProcessHandle.current().pid();
+    }
+
+    /**
      * Wraps an agent command with docker run or docker sandbox run.
      *
      * <p>The command arguments should contain HOST paths (absolute paths on the host
      * filesystem). This method scans the command for paths under workingDir and
      * translates them to container paths (/workspace/...).
      *
-     * @param agentName   Name of the agent (for default image lookup or sandbox agent name)
-     * @param agentType   Agent type (claude, codex, gemini) for type-specific behavior
-     * @param docker      Docker configuration
-     * @param command     Agent command with HOST paths (as produced by CommandBuilder)
-     * @param workingDir  Host working directory to mount as /workspace
+     * @param agentName     Name of the agent (for default image lookup or sandbox agent name)
+     * @param agentType     Agent type (claude, codex, gemini) for type-specific behavior
+     * @param docker        Docker configuration
+     * @param command       Agent command with HOST paths (as produced by CommandBuilder)
+     * @param workingDir    Host working directory to mount as /workspace
+     * @param containerName Unique container name for --name flag (used in docker run mode only)
      * @return Complete docker command with translated paths
      */
     public List<String> build(
@@ -73,12 +88,13 @@ public class DockerCommandBuilder {
             String agentType,
             DockerConfig docker,
             List<String> command,
-            Path workingDir
+            Path workingDir,
+            String containerName
     ) {
         if (docker.sandbox()) {
             return buildSandboxCommand(agentName, agentType, docker, command, workingDir);
         }
-        return buildDockerRunCommand(agentName, agentType, docker, command, workingDir);
+        return buildDockerRunCommand(agentName, agentType, docker, command, workingDir, containerName);
     }
 
     /**
@@ -170,7 +186,8 @@ public class DockerCommandBuilder {
             String agentType,
             DockerConfig docker,
             List<String> command,
-            Path workingDir
+            Path workingDir,
+            String containerName
     ) {
         // Validate resource limits before building command
         validateResourceLimits(docker);
@@ -181,7 +198,7 @@ public class DockerCommandBuilder {
         result.add("run");
         result.add("--rm");                    // Ephemeral container
         result.add("--name");
-        result.add(agentName);                 // Name container after the agent
+        result.add(containerName);             // Unique container name (includes PID)
         result.add("-i");                      // Keep stdin open for prompt redirection
 
         // Network configuration (defaults to bridge if not specified)
