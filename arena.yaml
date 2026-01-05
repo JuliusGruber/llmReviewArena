@@ -51,18 +51,19 @@ agents:
   claude:
     enabled: false
 
-  # Codex - uses Python wrapper for non-interactive execution
+  # Codex - runs in Docker with native Rust CLI
+  # Build the image first: docker build -t codex-cli:latest docker/codex/
+  # Note: Docker entrypoint is "codex exec", so command only needs the arguments
   codex:
     type: codex
     docker:
-      enabled: false
+      enabled: true
+      image: "codex-cli:latest"
     command:
-      - python
-      - src/main/resources/codex-wrapper.py
-      - "@prompt.md"
+      - --full-auto
+      - -o
       - "@output"
-    flags:
-      auto-approve: true
+      - "-"   # Read prompt from stdin
     enabled: true
 
   # Gemini - temporarily disabled

@@ -35,7 +35,8 @@ public class DockerCommandBuilder {
 
     private static final Map<String, String> DEFAULT_IMAGES = Map.of(
         "claude", "ghcr.io/zeeno-atl/claude-code:latest",
-        "codex", "diablotin74/codex-cli:latest",
+        // Codex: No default image - user must build from docker/codex/Dockerfile
+        // The community images (e.g., diablotin74/codex-cli) don't support non-interactive mode
         "gemini", "tgagor/gemini-cli:latest"
     );
 

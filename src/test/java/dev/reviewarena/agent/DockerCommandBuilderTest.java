@@ -129,13 +129,28 @@ class DockerCommandBuilderTest {
     }
 
     @Test
-    void build_usesDefaultImageForCodex() {
+    void build_throwsForCodexWithoutImage() {
+        // Codex has no default image - community images don't support non-interactive mode
+        // Users must build their own from docker/codex/Dockerfile
         DockerConfig docker = new DockerConfig(true, false, null, null, null, null);
+        List<String> command = List.of("codex", "exec", "prompt.md");
+
+        ConfigException ex = assertThrows(ConfigException.class, () ->
+            builder.build("codex", "codex", docker, command, tempDir, "codex-container"));
+
+        assertTrue(ex.getMessage().contains("No Docker image specified"));
+        assertTrue(ex.getMessage().contains("codex"));
+    }
+
+    @Test
+    void build_usesExplicitImageForCodex() {
+        // When image is explicitly specified, it should be used
+        DockerConfig docker = new DockerConfig(true, false, "codex-cli:latest", null, null, null);
         List<String> command = List.of("codex", "exec", "prompt.md");
 
         List<String> result = builder.build("codex", "codex", docker, command, tempDir, "codex-container");
 
-        assertTrue(result.contains("diablotin74/codex-cli:latest"));
+        assertTrue(result.contains("codex-cli:latest"));
     }
 
     @Test
