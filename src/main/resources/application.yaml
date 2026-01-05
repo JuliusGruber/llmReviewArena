@@ -11,6 +11,19 @@ meta:
     - codex
     - gemini
 
+  # Type inference from agent name prefixes
+  # Agent "claude-fast" -> type "claude", "anthropic-agent" -> type "claude"
+  type-aliases:
+    claude:
+      - claude
+      - anthropic
+    codex:
+      - codex
+      - openai
+    gemini:
+      - gemini
+      - google
+
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)
   max-output-size-kb: 500
