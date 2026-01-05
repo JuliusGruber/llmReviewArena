@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,13 +31,11 @@ public class ConfigLoader {
 
     private static final String DEFAULT_CONFIG_FILE = "arena.yaml";
 
-    /**
-     * Known agent types for validation.
-     * If an agent specifies or infers a type not in this set, configuration fails.
-     */
-    private static final Set<String> KNOWN_TYPES = Set.of("claude", "codex", "gemini");
-
     private final Path baseDir;
+
+    // Loaded from config at runtime (fail-fast if missing)
+    private Set<String> knownTypes;
+    private Map<String, List<String>> typeAliases;
 
     /**
      * Creates a ConfigLoader using the current working directory as base.
@@ -129,6 +128,9 @@ public class ConfigLoader {
     }
 
     private ArenaConfig buildArenaConfig(SmallRyeConfig config, CliOverrides overrides) {
+        // Load metadata from config (fail-fast if missing)
+        this.knownTypes = loadKnownTypes(config);
+
         // Load limits
         int maxRounds = overrides.maxRounds() != null
             ? overrides.maxRounds()
@@ -301,6 +303,20 @@ public class ConfigLoader {
             .orElse(null);
 
         return new DockerConfig(true, sandbox, image, memory, cpus, networkMode);
+    }
+
+    /**
+     * Loads known agent types from meta.known-agent-types config.
+     * Fails fast if missing or empty.
+     */
+    private Set<String> loadKnownTypes(SmallRyeConfig config) {
+        Optional<List<String>> types = config.getOptionalValues("meta.known-agent-types", String.class);
+        if (types.isEmpty() || types.get().isEmpty()) {
+            throw new ConfigException(
+                "Missing required 'meta.known-agent-types' in application.yaml. " +
+                "Example: meta.known-agent-types: [claude, codex, gemini]");
+        }
+        return new HashSet<>(types.get());
     }
 
     private Map<String, Object> loadAgentFlags(SmallRyeConfig config, String prefix) {
