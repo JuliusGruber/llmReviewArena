@@ -49,4 +49,4 @@ agents:
       - gemini                # positional prompt mode (reads from stdin)
     flags:
       auto-approve: true
-    enabled: true
+    enabled: false            # Disabled by default - enable in arena.yaml if needed
