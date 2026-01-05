@@ -294,7 +294,9 @@ public class AgentProcess implements AutoCloseable {
 
                         // Print to console with agent prefix if enabled
                         if (showOutput) {
-                            log.info("[{}] {}", agentName, line);
+                            // For JSON output format, extract just the human-readable result
+                            String displayLine = formatOutputLine(line);
+                            log.info("[{}] {}", agentName, displayLine);
                         }
                         log.debug("[{}:{}] {}", agentName, name, line);
                     }
@@ -330,6 +332,26 @@ public class AgentProcess implements AutoCloseable {
 
     private long getDurationMs() {
         return Duration.between(startTime, Instant.now()).toMillis();
+    }
+
+    /**
+     * Formats an output line for human-readable display.
+     *
+     * <p>When Claude CLI is run with {@code --output-format json}, it outputs a single JSON object
+     * containing verbose metadata (tokens, costs, UUIDs, etc.). This method extracts just the
+     * human-readable {@code result} field for cleaner console output.
+     *
+     * @param line the raw output line
+     * @return the formatted line (extracted result if JSON, original line otherwise)
+     */
+    private String formatOutputLine(String line) {
+        // Try to extract human-readable result from JSON output
+        String result = JsonOutputParser.extractResult(line);
+        if (result != null) {
+            return result;
+        }
+        // Not JSON or no result field - return original line
+        return line;
     }
 
     /**
