@@ -72,20 +72,10 @@ public record ArenaConfig(
     }
 
     /**
-     * Creates a config with all default values (no agents configured).
+     * Creates a config with all default values from application.yaml.
+     * Delegates to ConfigLoader to ensure single source of truth.
      */
     public static ArenaConfig defaults() {
-        return new ArenaConfig(
-            DEFAULT_MAX_ROUNDS,
-            DEFAULT_MAX_OUTPUT_SIZE_KB,
-            DEFAULT_MAX_CONCURRENT,
-            DEFAULT_SHOW_AGENT_OUTPUT,
-            DEFAULT_AGENT_TIMEOUT_MS,
-            DEFAULT_ROUND_TIMEOUT_MS,
-            DEFAULT_GRACE_PERIOD_MS,
-            DEFAULT_MIN_AGENTS,
-            Path.of(DEFAULT_OUTPUT_DIR),
-            Map.of()
-        );
+        return new ConfigLoader().load();
     }
 }
