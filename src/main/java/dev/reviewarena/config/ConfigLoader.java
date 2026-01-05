@@ -130,6 +130,7 @@ public class ConfigLoader {
     private ArenaConfig buildArenaConfig(SmallRyeConfig config, CliOverrides overrides) {
         // Load metadata from config (fail-fast if missing)
         this.knownTypes = loadKnownTypes(config);
+        this.typeAliases = loadTypeAliases(config);
 
         // Load limits
         int maxRounds = overrides.maxRounds() != null
@@ -317,6 +318,44 @@ public class ConfigLoader {
                 "Example: meta.known-agent-types: [claude, codex, gemini]");
         }
         return new HashSet<>(types.get());
+    }
+
+    /**
+     * Loads type aliases from meta.type-aliases config.
+     * Returns a map of type -> list of prefixes that map to that type.
+     * Fails fast if missing.
+     */
+    private Map<String, List<String>> loadTypeAliases(SmallRyeConfig config) {
+        Map<String, List<String>> aliases = new HashMap<>();
+
+        // Find all keys matching meta.type-aliases.<type>[n]
+        Set<String> typeNames = new HashSet<>();
+        for (String key : config.getPropertyNames()) {
+            if (key.startsWith("meta.type-aliases.")) {
+                // Extract type name: "meta.type-aliases.claude[0]" -> "claude"
+                String rest = key.substring("meta.type-aliases.".length());
+                int bracket = rest.indexOf('[');
+                String typeName = bracket > 0 ? rest.substring(0, bracket) : rest;
+                typeNames.add(typeName);
+            }
+        }
+
+        if (typeNames.isEmpty()) {
+            throw new ConfigException(
+                "Missing required 'meta.type-aliases' in application.yaml. " +
+                "Example: meta.type-aliases.claude: [claude, anthropic]");
+        }
+
+        // Load alias lists for each type
+        for (String typeName : typeNames) {
+            Optional<List<String>> aliasList = config.getOptionalValues(
+                "meta.type-aliases." + typeName, String.class);
+            if (aliasList.isPresent() && !aliasList.get().isEmpty()) {
+                aliases.put(typeName, aliasList.get());
+            }
+        }
+
+        return aliases;
     }
 
     private Map<String, Object> loadAgentFlags(SmallRyeConfig config, String prefix) {
