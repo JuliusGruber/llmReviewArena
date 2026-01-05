@@ -1,6 +1,6 @@
 # Local arena configuration to enable all agents
 agents:
-  claude:
+  claude1:
     type: claude
     # Regular Docker mode with credential mounting
     # Authenticate locally first with: claude /login
@@ -32,38 +32,38 @@ agents:
       output-format: json  # Single JSON output with .result field
     enabled: true
 
-  # claude3:
-  #   type: claude
-  #   # Third Claude instance
+    claude3:
+      type: claude
+      # Second Claude instance
+      docker:
+        enabled: true
+        sandbox: false
+        image: "docker/sandbox-templates:claude-code"
+      command:
+        - claude
+        - -p
+      flags:
+        auto-approve: true
+        output-format: json  # Single JSON output with .result field
+      enabled: true
+
+  # Codex - Docker mode enabled (temporarily disabled)
+  # codex:
+  #   type: codex
+  #   # Docker mode requires building Codex image locally:
+  #   #   git clone https://github.com/openai/codex-universal
+  #   #   docker build -t codex-universal:latest .
   #   docker:
   #     enabled: true
-  #     sandbox: false
-  #     image: "docker/sandbox-templates:claude-code"
+  #     image: "codex-universal:latest"  # Required - no default image
   #   command:
-  #     - claude
-  #     - -p
+  #     - python
+  #     - src/main/resources/codex-wrapper.py
+  #     - "@prompt.md"
+  #     - "@output"
   #   flags:
   #     auto-approve: true
-  #     output-format: json  # Single JSON output with .result field
   #   enabled: true
-
-  # Codex - Docker mode enabled
-  codex:
-    type: codex
-    # Docker mode requires building Codex image locally:
-    #   git clone https://github.com/openai/codex-universal
-    #   docker build -t codex-universal:latest .
-    docker:
-      enabled: true
-      image: "codex-universal:latest"  # Required - no default image
-    command:
-      - python
-      - src/main/resources/codex-wrapper.py
-      - "@prompt.md"
-      - "@output"
-    flags:
-      auto-approve: true
-    enabled: true
 
   # Gemini - temporarily disabled
   # gemini:
