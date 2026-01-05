@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Wrapper script to run codex with prompt from file.
 
-Uses 'codex exec' for non-interactive execution with --output-last-message
-to write the review directly to the output file.
+Uses 'codex exec' for non-interactive execution. The prompt instructs codex
+where to write the review file directly (no -o flag needed).
 """
 import subprocess
 import sys
@@ -40,16 +40,18 @@ if codex_path is None:
     sys.exit(1)
 
 # Build command using 'codex exec' with stdin for prompt
-# -o writes the last message directly to the output file
+# NOTE: Do NOT use -o flag here! The prompt already tells codex where to write
+# the review file. Using -o would overwrite the file with codex's final message
+# (e.g., "Review written to...") instead of the actual review content.
 cmd = [
     codex_path, 'exec',
     '--full-auto',
-    '-o', output_file,
     '-'  # Read prompt from stdin
 ]
 
 print(f"Running codex exec with prompt from {prompt_file}", file=sys.stderr)
 print(f"Using codex at: {codex_path}", file=sys.stderr)
+print(f"Expecting codex to write review to: {output_file}", file=sys.stderr)
 
 # On Windows, we need shell=True for .cmd files to work properly
 use_shell = platform.system() == 'Windows'
@@ -61,11 +63,13 @@ if result.returncode != 0:
     print(f"stdout: {result.stdout[-2000:] if result.stdout else '(empty)'}", file=sys.stderr)
     sys.exit(1)
 
-# Verify output was written
+# Verify output was written by codex (as instructed in the prompt)
 if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-    print(f"Review written to {output_file}", file=sys.stderr)
+    print(f"Review successfully written to {output_file}", file=sys.stderr)
     sys.exit(0)
 else:
-    print("Error: No review content written to output file", file=sys.stderr)
+    print("Error: Codex did not write the review file", file=sys.stderr)
+    print(f"Expected output at: {output_file}", file=sys.stderr)
     print(f"stdout: {result.stdout[-2000:] if result.stdout else '(empty)'}", file=sys.stderr)
+    print(f"stderr: {result.stderr[-2000:] if result.stderr else '(empty)'}", file=sys.stderr)
     sys.exit(1)

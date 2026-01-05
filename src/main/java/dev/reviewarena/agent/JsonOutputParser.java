@@ -50,10 +50,11 @@ public class JsonOutputParser {
             }
             return null;
         } catch (JsonSyntaxException e) {
-            log.warn("Failed to parse JSON output: {}", e.getMessage());
+            // Debug level: non-JSON output is expected for agents like codex
+            log.debug("Output is not JSON (expected for non-JSON agents): {}", e.getMessage());
             return null;
         } catch (IllegalStateException e) {
-            log.warn("JSON output is not an object: {}", e.getMessage());
+            log.debug("JSON output is not an object: {}", e.getMessage());
             return null;
         }
     }
