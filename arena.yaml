@@ -12,8 +12,11 @@ agents:
     command:
       - claude
       - -p
+      - --include-partial-messages  # Required for stream-json tool use visibility
     flags:
       auto-approve: true
+      verbose: true           # Required for stream-json output
+      output-format: stream-json  # Shows tool use, reasoning, token usage in real-time
     enabled: true
 
   claude2:
@@ -26,8 +29,11 @@ agents:
     command:
       - claude
       - -p
+      - --include-partial-messages
     flags:
       auto-approve: true
+      verbose: true
+      output-format: stream-json
     enabled: true
 
   claude3:
@@ -40,8 +46,11 @@ agents:
     command:
       - claude
       - -p
+      - --include-partial-messages
     flags:
       auto-approve: true
+      verbose: true
+      output-format: stream-json
     enabled: true
 
   # Codex - temporarily disabled

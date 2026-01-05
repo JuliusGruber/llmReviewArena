@@ -16,6 +16,8 @@ import java.util.Map;
  * <ul>
  *   <li>auto-approve: claude → --dangerously-skip-permissions, codex → --full-auto, gemini → --yolo</li>
  *   <li>allowed-tools: claude only → --allowedTools</li>
+ *   <li>verbose: claude only → --verbose (shows tool use and reasoning in batch mode)</li>
+ *   <li>output-format: claude only → --output-format (json, stream-json, or text)</li>
  * </ul>
  *
  * <p>Supports placeholders in command templates:
@@ -113,6 +115,25 @@ public class CommandBuilder {
                 if (!toolsCsv.isEmpty()) {
                     command.add("--allowedTools");
                     command.add(toolsCsv);
+                }
+            }
+        }
+
+        // Translate verbose flag (Claude only) - shows tool use and reasoning in batch mode
+        if ("claude".equals(type) && Boolean.TRUE.equals(flags.get("verbose"))) {
+            if (!command.contains("--verbose")) {
+                command.add("--verbose");
+            }
+        }
+
+        // Translate output-format flag (Claude only) - json, stream-json, or text
+        if ("claude".equals(type) && flags.containsKey("output-format")) {
+            Object outputFormat = flags.get("output-format");
+            if (outputFormat != null) {
+                String format = outputFormat.toString();
+                if (!command.contains("--output-format")) {
+                    command.add("--output-format");
+                    command.add(format);
                 }
             }
         }
