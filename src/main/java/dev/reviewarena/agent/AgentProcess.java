@@ -376,13 +376,13 @@ public class AgentProcess implements AutoCloseable {
 
         // Stop and unregister Docker container BEFORE destroying process tree.
         // This ensures graceful container shutdown via SIGTERM -> SIGKILL.
-        // docker stop is idempotent, so it's safe if shutdown hook also calls it.
+        // Using atomic stopAndUnregister() prevents race with shutdown hook -
+        // only one caller (close() or shutdown hook) will actually stop the container.
         //
         // NOTE: stopContainer() may block for up to 8 seconds (STOP_TIMEOUT + COMMAND_TIMEOUT).
         // This is acceptable because reliable container cleanup is more important than fast close().
         if (dockerContainerName != null) {
-            DockerContainerRegistry.stopContainer(dockerContainerName);
-            DockerContainerRegistry.unregister(dockerContainerName);
+            DockerContainerRegistry.stopAndUnregister(dockerContainerName);
         }
 
         log.debug("Closing agent process resources for '{}'", agentName);

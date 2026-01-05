@@ -98,6 +98,30 @@ public final class DockerContainerRegistry {
     }
 
     /**
+     * Atomically removes a container from tracking and stops it.
+     *
+     * <p>This method ensures only one caller (either {@code close()} or shutdown hook)
+     * stops each container by atomically removing it from the set before stopping.
+     * If the container was already removed by another caller, this method returns
+     * false and does not attempt to stop it.
+     *
+     * @param containerName the container to stop and unregister
+     * @return true if this call stopped the container, false if already removed
+     */
+    public static boolean stopAndUnregister(String containerName) {
+        if (containerName == null || containerName.isBlank()) {
+            return false;
+        }
+        if (activeContainers.remove(containerName)) {
+            log.debug("Atomically removed and stopping Docker container: {}", containerName);
+            stopContainer(containerName);
+            return true;
+        }
+        log.debug("Container '{}' already removed by another caller", containerName);
+        return false;
+    }
+
+    /**
      * Returns the number of currently registered containers.
      * Primarily for testing.
      */
@@ -168,7 +192,8 @@ public final class DockerContainerRegistry {
             try {
                 thread.join(COMMAND_TIMEOUT_SECONDS * 1000L);
                 if (thread.isAlive()) {
-                    log.warn("Timeout waiting for docker stop command to complete");
+                    log.warn("Timeout waiting for docker stop command for container '{}'",
+                        thread.getName().substring("docker-stop-".length()));
                     thread.interrupt();
                 }
             } catch (InterruptedException e) {

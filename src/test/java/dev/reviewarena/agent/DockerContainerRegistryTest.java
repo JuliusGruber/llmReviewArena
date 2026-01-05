@@ -114,4 +114,61 @@ class DockerContainerRegistryTest {
 
         assertThat(DockerContainerRegistry.getActiveCount()).isEqualTo(threadCount);
     }
+
+    @Test
+    void stopAndUnregister_returnsTrue_whenContainerExists() {
+        DockerContainerRegistry.register("claude");
+        boolean result = DockerContainerRegistry.stopAndUnregister("claude");
+        assertThat(result).isTrue();
+        assertThat(DockerContainerRegistry.getActiveCount()).isEqualTo(0);
+    }
+
+    @Test
+    void stopAndUnregister_returnsFalse_whenContainerNotExists() {
+        boolean result = DockerContainerRegistry.stopAndUnregister("nonexistent");
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void stopAndUnregister_nullOrBlank_returnsFalse() {
+        assertThat(DockerContainerRegistry.stopAndUnregister(null)).isFalse();
+        assertThat(DockerContainerRegistry.stopAndUnregister("")).isFalse();
+        assertThat(DockerContainerRegistry.stopAndUnregister("   ")).isFalse();
+    }
+
+    @Test
+    void concurrentStopAndUnregister_onlyOneSucceeds() throws InterruptedException {
+        // Register a single container
+        DockerContainerRegistry.register("claude");
+
+        // Call stopAndUnregister from two threads concurrently
+        java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch doneLatch = new java.util.concurrent.CountDownLatch(2);
+
+        Runnable task = () -> {
+            try {
+                startLatch.await(); // Wait for both threads to be ready
+                if (DockerContainerRegistry.stopAndUnregister("claude")) {
+                    successCount.incrementAndGet();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                doneLatch.countDown();
+            }
+        };
+
+        Thread t1 = new Thread(task);
+        Thread t2 = new Thread(task);
+        t1.start();
+        t2.start();
+
+        startLatch.countDown(); // Release both threads
+        doneLatch.await(); // Wait for both to complete
+
+        // Only one thread should have returned true
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(DockerContainerRegistry.getActiveCount()).isEqualTo(0);
+    }
 }
