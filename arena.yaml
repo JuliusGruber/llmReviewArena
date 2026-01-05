@@ -70,7 +70,7 @@ agents:
     type: gemini
     docker:
       enabled: true
-      image: "naoyoshinori/gemini-cli:node"
+      image: "tgagor/gemini-cli:latest"
     command:
       - gemini
     flags:
