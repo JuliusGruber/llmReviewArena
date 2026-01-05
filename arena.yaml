@@ -32,20 +32,24 @@ agents:
       output-format: json  # Single JSON output with .result field
     enabled: true
 
-    claude3:
-      type: claude
-      # Second Claude instance
-      docker:
-        enabled: true
-        sandbox: false
-        image: "docker/sandbox-templates:claude-code"
-      command:
-        - claude
-        - -p
-      flags:
-        auto-approve: true
-        output-format: json  # Single JSON output with .result field
+  claude3:
+    type: claude
+    # Third Claude instance
+    docker:
       enabled: true
+      sandbox: false
+      image: "docker/sandbox-templates:claude-code"
+    command:
+      - claude
+      - -p
+    flags:
+      auto-approve: true
+      output-format: json  # Single JSON output with .result field
+    enabled: true
+
+  # Disable default claude agent from application.yaml (we use claude1/2/3 instead)
+  claude:
+    enabled: false
 
   # Codex - Docker mode enabled (temporarily disabled)
   # codex:
