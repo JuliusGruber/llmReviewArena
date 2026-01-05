@@ -141,7 +141,7 @@ agents:
 | Agent | Default Image | Notes |
 |-------|---------------|-------|
 | Claude | `ghcr.io/zeeno-atl/claude-code:latest` | Always installs latest CLI |
-| Gemini | `naoyoshinori/gemini-cli:node` | Community-maintained image |
+| Gemini | `tgagor/gemini-cli:latest` | Community-maintained image |
 | Codex | *None - must be configured* | Requires local build (see below) |
 
 ### Codex Docker Setup

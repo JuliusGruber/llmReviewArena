@@ -35,7 +35,7 @@ public class DockerCommandBuilder {
     // Note: Codex has no default - OpenAI doesn't publish pre-built images
     private static final Map<String, String> DEFAULT_IMAGES = Map.of(
         "claude", "ghcr.io/zeeno-atl/claude-code:latest",
-        "gemini", "naoyoshinori/gemini-cli:node"
+        "gemini", "tgagor/gemini-cli:latest"
     );
 
     // Agents supported by Docker Desktop Sandbox ('docker sandbox run')

@@ -123,7 +123,7 @@ agents:
   gemini:
     docker:
       enabled: true
-      image: "naoyoshinori/gemini-cli:node"  # Optional, has default
+      image: "tgagor/gemini-cli:latest"  # Optional, has default
     command: ["gemini", "-p", "@prompt.md"]
     flags:
       auto-approve: true
@@ -136,7 +136,7 @@ agents:
 |-------|---------------|--------|-------|
 | Claude | `ghcr.io/zeeno-atl/claude-code:latest` | [GitHub](https://github.com/Zeeno-atl/claude-code) | Always installs latest CLI |
 | Codex | *None - must be configured* | [GitHub](https://github.com/openai/codex-universal) | No published image; requires local build or custom image |
-| Gemini | `naoyoshinori/gemini-cli:node` | [Docker Hub](https://hub.docker.com/r/naoyoshinori/gemini-cli) | Well-maintained community image |
+| Gemini | `tgagor/gemini-cli:latest` | [Docker Hub](https://hub.docker.com/r/tgagor/gemini-cli) | Actively maintained, tracks latest CLI |
 
 > **Codex Docker Setup:** OpenAI does not publish pre-built Docker images for Codex CLI. Users must either:
 > 1. Build locally: `git clone https://github.com/openai/codex-universal && docker build -t codex-universal:latest .`
@@ -283,7 +283,7 @@ public class DockerCommandBuilder {
     // Note: Codex has no default - OpenAI doesn't publish pre-built images
     private static final Map<String, String> DEFAULT_IMAGES = Map.of(
         "claude", "ghcr.io/zeeno-atl/claude-code:latest",
-        "gemini", "naoyoshinori/gemini-cli:node"
+        "gemini", "tgagor/gemini-cli:latest"
     );
 
     private static final List<String> API_KEY_ENV_VARS = List.of(

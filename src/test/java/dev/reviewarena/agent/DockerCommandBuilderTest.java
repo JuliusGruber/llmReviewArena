@@ -125,7 +125,7 @@ class DockerCommandBuilderTest {
 
         List<String> result = builder.build("gemini", "gemini", docker, command, tempDir);
 
-        assertTrue(result.contains("naoyoshinori/gemini-cli:node"));
+        assertTrue(result.contains("tgagor/gemini-cli:latest"));
     }
 
     @Test
