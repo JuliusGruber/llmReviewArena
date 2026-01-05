@@ -1,6 +1,16 @@
 # Review Arena - Default Configuration
 # These values are used when not overridden by arena.yaml or CLI arguments
 
+#==============================================================================
+# META: Configuration metadata (moved from Java constants)
+#==============================================================================
+meta:
+  # Valid agent types - add new types here, no Java changes needed
+  known-agent-types:
+    - claude
+    - codex
+    - gemini
+
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)
   max-output-size-kb: 500
