@@ -58,10 +58,8 @@ agents:
       enabled: true
       image: "diablotin74/codex-cli:latest"
     command:
-      - python
-      - src/main/resources/codex-wrapper.py
+      - codex
       - "@prompt.md"
-      - "@output"
     flags:
       auto-approve: true
     enabled: true
