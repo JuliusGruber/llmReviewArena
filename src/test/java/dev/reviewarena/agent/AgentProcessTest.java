@@ -509,4 +509,166 @@ class AgentProcessTest {
                 // Missing dockerConfig
                 .build());
     }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void execute_dockerDisabled_doesNotRegisterContainer_windows() throws IOException {
+        // Reset the registry before test
+        DockerContainerRegistry.clearForTesting();
+
+        // Create a simple batch script that writes output
+        Path script = tempDir.resolve("test.bat");
+        Files.writeString(script, """
+            @echo off
+            echo # Review > "%1\\review.md"
+            echo Content >> "%1\\review.md"
+            """);
+
+        AgentProcess agent = AgentProcess.builder()
+            .agentName("test-docker-disabled")
+            .agentType("claude")
+            .round(0)
+            .command(List.of("cmd", "/c", script.toString(), outputDir.toString()))
+            .workingDir(tempDir)
+            .outputFile(outputFile)
+            .stdoutLog(stdoutLog)
+            .stderrLog(stderrLog)
+            .timeoutMs(10_000)
+            .gracePeriodMs(1_000)
+            .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
+            .build();
+
+        agent.execute();
+
+        // Verify no container was registered (Docker is disabled)
+        assertEquals(0, DockerContainerRegistry.getActiveCount());
+
+        // Cleanup
+        DockerContainerRegistry.clearForTesting();
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void execute_dockerDisabled_doesNotRegisterContainer_unix() throws IOException {
+        // Reset the registry before test
+        DockerContainerRegistry.clearForTesting();
+
+        // Create a simple shell script that writes output
+        Path script = tempDir.resolve("test.sh");
+        Files.writeString(script, """
+            #!/bin/bash
+            echo "# Review" > "$1/review.md"
+            echo "Content" >> "$1/review.md"
+            """);
+        script.toFile().setExecutable(true);
+
+        AgentProcess agent = AgentProcess.builder()
+            .agentName("test-docker-disabled")
+            .agentType("claude")
+            .round(0)
+            .command(List.of("bash", script.toString(), outputDir.toString()))
+            .workingDir(tempDir)
+            .outputFile(outputFile)
+            .stdoutLog(stdoutLog)
+            .stderrLog(stderrLog)
+            .timeoutMs(10_000)
+            .gracePeriodMs(1_000)
+            .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
+            .build();
+
+        agent.execute();
+
+        // Verify no container was registered (Docker is disabled)
+        assertEquals(0, DockerContainerRegistry.getActiveCount());
+
+        // Cleanup
+        DockerContainerRegistry.clearForTesting();
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void close_isIdempotent_dockerDisabled_windows() throws IOException {
+        // Reset the registry before test
+        DockerContainerRegistry.clearForTesting();
+
+        // Create a simple batch script
+        Path script = tempDir.resolve("test.bat");
+        Files.writeString(script, """
+            @echo off
+            echo # Review > "%1\\review.md"
+            """);
+
+        AgentProcess agent = AgentProcess.builder()
+            .agentName("test-idempotent")
+            .agentType("claude")
+            .round(0)
+            .command(List.of("cmd", "/c", script.toString(), outputDir.toString()))
+            .workingDir(tempDir)
+            .outputFile(outputFile)
+            .stdoutLog(stdoutLog)
+            .stderrLog(stderrLog)
+            .timeoutMs(10_000)
+            .gracePeriodMs(1_000)
+            .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
+            .build();
+
+        agent.execute();
+
+        // Call close multiple times - should not throw
+        agent.close();
+        agent.close();
+        agent.close();
+
+        // No exception = success
+        assertEquals(0, DockerContainerRegistry.getActiveCount());
+
+        // Cleanup
+        DockerContainerRegistry.clearForTesting();
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void close_isIdempotent_dockerDisabled_unix() throws IOException {
+        // Reset the registry before test
+        DockerContainerRegistry.clearForTesting();
+
+        // Create a simple shell script
+        Path script = tempDir.resolve("test.sh");
+        Files.writeString(script, """
+            #!/bin/bash
+            echo "# Review" > "$1/review.md"
+            """);
+        script.toFile().setExecutable(true);
+
+        AgentProcess agent = AgentProcess.builder()
+            .agentName("test-idempotent")
+            .agentType("claude")
+            .round(0)
+            .command(List.of("bash", script.toString(), outputDir.toString()))
+            .workingDir(tempDir)
+            .outputFile(outputFile)
+            .stdoutLog(stdoutLog)
+            .stderrLog(stderrLog)
+            .timeoutMs(10_000)
+            .gracePeriodMs(1_000)
+            .outputValidator(validator)
+            .dockerConfig(DockerConfig.disabled())
+            .build();
+
+        agent.execute();
+
+        // Call close multiple times - should not throw
+        agent.close();
+        agent.close();
+        agent.close();
+
+        // No exception = success
+        assertEquals(0, DockerContainerRegistry.getActiveCount());
+
+        // Cleanup
+        DockerContainerRegistry.clearForTesting();
+    }
 }

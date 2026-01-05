@@ -49,6 +49,7 @@ public class AgentProcess implements AutoCloseable {
     private final boolean showOutput;
     private final DockerConfig dockerConfig;
     private final DockerCommandBuilder dockerCommandBuilder;
+    private final String dockerContainerName;  // null if not Docker mode or sandbox
 
     private Process process;
     private Instant startTime;
@@ -71,6 +72,11 @@ public class AgentProcess implements AutoCloseable {
         this.showOutput = builder.showOutput;
         this.dockerConfig = Objects.requireNonNull(builder.dockerConfig);
         this.dockerCommandBuilder = new DockerCommandBuilder();
+        // Track container name for cleanup - only for regular Docker mode (not sandbox)
+        // Container name matches agentName because DockerCommandBuilder uses --name {agentName}
+        this.dockerContainerName = dockerConfig.enabled() && !dockerConfig.sandbox()
+            ? agentName
+            : null;
     }
 
     /**
@@ -112,6 +118,11 @@ public class AgentProcess implements AutoCloseable {
             // that may not be released if the process crashes quickly (causes file locking on Windows)
 
             process = pb.start();
+
+            // Register Docker container for shutdown cleanup (non-sandbox mode only)
+            if (dockerContainerName != null) {
+                DockerContainerRegistry.register(dockerContainerName);
+            }
 
             // Pipe prompt content to stdin from memory (no file handle held)
             if (promptContent != null) {
@@ -340,6 +351,17 @@ public class AgentProcess implements AutoCloseable {
             return;
         }
         closed = true;
+
+        // Stop and unregister Docker container BEFORE destroying process tree.
+        // This ensures graceful container shutdown via SIGTERM -> SIGKILL.
+        // docker stop is idempotent, so it's safe if shutdown hook also calls it.
+        //
+        // NOTE: stopContainer() may block for up to 8 seconds (STOP_TIMEOUT + COMMAND_TIMEOUT).
+        // This is acceptable because reliable container cleanup is more important than fast close().
+        if (dockerContainerName != null) {
+            DockerContainerRegistry.stopContainer(dockerContainerName);
+            DockerContainerRegistry.unregister(dockerContainerName);
+        }
 
         log.debug("Closing agent process resources for '{}'", agentName);
 
