@@ -527,6 +527,9 @@ public class AgentProcess implements AutoCloseable {
             if (agentName == null || agentName.isBlank()) {
                 throw new IllegalStateException("agentName is required");
             }
+            if (agentType == null || agentType.isBlank()) {
+                throw new IllegalStateException("agentType is required");
+            }
             if (command == null || command.isEmpty()) {
                 throw new IllegalStateException("command is required");
             }

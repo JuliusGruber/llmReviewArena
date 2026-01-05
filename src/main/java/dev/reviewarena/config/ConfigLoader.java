@@ -229,6 +229,7 @@ public class ConfigLoader {
 
         // Load type (explicit or inferred from name)
         String type = config.getOptionalValue(prefix + ".type", String.class)
+            .map(String::toLowerCase)
             .orElseGet(() -> inferTypeFromName(agentName));
 
         // Validate type

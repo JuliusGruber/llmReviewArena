@@ -320,10 +320,29 @@ class AgentProcessTest {
     }
 
     @Test
+    void builder_missingAgentType_throws() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+            AgentProcess.builder()
+                .agentName("test")
+                // agentType intentionally omitted
+                .command(List.of("echo", "test"))
+                .workingDir(tempDir)
+                .outputFile(outputFile)
+                .stdoutLog(stdoutLog)
+                .stderrLog(stderrLog)
+                .outputValidator(validator)
+                .dockerConfig(DockerConfig.disabled())
+                .build());
+
+        assertEquals("agentType is required", ex.getMessage());
+    }
+
+    @Test
     void builder_missingCommand_throws() {
         assertThrows(IllegalStateException.class, () ->
             AgentProcess.builder()
                 .agentName("test")
+                .agentType("claude")
                 .workingDir(tempDir)
                 .outputFile(outputFile)
                 .stdoutLog(stdoutLog)
