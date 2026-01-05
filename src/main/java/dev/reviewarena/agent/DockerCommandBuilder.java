@@ -401,8 +401,14 @@ public class DockerCommandBuilder {
         }
 
         try {
-            // Create temp file in system temp dir (not in workingDir to keep it clean)
-            Path envFile = Files.createTempFile("docker-env-", ".env");
+            // Create temp file in project's .arena/ directory (not system temp).
+            // This ensures Docker can access it on Windows where Docker Desktop
+            // (WSL2 backend) may have issues reading from system temp directory.
+            // The .arena/ directory is already used for arena files and is mounted
+            // as /workspace/.arena/ in the container.
+            Path arenaDir = workingDir.resolve(".arena");
+            Files.createDirectories(arenaDir);  // Ensure .arena exists
+            Path envFile = Files.createTempFile(arenaDir, "docker-env-", ".env");
             envFile.toFile().deleteOnExit();  // Clean up on JVM exit
             Files.writeString(envFile, envContent.toString(), StandardCharsets.UTF_8);
             log.debug("Created env file for Docker: {}", envFile);
