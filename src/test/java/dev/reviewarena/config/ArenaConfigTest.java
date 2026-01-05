@@ -15,16 +15,18 @@ class ArenaConfigTest {
     void testDefaults_hasExpectedValues() {
         ArenaConfig config = ArenaConfig.defaults();
 
-        assertEquals(ArenaConfig.DEFAULT_MAX_ROUNDS, config.maxRounds());
-        assertEquals(ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB, config.maxOutputSizeKb());
-        assertEquals(ArenaConfig.DEFAULT_MAX_CONCURRENT, config.maxConcurrent());
-        assertEquals(ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT, config.showAgentOutput());
-        assertEquals(ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS, config.agentTimeoutMs());
-        assertEquals(ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS, config.roundTimeoutMs());
-        assertEquals(ArenaConfig.DEFAULT_GRACE_PERIOD_MS, config.gracePeriodMs());
-        assertEquals(ArenaConfig.DEFAULT_MIN_AGENTS, config.minAgents());
-        assertEquals(Path.of(ArenaConfig.DEFAULT_OUTPUT_DIR), config.outputDir());
-        assertTrue(config.agents().isEmpty());
+        // Values from application.yaml (single source of truth)
+        assertEquals(5, config.maxRounds());
+        assertEquals(500, config.maxOutputSizeKb());
+        assertEquals(0, config.maxConcurrent());
+        assertTrue(config.showAgentOutput());
+        assertEquals(600_000, config.agentTimeoutMs());
+        assertEquals(900_000, config.roundTimeoutMs());
+        assertEquals(5_000, config.gracePeriodMs());
+        assertEquals(1, config.minAgents()); // Changed from 2 to 1 for self-consistency
+        assertEquals(Path.of(".arena"), config.outputDir());
+        // Default agents are now loaded from application.yaml
+        assertFalse(config.agents().isEmpty());
     }
 
     @Test
@@ -139,16 +141,17 @@ class ArenaConfigTest {
     }
 
     // Helper to create config with modifications
+    // Values match application.yaml defaults
     private static class ConfigBuilder {
-        int maxRounds = ArenaConfig.DEFAULT_MAX_ROUNDS;
-        int maxOutputSizeKb = ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB;
-        int maxConcurrent = ArenaConfig.DEFAULT_MAX_CONCURRENT;
-        boolean showAgentOutput = ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT;
-        long agentTimeoutMs = ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS;
-        long roundTimeoutMs = ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS;
-        long gracePeriodMs = ArenaConfig.DEFAULT_GRACE_PERIOD_MS;
-        int minAgents = ArenaConfig.DEFAULT_MIN_AGENTS;
-        Path outputDir = Path.of(ArenaConfig.DEFAULT_OUTPUT_DIR);
+        int maxRounds = 5;
+        int maxOutputSizeKb = 500;
+        int maxConcurrent = 0;
+        boolean showAgentOutput = true;
+        long agentTimeoutMs = 600_000;
+        long roundTimeoutMs = 900_000;
+        long gracePeriodMs = 5_000;
+        int minAgents = 1;
+        Path outputDir = Path.of(".arena");
         Map<String, AgentConfig> agents = Map.of();
 
         ArenaConfig build() {
