@@ -16,6 +16,14 @@
 
 FROM node:22-slim
 
+# Install CA certificates for TLS connections and git for repository operations.
+# The node:22-slim base image is minimal and excludes system CA certs.
+# The codex Rust binary uses system CA certificates (via native-tls or rustls-native-certs)
+# and will fail with "network error" if they're missing.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates git && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install Codex CLI globally
 # The @openai/codex package now installs the native Rust binary
 RUN npm install -g @openai/codex && \

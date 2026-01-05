@@ -2,6 +2,7 @@ package dev.reviewarena.agent;
 
 import dev.reviewarena.config.ConfigException;
 import dev.reviewarena.config.DockerConfig;
+import dev.reviewarena.config.EnvLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -406,7 +407,7 @@ class DockerCommandBuilderTest {
 
     @Test
     void build_doesNotExposeApiKeyValuesInCommand() {
-        // This test verifies that API keys are passed using "-e VAR" (without value)
+        // This test verifies that API keys are passed via --env-file (not exposed in cmdline)
         // instead of "-e VAR=value", preventing exposure in /proc/<pid>/cmdline
         DockerConfig docker = new DockerConfig(true, false, "test-image:latest", null, null, null);
         List<String> command = List.of("agent");
@@ -426,12 +427,11 @@ class DockerCommandBuilderTest {
             }
         }
 
-        // If any API key is set in the environment, verify it's passed as just the name
-        for (String keyName : apiKeyEnvVars) {
-            if (System.getenv(keyName) != null) {
-                assertTrue(result.contains(keyName),
-                    "API key " + keyName + " should be passed without value");
-            }
+        // If any API key is set in the environment, verify --env-file is used
+        boolean anyKeySet = apiKeyEnvVars.stream().anyMatch(k -> EnvLoader.getEnv(k) != null);
+        if (anyKeySet) {
+            assertTrue(result.contains("--env-file"),
+                "API keys should be passed via --env-file for security");
         }
     }
 

@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -128,20 +130,12 @@ public class DockerCommandBuilder {
         result.add("-v");
         result.add(workingDir.toAbsolutePath() + ":/workspace");
 
-        // Pass API keys from host environment or .env file (only if set)
-        // Security: Use "-e VAR=value" format for .env values since Docker can only
-        // inherit from parent environment, not from our in-memory dotenv values.
-        for (String envVar : API_KEY_ENV_VARS) {
-            String value = EnvLoader.getEnv(envVar);
-            if (value != null) {
-                result.add("-e");
-                // If value comes from .env (not in System.getenv), we must pass the value explicitly
-                if (System.getenv(envVar) != null) {
-                    result.add(envVar);  // Docker inherits from parent environment
-                } else {
-                    result.add(envVar + "=" + value);  // Pass value from .env explicitly
-                }
-            }
+        // Pass API keys via --env-file to avoid exposing them in command line.
+        // This is secure (not visible in ps/cmdline) and works cross-platform.
+        Path envFile = createEnvFile(workingDir);
+        if (envFile != null) {
+            result.add("--env-file");
+            result.add(envFile.toString());
         }
 
         // Agent type (claude or gemini) for sandbox mode
@@ -239,20 +233,12 @@ public class DockerCommandBuilder {
             }
         }
 
-        // Pass API keys from host environment or .env file (only if set)
-        // Security: Use "-e VAR=value" format for .env values since Docker can only
-        // inherit from parent environment, not from our in-memory dotenv values.
-        for (String envVar : API_KEY_ENV_VARS) {
-            String value = EnvLoader.getEnv(envVar);
-            if (value != null) {
-                result.add("-e");
-                // If value comes from .env (not in System.getenv), we must pass the value explicitly
-                if (System.getenv(envVar) != null) {
-                    result.add(envVar);  // Docker inherits from parent environment
-                } else {
-                    result.add(envVar + "=" + value);  // Pass value from .env explicitly
-                }
-            }
+        // Pass API keys via --env-file to avoid exposing them in command line.
+        // This is secure (not visible in ps/cmdline) and works cross-platform.
+        Path envFile = createEnvFile(workingDir);
+        if (envFile != null) {
+            result.add("--env-file");
+            result.add(envFile.toString());
         }
 
         // Optional resource limits (already validated)
@@ -388,6 +374,43 @@ public class DockerCommandBuilder {
 
         log.debug("Claude credentials not found at {}. Use 'claude' and '/login' to authenticate.", credentialsFile);
         return null;
+    }
+
+    /**
+     * Creates a temporary env file containing API keys for Docker --env-file.
+     *
+     * <p>This approach avoids exposing API keys in the command line (which would
+     * be visible in ps output and /proc/&lt;pid&gt;/cmdline on Linux). The file is
+     * marked for deletion on JVM exit.
+     *
+     * @param workingDir The working directory (used for temp file location)
+     * @return Path to the env file, or null if no API keys are set
+     */
+    private Path createEnvFile(Path workingDir) {
+        var envContent = new StringBuilder();
+
+        for (String envVar : API_KEY_ENV_VARS) {
+            String value = EnvLoader.getEnv(envVar);
+            if (value != null) {
+                envContent.append(envVar).append("=").append(value).append("\n");
+            }
+        }
+
+        if (envContent.isEmpty()) {
+            return null;
+        }
+
+        try {
+            // Create temp file in system temp dir (not in workingDir to keep it clean)
+            Path envFile = Files.createTempFile("docker-env-", ".env");
+            envFile.toFile().deleteOnExit();  // Clean up on JVM exit
+            Files.writeString(envFile, envContent.toString(), StandardCharsets.UTF_8);
+            log.debug("Created env file for Docker: {}", envFile);
+            return envFile;
+        } catch (IOException e) {
+            log.warn("Failed to create env file, API keys may not be passed to container: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**
