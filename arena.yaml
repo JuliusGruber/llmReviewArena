@@ -32,20 +32,20 @@ agents:
       output-format: json  # Single JSON output with .result field
     enabled: true
 
-  claude3:
-    type: claude
-    # Third Claude instance
-    docker:
-      enabled: true
-      sandbox: false
-      image: "docker/sandbox-templates:claude-code"
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-      output-format: json  # Single JSON output with .result field
-    enabled: true
+  # claude3:
+  #   type: claude
+  #   # Third Claude instance
+  #   docker:
+  #     enabled: true
+  #     sandbox: false
+  #     image: "docker/sandbox-templates:claude-code"
+  #   command:
+  #     - claude
+  #     - -p
+  #   flags:
+  #     auto-approve: true
+  #     output-format: json  # Single JSON output with .result field
+  #   enabled: true
 
   # Codex - temporarily disabled
   codex:
@@ -65,17 +65,17 @@ agents:
       auto-approve: true
     enabled: false  # Explicitly disabled
 
-  # Gemini - temporarily disabled
+  # Gemini - Docker mode enabled for testing
   gemini:
     type: gemini
-    # docker:
-    #   enabled: true
-    #   image: "naoyoshinori/gemini-cli:node"  # Optional, uses default
+    docker:
+      enabled: true
+      image: "naoyoshinori/gemini-cli:node"
     command:
       - gemini
     flags:
       auto-approve: true
-    enabled: false  # Explicitly disabled
+    enabled: true
 
 limits:
   rounds: 5  # Maximum allowed is 5 (will be capped if higher)
