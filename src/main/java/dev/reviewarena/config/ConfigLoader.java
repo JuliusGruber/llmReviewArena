@@ -132,11 +132,12 @@ public class ConfigLoader {
         this.knownTypes = loadKnownTypes(config);
         this.typeAliases = loadTypeAliases(config);
 
-        // Load limits
+        // Load limits (fail-fast if missing from application.yaml)
         int maxRounds = overrides.maxRounds() != null
             ? overrides.maxRounds()
             : config.getOptionalValue("limits.rounds", Integer.class)
-                    .orElse(ArenaConfig.DEFAULT_MAX_ROUNDS);
+                    .orElseThrow(() -> new ConfigException(
+                        "Missing required 'limits.rounds' in application.yaml"));
 
         // Cap rounds at 5 maximum
         if (maxRounds > 5) {
@@ -144,38 +145,46 @@ public class ConfigLoader {
         }
 
         int maxOutputSizeKb = config.getOptionalValue("limits.max-output-size-kb", Integer.class)
-            .orElse(ArenaConfig.DEFAULT_MAX_OUTPUT_SIZE_KB);
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'limits.max-output-size-kb' in application.yaml"));
 
-        // Load execution settings
+        // Load execution settings (fail-fast if missing from application.yaml)
         int maxConcurrent = overrides.maxConcurrent() != null
             ? overrides.maxConcurrent()
             : config.getOptionalValue("execution.max-concurrent", Integer.class)
-                    .orElse(ArenaConfig.DEFAULT_MAX_CONCURRENT);
+                    .orElseThrow(() -> new ConfigException(
+                        "Missing required 'execution.max-concurrent' in application.yaml"));
 
         boolean showAgentOutput = overrides.showAgentOutput() != null
             ? overrides.showAgentOutput()
             : config.getOptionalValue("execution.show-agent-output", Boolean.class)
-                    .orElse(ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT);
+                    .orElseThrow(() -> new ConfigException(
+                        "Missing required 'execution.show-agent-output' in application.yaml"));
 
-        // Load timeouts
+        // Load timeouts (fail-fast if missing from application.yaml)
         long agentTimeoutMs = config.getOptionalValue("timeouts.agent-timeout-ms", Long.class)
-            .orElse(ArenaConfig.DEFAULT_AGENT_TIMEOUT_MS);
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'timeouts.agent-timeout-ms' in application.yaml"));
 
         long roundTimeoutMs = config.getOptionalValue("timeouts.round-timeout-ms", Long.class)
-            .orElse(ArenaConfig.DEFAULT_ROUND_TIMEOUT_MS);
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'timeouts.round-timeout-ms' in application.yaml"));
 
         long gracePeriodMs = config.getOptionalValue("timeouts.grace-period-ms", Long.class)
-            .orElse(ArenaConfig.DEFAULT_GRACE_PERIOD_MS);
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'timeouts.grace-period-ms' in application.yaml"));
 
-        // Load tournament constraints
+        // Load tournament constraints (fail-fast if missing from application.yaml)
         int minAgents = config.getOptionalValue("tournament.min-agents", Integer.class)
-            .orElse(ArenaConfig.DEFAULT_MIN_AGENTS);
+            .orElseThrow(() -> new ConfigException(
+                "Missing required 'tournament.min-agents' in application.yaml"));
 
-        // Load output directory
+        // Load output directory (fail-fast if missing from application.yaml)
         Path outputDir = overrides.outputDir() != null
             ? overrides.outputDir()
             : Path.of(config.getOptionalValue("output.dir", String.class)
-                    .orElse(ArenaConfig.DEFAULT_OUTPUT_DIR));
+                    .orElseThrow(() -> new ConfigException(
+                        "Missing required 'output.dir' in application.yaml")));
 
         // Load agents
         Map<String, AgentConfig> agents = loadAgents(config);

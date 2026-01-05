@@ -32,18 +32,8 @@ public record ArenaConfig(
     // Agents
     Map<String, AgentConfig> agents
 ) {
-    /**
-     * Default configuration values.
-     */
-    public static final int DEFAULT_MAX_ROUNDS = 5;
-    public static final int DEFAULT_MAX_OUTPUT_SIZE_KB = 500;
-    public static final int DEFAULT_MAX_CONCURRENT = 0; // unlimited
-    public static final boolean DEFAULT_SHOW_AGENT_OUTPUT = true;
-    public static final long DEFAULT_AGENT_TIMEOUT_MS = 600_000; // 10 minutes
-    public static final long DEFAULT_ROUND_TIMEOUT_MS = 900_000; // 15 minutes
-    public static final long DEFAULT_GRACE_PERIOD_MS = 5_000; // 5 seconds
-    public static final int DEFAULT_MIN_AGENTS = 2;
-    public static final String DEFAULT_OUTPUT_DIR = ".arena";
+    // All defaults now come from application.yaml (single source of truth)
+    // See ConfigLoader for fail-fast loading from YAML config
 
     /**
      * Compact constructor with validation.
