@@ -2,6 +2,7 @@ package dev.reviewarena.agent;
 
 import dev.reviewarena.config.ConfigException;
 import dev.reviewarena.config.DockerConfig;
+import dev.reviewarena.config.EnvLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,13 +111,19 @@ public class DockerCommandBuilder {
         result.add("-v");
         result.add(workingDir.toAbsolutePath() + ":/workspace");
 
-        // Pass API keys from host environment (only if set)
-        // Security: Use "-e VAR" without value so Docker inherits from parent environment.
-        // This prevents API keys from being visible in /proc/<pid>/cmdline or ps output.
+        // Pass API keys from host environment or .env file (only if set)
+        // Security: Use "-e VAR=value" format for .env values since Docker can only
+        // inherit from parent environment, not from our in-memory dotenv values.
         for (String envVar : API_KEY_ENV_VARS) {
-            if (System.getenv(envVar) != null) {
+            String value = EnvLoader.getEnv(envVar);
+            if (value != null) {
                 result.add("-e");
-                result.add(envVar);
+                // If value comes from .env (not in System.getenv), we must pass the value explicitly
+                if (System.getenv(envVar) != null) {
+                    result.add(envVar);  // Docker inherits from parent environment
+                } else {
+                    result.add(envVar + "=" + value);  // Pass value from .env explicitly
+                }
             }
         }
 
@@ -214,15 +221,19 @@ public class DockerCommandBuilder {
             }
         }
 
-        // Pass API keys from host environment (only if set)
-        // Security: Use "-e VAR" without value so Docker inherits from parent environment.
-        // This prevents API keys from being visible in /proc/<pid>/cmdline or ps output.
-        // ProcessBuilder inherits environment from the parent Java process, so Docker CLI
-        // can read the values from its parent environment without command-line exposure.
+        // Pass API keys from host environment or .env file (only if set)
+        // Security: Use "-e VAR=value" format for .env values since Docker can only
+        // inherit from parent environment, not from our in-memory dotenv values.
         for (String envVar : API_KEY_ENV_VARS) {
-            if (System.getenv(envVar) != null) {
+            String value = EnvLoader.getEnv(envVar);
+            if (value != null) {
                 result.add("-e");
-                result.add(envVar);
+                // If value comes from .env (not in System.getenv), we must pass the value explicitly
+                if (System.getenv(envVar) != null) {
+                    result.add(envVar);  // Docker inherits from parent environment
+                } else {
+                    result.add(envVar + "=" + value);  // Pass value from .env explicitly
+                }
             }
         }
 

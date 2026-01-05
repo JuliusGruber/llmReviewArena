@@ -7,6 +7,7 @@ import dev.reviewarena.agent.ReviewAggregator;
 import dev.reviewarena.agent.SynthesisResult;
 import dev.reviewarena.config.ArenaConfig;
 import dev.reviewarena.config.ConfigLoader;
+import dev.reviewarena.config.EnvLoader;
 import dev.reviewarena.config.ConfigLoader.CliOverrides;
 import dev.reviewarena.git.GitService;
 import dev.reviewarena.io.WorkspaceException;
@@ -165,6 +166,9 @@ public class ReviewArenaCli implements Callable<Integer> {
     //==========================================================================
 
     public static void main(String[] args) {
+        // Load .env file before anything else (API keys, etc.)
+        EnvLoader.initialize();
+
         int exitCode = new CommandLine(new ReviewArenaCli())
             .setExecutionExceptionHandler(new ExceptionHandler())
             .execute(args);
