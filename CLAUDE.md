@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+## GitHub Issues
+- When asked about an "issue" or to review an issue, always use this project's GitHub repo (llmReviewArena), not the Anthropic repo
+- Always run `git remote -v` before using `gh` CLI commands to get the correct repository owner/name
+- Never assume GitHub usernames from local paths (e.g., `C:\Users\juliu` does not mean the GitHub user is "juliu" or similar)
+
 ## Required Reading
 - Always read `specs/spec.md` before implementing features - this is the main project specification
 - Always read `specs/flow-diagram.md` to understand the application flow
