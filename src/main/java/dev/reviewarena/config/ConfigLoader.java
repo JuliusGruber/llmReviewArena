@@ -236,15 +236,15 @@ public class ConfigLoader {
             .orElseGet(() -> inferTypeFromName(agentName));
 
         // Validate type
-        if (type != null && !KNOWN_TYPES.contains(type)) {
+        if (type != null && !knownTypes.contains(type)) {
             throw new ConfigException(
                 "Agent '" + agentName + "' has unknown type '" + type + "'. " +
-                "Valid types are: " + KNOWN_TYPES);
+                "Valid types are: " + knownTypes);
         }
         if (type == null) {
             throw new ConfigException(
                 "Agent '" + agentName + "' has no 'type' specified and type could not be inferred from name. " +
-                "Add 'type: <type>' to the agent configuration. Valid types are: " + KNOWN_TYPES);
+                "Add 'type: <type>' to the agent configuration. Valid types are: " + knownTypes);
         }
 
         // Load enabled flag (default from agent-defaults)
