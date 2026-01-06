@@ -202,10 +202,21 @@ public class DockerCommandBuilder {
         result.add("/workspace");
 
         // Add user mapping for file ownership (Linux/macOS only)
+        // Gemini CLI image (tgagor/gemini-cli) handles user creation via its entrypoint
+        // using DEFAULT_UID/DEFAULT_GID env vars, so we skip --user for Gemini.
         String userMapping = getHostUserMapping();
         if (userMapping != null) {
-            result.add("--user");
-            result.add(userMapping);
+            if ("gemini".equals(agentType)) {
+                // Gemini entrypoint expects to run as root and create user dynamically
+                String[] uidGid = userMapping.split(":");
+                result.add("-e");
+                result.add("DEFAULT_UID=" + uidGid[0]);
+                result.add("-e");
+                result.add("DEFAULT_GID=" + uidGid[1]);
+            } else {
+                result.add("--user");
+                result.add(userMapping);
+            }
         }
 
         // Mount only the Claude credentials FILE (not the whole directory) as read-only
