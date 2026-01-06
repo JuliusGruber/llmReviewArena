@@ -32,20 +32,20 @@ agents:
       output-format: json  # Single JSON output with .result field
     enabled: true
 
-  # claude3:
-  #   type: claude
-  #   # Third Claude instance
-  #   docker:
-  #     enabled: true
-  #     sandbox: false
-  #     image: "docker/sandbox-templates:claude-code"
-  #   command:
-  #     - claude
-  #     - -p
-  #   flags:
-  #     auto-approve: true
-  #     output-format: json  # Single JSON output with .result field
-  #   enabled: true
+  claude3:
+    type: claude
+    # Third Claude instance
+    docker:
+      enabled: true
+      sandbox: false
+      image: "docker/sandbox-templates:claude-code"
+    command:
+      - claude
+      - -p
+    flags:
+      auto-approve: true
+      output-format: json  # Single JSON output with .result field
+    enabled: true
 
   # Disable default claude agent from application.yaml (we use claude1/2/3 instead)
   claude:
@@ -64,7 +64,7 @@ agents:
       - -o
       - "@output"
       - "-"   # Read prompt from stdin
-    enabled: true
+    enabled: false
 
   # Gemini - disabled in favor of codex
   # gemini:
@@ -79,7 +79,7 @@ agents:
   #   enabled: true
 
 limits:
-  rounds: 5  # Maximum allowed is 5 (will be capped if higher)
+  rounds: 3  # Maximum allowed is 5 (will be capped if higher)
 
 tournament:
   min-agents: 1
