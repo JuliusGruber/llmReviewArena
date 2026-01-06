@@ -9,6 +9,9 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Git operations using JGit.
@@ -38,18 +41,58 @@ public class GitService implements Closeable {
      */
     public GitService(File workDir) throws GitValidationException {
         try {
-            FileRepositoryBuilder builder = new FileRepositoryBuilder()
-                    .findGitDir(workDir)
-                    .setMustExist(true);
-            if (builder.getGitDir() == null) {
+            File gitDir = resolveGitDir(workDir);
+            if (gitDir == null) {
                 throw new GitValidationException("Error: Not a git repository", EXIT_GIT_ERROR);
             }
+
+            FileRepositoryBuilder builder = new FileRepositoryBuilder()
+                    .setGitDir(gitDir)
+                    .setWorkTree(workDir)
+                    .readEnvironment()
+                    .setMustExist(true);
             this.repository = builder.build();
         } catch (IOException e) {
             throw new GitValidationException("Error: Not a git repository", EXIT_GIT_ERROR, e);
         } catch (IllegalArgumentException e) {
             throw new GitValidationException("Error: Not a git repository", EXIT_GIT_ERROR, e);
         }
+    }
+
+    /**
+     * Resolves the actual git directory, handling worktrees where .git is a file.
+     * For worktrees, follows the gitdir pointer and then the commondir to find the main repo.
+     */
+    private static File resolveGitDir(File workDir) throws IOException {
+        File current = workDir;
+        while (current != null) {
+            File gitFile = new File(current, ".git");
+            if (gitFile.exists()) {
+                if (gitFile.isDirectory()) {
+                    // Normal git directory
+                    return gitFile;
+                } else if (gitFile.isFile()) {
+                    // Worktree: .git is a file containing "gitdir: <path>"
+                    String content = Files.readString(gitFile.toPath(), StandardCharsets.UTF_8).trim();
+                    if (content.startsWith("gitdir: ")) {
+                        Path worktreeGitDir = Path.of(content.substring(8));
+                        if (!worktreeGitDir.isAbsolute()) {
+                            worktreeGitDir = gitFile.toPath().getParent().resolve(worktreeGitDir).normalize();
+                        }
+                        // Check for commondir which points to main repo
+                        Path commonDirFile = worktreeGitDir.resolve("commondir");
+                        if (Files.exists(commonDirFile)) {
+                            String commonDir = Files.readString(commonDirFile, StandardCharsets.UTF_8).trim();
+                            Path mainGitDir = worktreeGitDir.resolve(commonDir).normalize();
+                            return mainGitDir.toFile();
+                        }
+                        return worktreeGitDir.toFile();
+                    }
+                }
+            }
+            current = current.getParentFile();
+        }
+        return null;
     }
 
     /**
