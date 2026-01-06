@@ -79,7 +79,7 @@ agents:
   #   enabled: true
 
 limits:
-  rounds: 3  # Maximum allowed is 5 (will be capped if higher)
+  rounds: 2  # Maximum allowed is 5 (will be capped if higher)
 
 tournament:
   min-agents: 1
