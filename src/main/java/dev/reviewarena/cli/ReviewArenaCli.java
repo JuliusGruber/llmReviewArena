@@ -12,6 +12,8 @@ import dev.reviewarena.config.ConfigLoader.CliOverrides;
 import dev.reviewarena.git.GitService;
 import dev.reviewarena.io.WorkspaceException;
 import dev.reviewarena.io.WorkspaceManager;
+import lombok.AccessLevel;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -48,6 +50,7 @@ public class ReviewArenaCli implements Callable<Integer> {
     //==========================================================================
 
     @ArgGroup(exclusive = true, multiplicity = "1")
+    @Getter(AccessLevel.PACKAGE)
     private ReviewTarget reviewTarget;
 
     static class ReviewTarget {
@@ -82,18 +85,21 @@ public class ReviewArenaCli implements Callable<Integer> {
             paramLabel = "<file>",
             description = "Path to config file (default: ${DEFAULT-VALUE})",
             defaultValue = "${REVIEW_ARENA_CONFIG:-arena.yaml}")
+    @Getter(AccessLevel.PACKAGE)
     private Path configFile;
 
     @Option(names = {"-r", "--rounds"},
             paramLabel = "<n>",
             description = "Maximum cross-pollination rounds (default: ${DEFAULT-VALUE})",
             defaultValue = "${REVIEW_ARENA_MAX_ROUNDS:-5}")
+    @Getter(AccessLevel.PACKAGE)
     private int maxRounds;
 
     @Option(names = {"-o", "--output"},
             paramLabel = "<dir>",
             description = "Output directory (default: ${DEFAULT-VALUE})",
             defaultValue = "${REVIEW_ARENA_OUTPUT_DIR:-.arena}")
+    @Getter(AccessLevel.PACKAGE)
     private Path outputDir;
 
     //==========================================================================
@@ -101,6 +107,7 @@ public class ReviewArenaCli implements Callable<Integer> {
     //==========================================================================
 
     @ArgGroup(exclusive = true)
+    @Getter(AccessLevel.PACKAGE)
     private ExecutionMode executionMode;
 
     static class ExecutionMode {
@@ -117,6 +124,7 @@ public class ReviewArenaCli implements Callable<Integer> {
             paramLabel = "<n>",
             description = "Limit concurrent agents (0=unlimited, 1=sequential)",
             defaultValue = "${REVIEW_ARENA_MAX_CONCURRENT:-0}")
+    @Getter(AccessLevel.PACKAGE)
     private int maxConcurrent;
 
     //==========================================================================
@@ -125,10 +133,12 @@ public class ReviewArenaCli implements Callable<Integer> {
 
     @Option(names = "--dry-run",
             description = "Show what would happen without running agents")
+    @Getter(AccessLevel.PACKAGE)
     private boolean dryRun;
 
     @Option(names = {"-q", "--quiet"},
             description = "Suppress agent output (don't stream to console)")
+    @Getter(AccessLevel.PACKAGE)
     private boolean quiet;
 
     //==========================================================================
@@ -389,41 +399,5 @@ public class ReviewArenaCli implements Callable<Integer> {
         }
         log.info("  {}. Final synthesis: Champion review (claude)", config.maxRounds() + 2);
         log.info("Synthesis agent: claude (required)");
-    }
-
-    //==========================================================================
-    // Accessors for testing
-    //==========================================================================
-
-    ReviewTarget getReviewTarget() {
-        return reviewTarget;
-    }
-
-    Path getConfigFile() {
-        return configFile;
-    }
-
-    int getMaxRounds() {
-        return maxRounds;
-    }
-
-    Path getOutputDir() {
-        return outputDir;
-    }
-
-    ExecutionMode getExecutionMode() {
-        return executionMode;
-    }
-
-    int getMaxConcurrent() {
-        return maxConcurrent;
-    }
-
-    boolean isDryRun() {
-        return dryRun;
-    }
-
-    boolean isQuiet() {
-        return quiet;
     }
 }
