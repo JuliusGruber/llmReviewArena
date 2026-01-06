@@ -47,8 +47,21 @@ agents:
       output-format: json  # Single JSON output with .result field
     enabled: true
 
-  # Disable default claude agent from application.yaml (we use claude1/2/3 instead)
+  # Synthesis uses Claude with Docker + Opus model (ultrathink)
+  # Disabled for tournament rounds (we use claude1/2 instead) but available for synthesis via Docker
   claude:
+    type: claude
+    docker:
+      enabled: true
+      sandbox: false
+      image: "docker/sandbox-templates:claude-code"
+    command:
+      - claude
+      - -p
+      - --model
+      - opus
+    flags:
+      auto-approve: true
     enabled: false
 
   # Codex - runs in Docker with native Rust CLI
