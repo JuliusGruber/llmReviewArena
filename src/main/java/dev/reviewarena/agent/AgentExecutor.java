@@ -54,15 +54,28 @@ public class AgentExecutor {
     }
 
     /**
-     * Validates Docker availability if any enabled agent has Docker configured.
+     * Validates Docker availability if any agent requires Docker.
      * Called once at construction time to fail fast if Docker is required but unavailable.
+     *
+     * <p>Docker is required in these scenarios:
+     * <ul>
+     *   <li>Any enabled agent has Docker configured</li>
+     *   <li>Claude (synthesizer) is disabled but has Docker enabled for synthesis</li>
+     * </ul>
      */
     private void validateDockerIfNeeded() {
-        boolean anyAgentUsesDocker = config.agents().values().stream()
+        // Check if any enabled agent uses Docker
+        boolean anyEnabledAgentUsesDocker = config.agents().values().stream()
             .filter(AgentConfig::enabled)
             .anyMatch(a -> a.docker().enabled());
 
-        if (anyAgentUsesDocker) {
+        // Check if Claude (synthesizer) is disabled but has Docker enabled for synthesis
+        AgentConfig claude = config.agents().get("claude");
+        boolean claudeSynthesisNeedsDocker = claude != null
+            && !claude.enabled()
+            && claude.docker().enabled();
+
+        if (anyEnabledAgentUsesDocker || claudeSynthesisNeedsDocker) {
             dockerChecker.requireDocker();
             log.info("Docker mode enabled for container-based agent execution");
         }
@@ -278,7 +291,13 @@ public class AgentExecutor {
      * Validates that Claude is available for synthesis.
      * Per spec: "Claude is always used for this step regardless of which agents participated."
      *
-     * @throws AgentException if Claude is not configured or not enabled
+     * <p>Claude can be used for synthesis if either:
+     * <ul>
+     *   <li>The agent is enabled (local CLI available)</li>
+     *   <li>Docker is enabled for the agent (container execution available)</li>
+     * </ul>
+     *
+     * @throws AgentException if Claude is not configured or not available
      */
     public void validateSynthesizerAvailable() {
         AgentConfig claude = config.agents().get("claude");
@@ -286,9 +305,11 @@ public class AgentExecutor {
             throw new AgentException(
                 "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml.");
         }
-        if (!claude.enabled()) {
+        // Claude is available if enabled OR if Docker is enabled for it
+        if (!claude.enabled() && !claude.docker().enabled()) {
             throw new AgentException(
-                "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled.");
+                "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled. "
+                + "Either enable the agent or configure Docker execution (agents.claude.docker.enabled: true).");
         }
     }
 
@@ -311,16 +332,26 @@ public class AgentExecutor {
      * particularly for Windows where CLI tools need cmd.exe wrapping, and for
      * Docker where paths need translation to container paths.
      *
+     * <p>The agent can be used for synthesis if either:
+     * <ul>
+     *   <li>The agent is enabled (local CLI available)</li>
+     *   <li>Docker is enabled for the agent (container execution available)</li>
+     * </ul>
+     *
      * @param agentName  the name of the agent to use for synthesis (must be "claude")
      * @param promptPath the path to the synthesis prompt (HOST path)
      * @param outputPath the path where champion_review.md should be written (HOST path)
      * @return the synthesis result
-     * @throws AgentException if agent is not found or disabled
+     * @throws AgentException if agent is not found or not available
      */
     public SynthesisResult executeSynthesis(String agentName, Path promptPath, Path outputPath) {
         AgentConfig agentConfig = config.agents().get(agentName);
-        if (agentConfig == null || !agentConfig.enabled()) {
-            throw new AgentException("Synthesizer agent '" + agentName + "' not found or disabled");
+        if (agentConfig == null) {
+            throw new AgentException("Synthesizer agent '" + agentName + "' not found");
+        }
+        // Agent can be used if enabled OR if Docker is enabled for it
+        if (!agentConfig.enabled() && !agentConfig.docker().enabled()) {
+            throw new AgentException("Synthesizer agent '" + agentName + "' is disabled");
         }
 
         log.info("[SYNTHESIS] Starting synthesis with agent: {}", agentName);
