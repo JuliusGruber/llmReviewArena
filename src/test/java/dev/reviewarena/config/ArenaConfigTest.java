@@ -16,7 +16,7 @@ class ArenaConfigTest {
         ArenaConfig config = ArenaConfig.defaults();
 
         // Values from application.yaml (single source of truth)
-        assertEquals(2, config.maxRounds());
+        assertEquals(5, config.maxRounds());
         assertEquals(500, config.maxOutputSizeKb());
         assertEquals(0, config.maxConcurrent());
         assertTrue(config.showAgentOutput());
@@ -143,7 +143,7 @@ class ArenaConfigTest {
     // Helper to create config with modifications
     // Values match application.yaml defaults
     private static class ConfigBuilder {
-        int maxRounds = 3;
+        int maxRounds = 5;
         int maxOutputSizeKb = 500;
         int maxConcurrent = 0;
         boolean showAgentOutput = true;

@@ -74,8 +74,9 @@ public record ArenaConfig(
     /**
      * Creates a config with all default values from application.yaml.
      * Delegates to ConfigLoader to ensure single source of truth.
+     * Does not load arena.yaml overrides - use ConfigLoader.load() for that.
      */
     public static ArenaConfig defaults() {
-        return new ConfigLoader().load();
+        return new ConfigLoader().loadPureDefaults();
     }
 }

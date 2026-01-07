@@ -90,6 +90,39 @@ public class ConfigLoader {
         return load(baseDir.resolve(DEFAULT_CONFIG_FILE), CliOverrides.none());
     }
 
+    /**
+     * Loads pure defaults from application.yaml only (no arena.yaml overrides).
+     * Use this for testing or when you need the built-in defaults without
+     * any filesystem config overrides.
+     */
+    public ArenaConfig loadPureDefaults() {
+        SmallRyeConfig config = buildConfigFromApplicationYamlOnly();
+        return buildArenaConfig(config, CliOverrides.none());
+    }
+
+    private SmallRyeConfig buildConfigFromApplicationYamlOnly() {
+        SmallRyeConfigBuilder builder = new SmallRyeConfigBuilder()
+            .addDefaultSources()
+            .addDefaultInterceptors();
+
+        // Only add classpath application.yaml (built-in defaults)
+        try (InputStream appYaml = ConfigLoader.class.getClassLoader()
+                .getResourceAsStream("application.yaml")) {
+            if (appYaml != null) {
+                String yamlContent = new String(appYaml.readAllBytes(), StandardCharsets.UTF_8);
+                builder.withSources(new YamlConfigSource(
+                    "application.yaml",
+                    yamlContent,
+                    100
+                ));
+            }
+        } catch (IOException e) {
+            throw new ConfigException("Failed to read built-in application.yaml", e);
+        }
+
+        return builder.build();
+    }
+
     private SmallRyeConfig buildConfig(Path arenaYamlPath) {
         SmallRyeConfigBuilder builder = new SmallRyeConfigBuilder()
             .addDefaultSources()           // System props + env vars
