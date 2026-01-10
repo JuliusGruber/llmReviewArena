@@ -1,6 +1,14 @@
 # LLM Review Arena
 
-A **process-orchestrated multi-agent code review tournament** that pits local CLI agents against each other in iterative rounds of collaborative refinement.
+## What It Does
+
+A multi-agent code review tournament that orchestrates local CLI agents (Claude, Codex, Gemini) to perform iterative, collaborative code reviews:
+
+1. **Round 0**: Each agent independently reviews code
+2. **Rounds 1-N**: Agents see combined reviews from previous rounds and improve
+3. **Final Synthesis**: Claude synthesizes all rounds into a `champion_review.md`
+
+**Key design**: filesystem-based communication (no REST APIs) - agents share work via markdown files in a `.arena/` directory.
 
 ## Quick Start
 
@@ -191,16 +199,6 @@ This project is a vibe coding experiment inspired by Jeffrey Emanuel's work on m
 - [LLM Multi-Round Coding Tournament](https://www.jeffreyemanuel.com/writing/llm_multi_round_coding_tournament) - Tournament structure where models synthesize each other's solutions
 
 The core insight: **collective intelligence outperforms individual genius** through structured cross-pollination of approaches.
-
-## What It Does
-
-The arena orchestrates multiple LLM CLI agents to perform **iterative code review**:
-
-1. **Round 0**: Each agent independently reviews the same code/PR
-2. **Round 1-N**: Each agent sees all previous reviews and synthesizes improvements
-3. **Final**: A comprehensive, battle-tested review emerges from collaborative refinement
-
-Default: **5 cross-pollination rounds** after Round 0 (6 total rounds, configurable via `--rounds` or `max_rounds` in config)
 
 ## The Tournament Model
 
