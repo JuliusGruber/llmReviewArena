@@ -6,7 +6,7 @@ agents:
     # Authenticate locally first with: claude /login
     # Credentials from ~/.claude/ are mounted into the container
     docker:
-      enabled: true
+      enabled: false
       sandbox: false
       image: "docker/sandbox-templates:claude-code"
     command:
@@ -21,7 +21,7 @@ agents:
     type: claude
     # Second Claude instance
     docker:
-      enabled: true
+      enabled: false
       sandbox: false
       image: "docker/sandbox-templates:claude-code"
     command:
@@ -36,7 +36,7 @@ agents:
     type: claude
     # Third Claude instance
     docker:
-      enabled: true
+      enabled: false
       sandbox: false
       image: "docker/sandbox-templates:claude-code"
     command:
@@ -52,7 +52,7 @@ agents:
   claude:
     type: claude
     docker:
-      enabled: true
+      enabled: false
       sandbox: false
       image: "docker/sandbox-templates:claude-code"
     command:
