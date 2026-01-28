@@ -57,14 +57,45 @@ output:
 # Default agents (can be overridden in arena.yaml)
 # Note: Prompt is delivered via stdin redirection (not as command argument)
 agents:
-  claude:
+  claude1:
     type: claude
     command:
       - claude
       - -p                    # print mode (non-interactive, reads prompt from stdin)
     flags:
       auto-approve: true
+      output-format: json     # Single JSON output with .result field
     enabled: true
+
+  claude2:
+    type: claude
+    command:
+      - claude
+      - -p
+    flags:
+      auto-approve: true
+      output-format: json
+    enabled: true
+
+  claude3:
+    type: claude
+    command:
+      - claude
+      - -p
+    flags:
+      auto-approve: true
+      output-format: json
+    enabled: true
+
+  # Synthesis agent - disabled for tournament rounds, but required for final synthesis
+  claude:
+    type: claude
+    command:
+      - claude
+      - -p
+    flags:
+      auto-approve: true
+    enabled: false            # Disabled for tournament, but used for synthesis
 
   codex:
     type: codex

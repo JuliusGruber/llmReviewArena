@@ -940,7 +940,6 @@ Agents write directly to their designated output path without needing to create 
 | Scenario | Error Message |
 |----------|---------------|
 | Claude not configured | `"Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml."` |
-| Claude disabled | `"Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled."` |
 | Synthesis prompt generation fails | `"Failed to generate synthesis prompt: <reason>"` |
 | Synthesis execution fails | `"Synthesis failed: <reason>"` |
 
@@ -948,7 +947,8 @@ This is a hard requirement, not a soft fallback. The synthesizer role is critica
 
 **Edge cases:**
 - If Claude is the only surviving agent, synthesis still runs (Claude synthesizes its own review)
-- If Claude did not participate in tournament rounds, it is still used for synthesis (per spec)
+- If Claude did not participate in tournament rounds (`enabled: false`), it is still used for synthesis
+- The `enabled` flag only controls tournament participation, not synthesis availability
 
 ### State Recovery
 
