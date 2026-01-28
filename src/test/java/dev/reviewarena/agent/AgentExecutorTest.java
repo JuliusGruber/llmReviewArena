@@ -314,21 +314,9 @@ class AgentExecutorTest {
         assertTrue(ex.getMessage().contains("not found"));
     }
 
-    @Test
-    void executeSynthesis_agentDisabled_throwsAgentException() {
-        Map<String, AgentConfig> agents = Map.of(
-            "claude", AgentConfig.disabled("claude", List.of("claude", "-p", "@prompt.md"))
-        );
-        config = createConfig(agents);
-        workspace = new WorkspaceManager(tempDir, config);
-        workspace.initialize("test-commit", "", "");
-
-        AgentExecutor executor = new AgentExecutor(config, workspace);
-
-        AgentException ex = assertThrows(AgentException.class, () ->
-            executor.executeSynthesis("claude", Path.of("/prompt.md"), Path.of("/output.md")));
-        assertTrue(ex.getMessage().contains("disabled"));
-    }
+    // Note: There is no test for "disabled agent throws exception" because per spec,
+    // disabled agents CAN still be used for synthesis. The 'enabled' flag only controls
+    // tournament participation, not synthesis availability.
 
     // ===== Docker synthesis tests =====
 
