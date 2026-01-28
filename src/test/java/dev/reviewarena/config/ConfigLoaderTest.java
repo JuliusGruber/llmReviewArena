@@ -44,9 +44,9 @@ class ConfigLoaderTest {
 
         // Verify default agents from application.yaml are loaded
         assertFalse(config.agents().isEmpty());
-        assertTrue(config.agents().containsKey("claude"));
-        assertTrue(config.agents().containsKey("codex"));
-        assertTrue(config.agents().containsKey("gemini"));
+        assertTrue(config.agents().containsKey("claude1"));
+        assertTrue(config.agents().containsKey("claude2"));
+        assertTrue(config.agents().containsKey("claude3"));
     }
 
     // ===== Loading from arena.yaml =====

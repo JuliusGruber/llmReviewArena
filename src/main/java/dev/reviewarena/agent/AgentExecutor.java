@@ -290,14 +290,13 @@ public class AgentExecutor {
     /**
      * Validates that Claude is available for synthesis.
      * Per spec: "Claude is always used for this step regardless of which agents participated."
+     * Per spec: "If Claude did not participate in tournament rounds, it is still used for synthesis."
      *
-     * <p>Claude can be used for synthesis if either:
-     * <ul>
-     *   <li>The agent is enabled (local CLI available)</li>
-     *   <li>Docker is enabled for the agent (container execution available)</li>
-     * </ul>
+     * <p>Claude is available for synthesis if it is configured (has a command).
+     * The {@code enabled} flag only controls tournament participation, not synthesis availability.
+     * Docker can be used as an alternative execution method if enabled.
      *
-     * @throws AgentException if Claude is not configured or not available
+     * @throws AgentException if Claude is not configured
      */
     public void validateSynthesizerAvailable() {
         AgentConfig claude = config.agents().get("claude");
@@ -305,12 +304,9 @@ public class AgentExecutor {
             throw new AgentException(
                 "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml.");
         }
-        // Claude is available if enabled OR if Docker is enabled for it
-        if (!claude.enabled() && !claude.docker().enabled()) {
-            throw new AgentException(
-                "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled. "
-                + "Either enable the agent or configure Docker execution (agents.claude.docker.enabled: true).");
-        }
+        // No additional validation needed - if claude is configured with a command,
+        // it is assumed to be available for synthesis. The 'enabled' flag only controls
+        // tournament participation, not availability for synthesis.
     }
 
     /**
@@ -349,10 +345,9 @@ public class AgentExecutor {
         if (agentConfig == null) {
             throw new AgentException("Synthesizer agent '" + agentName + "' not found");
         }
-        // Agent can be used if enabled OR if Docker is enabled for it
-        if (!agentConfig.enabled() && !agentConfig.docker().enabled()) {
-            throw new AgentException("Synthesizer agent '" + agentName + "' is disabled");
-        }
+        // No 'enabled' check for synthesis - the 'enabled' flag only controls tournament
+        // participation. Per spec: "If Claude did not participate in tournament rounds,
+        // it is still used for synthesis."
 
         log.info("[SYNTHESIS] Starting synthesis with agent: {}", agentName);
 

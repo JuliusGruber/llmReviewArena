@@ -253,7 +253,9 @@ class AgentExecutorTest {
     }
 
     @Test
-    void validateSynthesizerAvailable_claudeDisabled_throwsAgentException() {
+    void validateSynthesizerAvailable_claudeDisabled_stillValid() {
+        // Per spec: "If Claude did not participate in tournament rounds, it is still used for synthesis"
+        // The 'enabled' flag only controls tournament participation, not synthesis availability
         Map<String, AgentConfig> agents = Map.of(
             "claude", AgentConfig.disabled("claude", List.of("claude", "-p", "@prompt.md"))
         );
@@ -263,10 +265,8 @@ class AgentExecutorTest {
 
         AgentExecutor executor = new AgentExecutor(config, workspace);
 
-        AgentException ex = assertThrows(AgentException.class, () ->
-            executor.validateSynthesizerAvailable());
-        assertTrue(ex.getMessage().contains("Final synthesis requires Claude CLI"));
-        assertTrue(ex.getMessage().contains("disabled"));
+        // Should NOT throw - disabled claude is still valid for synthesis
+        assertDoesNotThrow(() -> executor.validateSynthesizerAvailable());
     }
 
     @Test
