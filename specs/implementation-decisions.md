@@ -23,7 +23,7 @@ This document captures all implementation decisions made for the LLM Review Aren
 
 ## Configuration with MicroProfile Config
 
-The project uses **SmallRye Config** (the reference implementation of MicroProfile Config) to enable type-safe configuration injection via `@ConfigProperty`.
+The project uses **SmallRye Config** (the reference implementation of MicroProfile Config) for programmatic configuration loading.
 
 ### Maven Dependencies
 
@@ -55,27 +55,9 @@ SmallRye Config loads configuration from multiple sources in priority order:
 ### Usage Pattern
 
 ```java
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import jakarta.inject.Inject;
-
-public class ArenaConfig {
-
-    @Inject
-    @ConfigProperty(name = "limits.max-rounds", defaultValue = "5")
-    int maxRounds;
-
-    @Inject
-    @ConfigProperty(name = "limits.max-output-size-kb", defaultValue = "500")
-    int maxOutputSizeKb;
-
-    @Inject
-    @ConfigProperty(name = "execution.max-concurrent", defaultValue = "0")
-    int maxConcurrent;
-
-    @Inject
-    @ConfigProperty(name = "timeouts.agent-timeout-ms", defaultValue = "300000")
-    long agentTimeoutMs;
-}
+SmallRyeConfig config = buildConfig(arenaYamlPath);
+int maxRounds = config.getOptionalValue("limits.rounds", Integer.class)
+    .orElseThrow(() -> new ConfigException("Missing required 'limits.rounds'"));
 ```
 
 ### YAML Configuration Example
@@ -83,49 +65,53 @@ public class ArenaConfig {
 ```yaml
 # application.yaml
 limits:
-  max-rounds: 5
+  rounds: 5
   max-output-size-kb: 500
 
 execution:
   max-concurrent: 0
+  show-agent-output: true
 
 timeouts:
-  agent-timeout-ms: 300000
-  round-timeout-ms: 900000
+  agent-timeout-ms: 600000    # 10 minutes
+  round-timeout-ms: 900000    # 15 minutes
   grace-period-ms: 5000
+
+tournament:
+  min-agents: 1
 
 agents:
   claude:
-    command: ["claude", "-p", "@prompt.md"]
+    command: ["claude", "-p"]
     flags:
       auto-approve: true
+      output-format: json
   codex:
-    command: ["codex", "exec", "@prompt.md"]
+    command: ["codex", "exec", "--full-auto", "-o", "@output", "-"]
     flags:
-      auto-approve: true
+      auto-approve: false
   gemini:
-    command: ["gemini", "-p", "@prompt.md"]
+    command: ["gemini"]
     flags:
       auto-approve: true
 ```
 
 ### Programmatic Access
 
-For cases where injection is not available (e.g., static contexts):
+Configuration is loaded programmatically via SmallRye Config's builder API:
 
 ```java
-import org.eclipse.microprofile.config.ConfigProvider;
 import io.smallrye.config.SmallRyeConfig;
 
-SmallRyeConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class);
-int maxRounds = config.getValue("limits.max-rounds", Integer.class);
+SmallRyeConfig config = buildConfig(arenaYamlPath);
+int maxRounds = config.getValue("limits.rounds", Integer.class);
 ```
 
 ### Benefits
 
 | Benefit | Description |
 |---------|-------------|
-| Type-safe injection | `@ConfigProperty` provides compile-time type checking |
+| Type-safe access | Programmatic API with type conversion |
 | Default values | Fallback values when config is missing |
 | Multiple sources | Environment variables, system properties, YAML files |
 | Nested YAML support | Complex hierarchical configuration structures |
@@ -138,10 +124,8 @@ dev.reviewarena
 ├── cli          # CLI entry point, argument parsing (picocli)
 ├── config       # Configuration loading, YAML parsing, defaults
 ├── git          # Git operations (JGit), startup validation
-├── agent        # AgentProcess, AgentExecutor, process management
-├── tournament   # Round execution, cross-pollination logic
-├── io           # File operations, template loading, output writing
-└── model        # Domain records (Review, RoundResult, etc.)
+├── agent        # AgentProcess, AgentExecutor, CommandBuilder, ReviewAggregator, OutputValidator
+└── io           # WorkspaceManager, TemplateLoader, template contexts
 ```
 
 **Main class:** `dev.reviewarena.cli.ReviewArenaCli`
@@ -187,7 +171,7 @@ ArenaException (exit 1 - general error)
 ### Tournament Constraints
 | Decision | Choice |
 |----------|--------|
-| Minimum agents | 2 - tournament aborts if fewer remain (cross-pollination requires 2+) |
+| Minimum agents | 1 - single-agent mode allowed by default; set to 2 for cross-pollination enforcement |
 
 ### stdout/stderr Handling
 - **Drain to logs:** Capture in background threads, log at DEBUG level
@@ -248,22 +232,16 @@ ArenaException (exit 1 - general error)
 
 ## Development Milestones
 
-**Milestone 1 (MVP):** Full tournament with mock agents
-- Complete flow implemented
-- Shell script mock agents for testing
-- Validates entire architecture
+**Milestone 1:** Git validation + Configuration + Workspace setup
 
-**Milestone 2:** Real agent integration
-- Claude CLI integration
-- Codex CLI integration
-- Gemini CLI integration
+**Milestone 2:** Agent process layer
 
 ## Summary of Key Choices
 
 | Question | Answer |
 |----------|--------|
 | How to parse CLI args? | picocli |
-| How to inject config properties? | SmallRye Config (MicroProfile Config) with `@ConfigProperty` |
+| How to load config properties? | SmallRye Config (MicroProfile Config) programmatic API |
 | How to parse YAML config? | SmallRye Config with YAML source (SnakeYAML internally) |
 | How to log? | SLF4J + Logback |
 | How to resolve template placeholders? | FreeMarker engine |
@@ -291,10 +269,10 @@ ArenaException (exit 1 - general error)
 | Launcher scripts? | Unix + Windows |
 | Timeout action? | Always kill-and-skip (continue tournament) |
 | Partial output on timeout? | Always discarded |
-| Minimum agents? | 2 (required for cross-pollination) |
+| Minimum agents? | 1 (default, allows single-agent mode) |
 | Per-agent timeout overrides? | No (single timeout for all) |
 | Raw CLI flag passthrough? | No (use structured flags only) |
 | YAML key naming convention? | kebab-case |
 | Synthesizer agent? | Claude required (no fallback) |
 | Synthesis prompt persistence? | Yes, saved to `.arena/rounds/final/prompt.md` |
-| TemplateContext for synthesis? | Extend existing record with nullable fields |
+| TemplateContext for synthesis? | Separate SynthesisContext record |

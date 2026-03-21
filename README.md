@@ -100,11 +100,11 @@ agents:
 
 ### Minimum Agents
 
-The tournament requires at least 2 agents by default. For single-agent mode (testing), set:
+The tournament requires at least 1 agent by default (allows single-agent mode when only Claude is enabled). For cross-pollination enforcement, set:
 
 ```yaml
 tournament:
-  min-agents: 1
+  min-agents: 2
 ```
 
 ## Docker Support
@@ -155,7 +155,7 @@ agents:
 | Agent | Default Image | Notes |
 |-------|---------------|-------|
 | Claude | `ghcr.io/zeeno-atl/claude-code:latest` | Community-maintained image |
-| Codex | `diablotin74/codex-cli:latest` | Community-maintained image |
+| Codex | _(none — user must specify image)_ | Community images don't support non-interactive mode |
 | Gemini | `tgagor/gemini-cli:latest` | Community-maintained image |
 
 ### Environment Variables
@@ -253,22 +253,26 @@ This keeps complexity linear while maximizing cross-pollination.
 
 ```
 .arena/
-├── task.md                    # Task definition, rubric, and constraints
+├── prompts/
+│   ├── task.md                    # Task definition, rubric, and constraints
+│   ├── round-0-claude-1.md       # Pre-generated round prompts
+│   └── ...
 ├── rounds/
 │   ├── round-0/
 │   │   ├── claude-1/
-│   │   │   └── review.md
+│   │   │   ├── review.md
+│   │   │   ├── stdout.log
+│   │   │   └── stderr.log
 │   │   ├── codex-1/
 │   │   │   └── review.md
 │   │   ├── claude-2/
 │   │   │   └── review.md
 │   │   └── all_reviews.md     # Combined output (input for round-1)
 │   ├── round-1/
-│   │   ├── [agent-N]/
-│   │   │   └── review.md      # Synthesized improvements
-│   │   └── all_reviews.md     # Combined output (input for round-2)
+│   │   └── ...
 │   └── final/
-│       └── champion_review.md # Synthesized final review (always produced by synthesis agent)
+│       ├── prompt.md          # Persisted synthesis prompt
+│       └── champion_review.md
 ```
 
 ## How It Works
@@ -278,7 +282,7 @@ This keeps complexity linear while maximizing cross-pollination.
 Each round spawns ephemeral agent processes:
 
 ```
-Start → Feed prompt (@prompt.txt) → Agent works → Capture output (review.md) → Kill
+Start → Feed prompt (via stdin) → Agent works → Capture output (review.md) → Kill
 ```
 
 ### 2. Round Execution
@@ -324,6 +328,8 @@ agents:
   # Type templates: config inherited by generated instances
   claude:
     command: ["claude", "-p"]
+    flags:
+      output-format: json
   codex:
     command: ["codex", "exec", "--full-auto", "-o", "@output", "-"]
     flags:
@@ -336,16 +342,15 @@ agents:
     command: ["claude", "-p"]
 
 execution:
-  max_concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
+  max-concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
 
 limits:
-  max_output_size_kb: 500    # Maximum size per output file
-  max_rounds: 5              # Maximum tournament rounds (default: 5)
+  max-output-size-kb: 500    # Maximum size per output file
+  rounds: 5                  # Maximum cross-pollination rounds (default: 5)
 
 timeouts:
-  agent_timeout_ms: 300000   # Per-agent timeout (default: 5 minutes)
-  round_timeout_ms: 900000   # Per-round timeout (default: 15 minutes)
-  # See specs/spec.md for advanced timeout options (grace_period, per_agent, on_timeout)
+  agent-timeout-ms: 600000   # Per-agent timeout (default: 10 minutes)
+  round-timeout-ms: 900000   # Per-round timeout (default: 15 minutes)
 ```
 
 ## CLI Usage
@@ -373,6 +378,8 @@ review-arena [options] <ref1> [ref2]
 | `--sequential` | | Force sequential agent execution |
 | `--max-concurrent <n>` | | Limit concurrent agents (0=unlimited, 1=sequential) |
 | `--staged` | | Review staged changes instead of commits |
+| `--dry-run` | | Show what would happen without running agents |
+| `--quiet` | `-q` | Suppress agent output (don't stream to console) |
 
 ## Exit Codes
 
@@ -405,10 +412,10 @@ When an agent fails during a round (crash, timeout, or invalid output):
 | Behavior | Description |
 |----------|-------------|
 | **Exclude from current round** | The failed agent's output is not included in `all_reviews.md` |
-| **Exclude from subsequent rounds** | The agent is removed from the tournament entirely |
+| **Retry in subsequent rounds** | The agent still participates in all subsequent rounds |
 | **Log error to console** | Failure details are printed to stderr |
 
-The tournament continues with remaining agents. A single flaky agent does not block the entire review.
+The tournament continues with remaining agents. Transient failures (API timeouts, rate limits) do not permanently disqualify an agent. This maintains review diversity across all rounds.
 
 ## Future Directions
 

@@ -123,7 +123,7 @@
 │                                                                              │
 │    ┌───────┐     ┌───────────────┐     ┌───────────┐     ┌──────────┐      │
 │    │ START │ ──▶ │ FEED PROMPT   │ ──▶ │ AGENT     │ ──▶ │ CAPTURE  │      │
-│    │process│     │ (@prompt.md)  │     │ WORKS     │     │ OUTPUT   │      │
+│    │process│     │ (via stdin)   │     │ WORKS     │     │ OUTPUT   │      │
 │    └───────┘     └───────────────┘     └───────────┘     └────┬─────┘      │
 │                                                                │            │
 │                                              ┌─────────────────┘            │
@@ -133,7 +133,7 @@
 │                                        │ PROCESS  │     │ OUTPUT       │   │
 │                                        └──────────┘     └──────────────┘   │
 │                                                                             │
-│   Timeouts: agent_timeout_ms (5min default), round_timeout_ms (15min)      │
+│   Timeouts: agent_timeout_ms (10min default), round_timeout_ms (15min)     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
