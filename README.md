@@ -67,21 +67,28 @@ Verify: `codex --version && python --version`
 
 ### Agent Configuration
 
-Create `arena.yaml` in your project root to enable/disable agents:
+Create `arena.yaml` in your project root to select which agents participate:
 
 ```yaml
+# Select and order review agents using type shorthands
+# The system auto-generates numbered instances (claude-1, codex-1, claude-2)
+review-agents: claude, codex, claude
+
 agents:
-  claude:
-    enabled: true    # Required for synthesis - cannot be disabled
-  gemini:
-    enabled: true    # Set to false if not installed
+  # Synthesis agent (always Claude, used for final champion_review.md)
+  synthesis:
+    command:
+      - claude
+      - -p
+
+  # Enable codex as a type template (disabled by default)
   codex:
-    enabled: false   # Set to true if installed
+    enabled: true
 ```
 
 ### Custom Agent Paths
 
-If agents are not in your PATH, specify the full command:
+If agents are not in your PATH, specify the full command on the type template:
 
 ```yaml
 agents:
@@ -89,7 +96,6 @@ agents:
     command:
       - /usr/local/bin/claude
       - -p
-    enabled: true
 ```
 
 ### Minimum Agents
@@ -122,10 +128,11 @@ docker info
 
 ### Enabling Docker Mode
 
-Add `docker` configuration to your agents in `arena.yaml`:
+Add `docker` configuration to agent type templates or the synthesis agent in `arena.yaml`:
 
 ```yaml
 agents:
+  # Type template: Docker config is inherited by all generated instances
   claude:
     docker:
       enabled: true
@@ -135,13 +142,12 @@ agents:
     command: ["claude", "-p"]
     flags:
       auto-approve: true
-    enabled: true
 
-  gemini:
+  # Synthesis agent: separate Docker config for final synthesis step
+  synthesis:
     docker:
       enabled: true
-    command: ["gemini"]
-    enabled: true
+    command: ["claude", "-p"]
 ```
 
 ### Default Images
@@ -204,9 +210,9 @@ The core insight: **collective intelligence outperforms individual genius** thro
 
 ```
 Round 0 (Independent Reviews)
-├── Claude CLI → claude/review.md
-├── Codex CLI  → codex/review.md
-└── Gemini CLI → gemini/review.md
+├── claude-1 → claude-1/review.md
+├── codex-1  → codex-1/review.md
+└── claude-2 → claude-2/review.md
 
 Round 1 (Cross-Pollination)
 ├── All agents read: all_reviews.md (combined output)
@@ -250,19 +256,19 @@ This keeps complexity linear while maximizing cross-pollination.
 ├── task.md                    # Task definition, rubric, and constraints
 ├── rounds/
 │   ├── round-0/
-│   │   ├── claude/
+│   │   ├── claude-1/
 │   │   │   └── review.md
-│   │   ├── codex/
+│   │   ├── codex-1/
 │   │   │   └── review.md
-│   │   ├── gemini/
+│   │   ├── claude-2/
 │   │   │   └── review.md
 │   │   └── all_reviews.md     # Combined output (input for round-1)
 │   ├── round-1/
-│   │   ├── [agent]/
+│   │   ├── [agent-N]/
 │   │   │   └── review.md      # Synthesized improvements
 │   │   └── all_reviews.md     # Combined output (input for round-2)
 │   └── final/
-│       └── champion_review.md # Synthesized final review (always produced by Claude)
+│       └── champion_review.md # Synthesized final review (always produced by synthesis agent)
 ```
 
 ## How It Works
@@ -311,13 +317,21 @@ Code review is ideal for this tournament approach because:
 Configuration file: `arena.yaml`
 
 ```yaml
+# Select review agents using type shorthands (auto-expanded to numbered instances)
+review-agents: claude, codex, claude
+
 agents:
+  # Type templates: config inherited by generated instances
   claude:
-    command: ["claude", "-p", "@prompt.txt"]
+    command: ["claude", "-p"]
   codex:
-    command: ["codex", "exec", "@prompt.txt"]
+    command: ["codex", "-q"]
   gemini:
-    command: ["gemini", "-p", "@prompt.txt"]
+    command: ["gemini"]
+
+  # Synthesis agent (always Claude, used for final champion_review.md)
+  synthesis:
+    command: ["claude", "-p"]
 
 execution:
   max_concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once

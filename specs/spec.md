@@ -935,20 +935,20 @@ Agents write directly to their designated output path without needing to create 
 
 ### Synthesizer Requirement
 
-**Claude is required** for the final synthesis step. The orchestrator fails with exit code 4 in these scenarios:
+**Claude is required** for the final synthesis step, configured as the `synthesis` agent. The orchestrator fails with exit code 4 in these scenarios:
 
 | Scenario | Error Message |
 |----------|---------------|
-| Claude not configured | `"Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml."` |
+| Synthesis agent not configured | `"Final synthesis requires Claude CLI. Ensure 'synthesis' agent is configured in arena.yaml."` |
 | Synthesis prompt generation fails | `"Failed to generate synthesis prompt: <reason>"` |
 | Synthesis execution fails | `"Synthesis failed: <reason>"` |
 
 This is a hard requirement, not a soft fallback. The synthesizer role is critical to producing the final `champion_review.md`.
 
 **Edge cases:**
-- If Claude is the only surviving agent, synthesis still runs (Claude synthesizes its own review)
-- If Claude did not participate in tournament rounds (`enabled: false`), it is still used for synthesis
-- The `enabled` flag only controls tournament participation, not synthesis availability
+- If Claude is the only surviving agent type, synthesis still runs (Claude synthesizes its own review)
+- The `synthesis` agent is separate from the `claude` type template used by `review-agents`
+- The `enabled` flag on `synthesis` only controls tournament participation, not synthesis availability
 
 ### State Recovery
 
