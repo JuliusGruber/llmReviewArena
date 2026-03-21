@@ -325,7 +325,9 @@ agents:
   claude:
     command: ["claude", "-p"]
   codex:
-    command: ["codex", "-q"]
+    command: ["codex", "exec", "--full-auto", "-o", "@output", "-"]
+    flags:
+      auto-approve: false
   gemini:
     command: ["gemini"]
 

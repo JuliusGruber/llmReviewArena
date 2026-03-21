@@ -74,10 +74,14 @@ agents:
     type: codex
     command:
       - codex
-      - -q                    # quiet mode requires prompt as positional arg, not stdin
+      - exec
+      - --full-auto
+      - -o
+      - "@output"
+      - "-"                   # Read prompt from stdin
     flags:
-      auto-approve: true
-    enabled: false            # Disabled: codex -q requires prompt as argument, not stdin
+      auto-approve: false     # --full-auto already embedded in command above
+    enabled: false            # Disabled by default; enable in arena.yaml if codex is installed
 
   gemini:
     type: gemini
