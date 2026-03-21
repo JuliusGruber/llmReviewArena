@@ -222,6 +222,11 @@ public class ConfigLoader {
         // Load agents
         Map<String, AgentConfig> agents = loadAgents(config);
 
+        // Load review-agents shorthand (optional)
+        List<String> reviewAgents = config.getOptionalValues("review-agents", String.class)
+            .map(list -> list.stream().map(String::trim).filter(s -> !s.isEmpty()).toList())
+            .orElse(List.of());
+
         return new ArenaConfig(
             maxRounds,
             maxOutputSizeKb,
@@ -232,7 +237,8 @@ public class ConfigLoader {
             gracePeriodMs,
             minAgents,
             outputDir,
-            agents
+            agents,
+            reviewAgents
         );
     }
 

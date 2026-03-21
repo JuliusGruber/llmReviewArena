@@ -31,7 +31,7 @@ class ReviewAggregatorTest {
         );
         ArenaConfig config = new ArenaConfig(
             2, 500, 0, false, 30_000, 90_000, 1_000, 2,
-            Path.of(".arena"), agents
+            Path.of(".arena"), agents, List.of()
         );
         workspace = new WorkspaceManager(tempDir, config);
         workspace.initialize("abc123", "", "");

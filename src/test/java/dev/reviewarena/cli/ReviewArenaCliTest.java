@@ -57,7 +57,8 @@ class ReviewArenaCliTest {
                     5_000, // gracePeriodMs
                     1, // minAgents
                     overrides.outputDir() != null ? overrides.outputDir() : Path.of(".arena"),
-                    agents
+                    agents,
+                    List.of()
                 );
             }
         };
