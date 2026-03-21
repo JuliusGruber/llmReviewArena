@@ -28,8 +28,10 @@ agents:
       - opus
 
   # Codex: local execution (uses codex CLI from PATH)
-  # Note: --full-auto is in command directly, so auto-approve must be false
-  # to prevent CommandBuilder from adding a duplicate --full-auto flag
+  # --full-auto is embedded in command above; auto-approve: false prevents CommandBuilder
+  # from injecting it (CommandBuilder.java:97 short-circuits on false before the dedup
+  # guard at line 99 is reached). Explicit false is the cleaner signal that flag injection
+  # is handled entirely via the command list.
   codex:
     docker:
       enabled: false
