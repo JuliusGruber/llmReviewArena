@@ -27,14 +27,13 @@ agents:
       - --model
       - opus
 
-  # Codex: Docker-based with native Rust CLI
-  # Build the image first: docker build -t codex-cli:latest docker/codex/
-  # Docker entrypoint is "codex exec", so command only needs the arguments
+  # Codex: local execution (uses codex CLI from PATH)
   codex:
     docker:
-      enabled: true
-      image: "codex-cli:latest"
+      enabled: false
     command:
+      - codex
+      - -q
       - --full-auto
       - -o
       - "@output"
