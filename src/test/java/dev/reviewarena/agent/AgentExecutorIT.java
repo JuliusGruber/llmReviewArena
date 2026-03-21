@@ -257,7 +257,8 @@ class AgentExecutorIT {
             100, // 100ms grace period
             1,
             Path.of(".arena"),
-            agents
+            agents,
+            List.of()
         );
         WorkspaceManager workspace = new WorkspaceManager(tempDir, config);
         workspace.initialize("test-commit", "", "");
@@ -288,7 +289,8 @@ class AgentExecutorIT {
             100, // 100ms grace period
             1,
             Path.of(".arena"),
-            agents
+            agents,
+            List.of()
         );
         WorkspaceManager workspace = new WorkspaceManager(tempDir, config);
         workspace.initialize("test-commit", "", "");
@@ -423,7 +425,8 @@ class AgentExecutorIT {
             1_000, // gracePeriodMs
             1, // minAgents
             Path.of(".arena"),
-            agents
+            agents,
+            List.of()
         );
     }
 }

@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -333,10 +334,7 @@ public class WorkspaceManager {
     }
 
     private Set<String> getEnabledAgentNames() {
-        return config.agents().entrySet().stream()
-                .filter(entry -> entry.getValue().enabled())
-                .map(java.util.Map.Entry::getKey)
-                .collect(Collectors.toSet());
+        return new LinkedHashSet<>(config.reviewAgentNames());
     }
 
     private void generateTaskMd(Path arenaDir) throws IOException {

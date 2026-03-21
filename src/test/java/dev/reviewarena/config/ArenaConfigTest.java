@@ -3,6 +3,7 @@ package dev.reviewarena.config;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +128,82 @@ class ArenaConfigTest {
     }
 
     @Test
+    void testValidation_nullReviewAgents_throws() {
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> createConfigWith(b -> b.reviewAgents = null));
+
+        assertTrue(ex.getMessage().contains("reviewAgents must not be null"));
+    }
+
+    @Test
+    void testValidation_reviewAgentsUnknownName_throws() {
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> createConfigWith(b -> {
+                b.agents = Map.of("claude", AgentConfig.of("claude", List.of("claude")));
+                b.reviewAgents = List.of("claude", "nonexistent");
+            }));
+
+        assertTrue(ex.getMessage().contains("unknown agent 'nonexistent'"));
+    }
+
+    @Test
+    void testReviewAgentNames_withReviewAgents_returnsListAsIs() {
+        ArenaConfig config = createConfigWith(b -> {
+            b.agents = Map.of(
+                "b-agent", AgentConfig.of("b-agent", List.of("cmd")),
+                "a-agent", AgentConfig.of("a-agent", List.of("cmd"))
+            );
+            b.reviewAgents = List.of("b-agent", "a-agent");
+        });
+
+        assertEquals(List.of("b-agent", "a-agent"), config.reviewAgentNames());
+    }
+
+    @Test
+    void testReviewAgentNames_empty_fallsBackToEnabledAlphabetical() {
+        ArenaConfig config = createConfigWith(b -> {
+            b.agents = Map.of(
+                "zebra", AgentConfig.of("zebra", List.of("cmd")),
+                "alpha", AgentConfig.of("alpha", List.of("cmd")),
+                "disabled", AgentConfig.disabled("disabled", List.of("cmd"))
+            );
+            b.reviewAgents = List.of();
+        });
+
+        assertEquals(List.of("alpha", "zebra"), config.reviewAgentNames());
+    }
+
+    @Test
+    void testReviewAgentNames_includesDisabledAgentWhenListed() {
+        ArenaConfig config = createConfigWith(b -> {
+            b.agents = Map.of(
+                "enabled-one", AgentConfig.of("enabled-one", List.of("cmd")),
+                "disabled-one", AgentConfig.disabled("disabled-one", List.of("cmd"))
+            );
+            b.reviewAgents = List.of("disabled-one", "enabled-one");
+        });
+
+        assertEquals(List.of("disabled-one", "enabled-one"), config.reviewAgentNames());
+    }
+
+    @Test
+    void testReviewAgents_isImmutable() {
+        List<String> mutableList = new ArrayList<>(List.of("claude"));
+        ArenaConfig config = createConfigWith(b -> {
+            b.agents = Map.of("claude", AgentConfig.of("claude", List.of("cmd")));
+            b.reviewAgents = mutableList;
+        });
+
+        // Modifying original list doesn't affect config
+        mutableList.add("nonexistent");
+        assertEquals(1, config.reviewAgents().size());
+
+        // Config's reviewAgents list is immutable
+        assertThrows(UnsupportedOperationException.class,
+            () -> config.reviewAgents().add("other"));
+    }
+
+    @Test
     void testValidation_zeroMaxConcurrent_allowed() {
         // 0 means unlimited
         ArenaConfig config = createConfigWith(b -> b.maxConcurrent = 0);
@@ -153,12 +230,13 @@ class ArenaConfigTest {
         int minAgents = 1;
         Path outputDir = Path.of(".arena");
         Map<String, AgentConfig> agents = Map.of();
+        List<String> reviewAgents = List.of();
 
         ArenaConfig build() {
             return new ArenaConfig(
                 maxRounds, maxOutputSizeKb, maxConcurrent, showAgentOutput,
                 agentTimeoutMs, roundTimeoutMs, gracePeriodMs,
-                minAgents, outputDir, agents
+                minAgents, outputDir, agents, reviewAgents
             );
         }
     }

@@ -118,10 +118,9 @@ public class AgentExecutor {
      * @throws AgentException if round execution fails catastrophically
      */
     public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) {
-        List<AgentConfig> agents = config.agents().values().stream()
-            .filter(AgentConfig::enabled)
-            .filter(a -> agentNames.contains(a.name()))
-            .sorted(Comparator.comparing(AgentConfig::name))
+        List<AgentConfig> agents = config.reviewAgentNames().stream()
+            .filter(agentNames::contains)
+            .map(name -> config.agents().get(name))
             .toList();
 
         if (agents.isEmpty()) {
@@ -258,9 +257,8 @@ public class AgentExecutor {
     }
 
     private List<AgentConfig> getEnabledAgents() {
-        return config.agents().values().stream()
-            .filter(AgentConfig::enabled)
-            .sorted(Comparator.comparing(AgentConfig::name)) // Alphabetical for determinism
+        return config.reviewAgentNames().stream()
+            .map(name -> config.agents().get(name))
             .toList();
     }
 

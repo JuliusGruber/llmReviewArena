@@ -199,7 +199,8 @@ class AgentExecutorTest {
             1_000, // gracePeriodMs
             2, // minAgents
             Path.of(".arena"),
-            agents
+            agents,
+            List.of()
         );
     }
 
@@ -214,7 +215,8 @@ class AgentExecutorTest {
             1_000, // gracePeriodMs
             1, // minAgents
             Path.of(".arena"),
-            agents
+            agents,
+            List.of()
         );
     }
 

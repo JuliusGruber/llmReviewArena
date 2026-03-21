@@ -1,74 +1,33 @@
-# Local arena configuration to enable all agents
+# Local arena configuration - overrides only
+# Base defaults are in src/main/resources/application.yaml
+#
+# To enable Docker for claude1/2/3, add:
+#   agents.claude1.docker:
+#     enabled: true
+#     image: "docker/sandbox-templates:claude-code"
+#
+# Authenticate locally first with: claude /login
+# Credentials from ~/.claude/ are mounted into the container
+
+review-agents: claude1, claude2, claude3
+
 agents:
-  claude1:
-    type: claude
-    # Regular Docker mode with credential mounting
-    # Authenticate locally first with: claude /login
-    # Credentials from ~/.claude/ are mounted into the container
-    docker:
-      enabled: false
-      sandbox: false
-      image: "docker/sandbox-templates:claude-code"
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-      output-format: json  # Single JSON output with .result field
-    enabled: true
-
-  claude2:
-    type: claude
-    # Second Claude instance
-    docker:
-      enabled: false
-      sandbox: false
-      image: "docker/sandbox-templates:claude-code"
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-      output-format: json  # Single JSON output with .result field
-    enabled: true
-
-  claude3:
-    type: claude
-    # Third Claude instance
-    docker:
-      enabled: false
-      sandbox: false
-      image: "docker/sandbox-templates:claude-code"
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-      output-format: json  # Single JSON output with .result field
-    enabled: true
-
-  # Synthesis uses Claude with Docker + Opus model (ultrathink)
-  # Disabled for tournament rounds (we use claude1/2 instead) but available for synthesis via Docker
+  # Synthesis agent: Docker + Opus model (ultrathink)
+  # Disabled for tournament rounds, used only for final synthesis
   claude:
-    type: claude
     docker:
       enabled: true
-      sandbox: false
       image: "docker/sandbox-templates:claude-code"
     command:
       - claude
       - -p
       - --model
       - opus
-    flags:
-      auto-approve: true
-    enabled: false
 
-  # Codex - runs in Docker with native Rust CLI
+  # Codex: Docker-based with native Rust CLI
   # Build the image first: docker build -t codex-cli:latest docker/codex/
-  # Note: Docker entrypoint is "codex exec", so command only needs the arguments
+  # Docker entrypoint is "codex exec", so command only needs the arguments
   codex:
-    type: codex
     docker:
       enabled: true
       image: "codex-cli:latest"
@@ -77,22 +36,10 @@ agents:
       - -o
       - "@output"
       - "-"   # Read prompt from stdin
-    enabled: false
 
-  # Gemini - disabled in favor of codex
+  # Gemini: uncomment to enable
   # gemini:
-  #   type: gemini
   #   docker:
   #     enabled: true
   #     image: "tgagor/gemini-cli:latest"
-  #   command:
-  #     - gemini
-  #   flags:
-  #     auto-approve: true
   #   enabled: true
-
-limits:
-  rounds: 5  # Maximum allowed is 5 (will be capped if higher)
-
-tournament:
-  min-agents: 1

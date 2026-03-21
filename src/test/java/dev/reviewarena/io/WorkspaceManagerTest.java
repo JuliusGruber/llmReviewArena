@@ -41,7 +41,8 @@ class WorkspaceManagerTest {
             5000,   // gracePeriodMs
             1,      // minAgents
             Path.of(".arena"),
-            agents
+            agents,
+            List.of()
         );
     }
 
@@ -250,7 +251,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
+            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents, List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -269,7 +270,7 @@ class WorkspaceManagerTest {
     void testInitialize_usesCustomOutputDir() {
         ArenaConfig config = new ArenaConfig(
             1, 500, 0, true, 600000, 900000, 5000, 1, Path.of("custom-output"),
-            Map.of("agent1", AgentConfig.of("agent1", List.of("cmd")))
+            Map.of("agent1", AgentConfig.of("agent1", List.of("cmd"))), List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -331,7 +332,7 @@ class WorkspaceManagerTest {
     void testInitialize_oneRound_createsRound0AndRound1() {
         ArenaConfig config = new ArenaConfig(
             1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"),
-            Map.of("agent1", AgentConfig.of("agent1", List.of("cmd")))
+            Map.of("agent1", AgentConfig.of("agent1", List.of("cmd"))), List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -351,7 +352,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
+            1, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents, List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -375,7 +376,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            7, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
+            7, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents, List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -406,7 +407,7 @@ class WorkspaceManagerTest {
         );
 
         ArenaConfig config = new ArenaConfig(
-            8, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents
+            8, 500, 0, true, 600000, 900000, 5000, 1, Path.of(".arena"), agents, List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, config);
@@ -485,7 +486,7 @@ class WorkspaceManagerTest {
     void testGenerateSynthesisPrompt_usesConfigOutputDir() throws IOException {
         ArenaConfig customConfig = new ArenaConfig(
             2, 500, 0, true, 600000, 900000, 5000, 1, Path.of("custom-out"),
-            Map.of("claude", AgentConfig.of("claude", List.of("claude")))
+            Map.of("claude", AgentConfig.of("claude", List.of("claude"))), List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, customConfig);
@@ -517,7 +518,7 @@ class WorkspaceManagerTest {
     void testRegenerateRoundPrompts_usesConfigOutputDir() throws IOException {
         ArenaConfig customConfig = new ArenaConfig(
             2, 500, 0, true, 600000, 900000, 5000, 1, Path.of("custom-out"),
-            Map.of("claude", AgentConfig.of("claude", List.of("claude")))
+            Map.of("claude", AgentConfig.of("claude", List.of("claude"))), List.of()
         );
 
         WorkspaceManager manager = new WorkspaceManager(tempDir, customConfig);

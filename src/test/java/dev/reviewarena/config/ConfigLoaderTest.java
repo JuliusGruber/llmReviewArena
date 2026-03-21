@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ConfigLoaderTest {
@@ -515,6 +517,54 @@ class ConfigLoaderTest {
             """);
 
         assertThrows(ConfigException.class, () -> loader.load(arenaYaml, CliOverrides.none()));
+    }
+
+    // ===== review-agents loading =====
+
+    @Test
+    void testLoad_reviewAgentsCommaString_parsesList() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            review-agents: claude1, claude2, claude3
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        assertEquals(List.of("claude1", "claude2", "claude3"), config.reviewAgents());
+    }
+
+    @Test
+    void testLoad_reviewAgentsYamlList_parsesList() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            review-agents:
+              - claude1
+              - claude2
+              - claude3
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        assertEquals(List.of("claude1", "claude2", "claude3"), config.reviewAgents());
+    }
+
+    @Test
+    void testLoad_reviewAgentsNotSpecified_emptyList() {
+        ArenaConfig config = loader.load(tempDir.resolve("nonexistent.yaml"), CliOverrides.none());
+
+        assertTrue(config.reviewAgents().isEmpty());
+    }
+
+    @Test
+    void testLoad_reviewAgentsUnknownName_throwsConfigException() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            review-agents: claude1, nonexistent-agent
+            """);
+
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> loader.load(arenaYaml, CliOverrides.none()));
+        assertTrue(ex.getMessage().contains("unknown agent 'nonexistent-agent'"));
     }
 
     @Test

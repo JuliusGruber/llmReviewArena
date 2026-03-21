@@ -1,6 +1,7 @@
 package dev.reviewarena.config;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,7 +31,10 @@ public record ArenaConfig(
     Path outputDir,
 
     // Agents
-    Map<String, AgentConfig> agents
+    Map<String, AgentConfig> agents,
+
+    // Review agent selection (shorthand override)
+    List<String> reviewAgents
 ) {
     // All defaults now come from application.yaml (single source of truth)
     // See ConfigLoader for fail-fast loading from YAML config
@@ -67,8 +71,39 @@ public record ArenaConfig(
         if (agents == null) {
             throw new ConfigException("agents must not be null");
         }
+        if (reviewAgents == null) {
+            throw new ConfigException("reviewAgents must not be null (use List.of() for empty)");
+        }
         // Make agents map immutable
         agents = Map.copyOf(agents);
+        // Make reviewAgents immutable and validate all names exist in agents map
+        reviewAgents = List.copyOf(reviewAgents);
+        for (String name : reviewAgents) {
+            if (!agents.containsKey(name)) {
+                throw new ConfigException(
+                    "review-agents references unknown agent '" + name + "'. " +
+                    "Available agents: " + agents.keySet());
+            }
+        }
+    }
+
+    /**
+     * Returns the list of agent names to use for review rounds.
+     *
+     * <p>If {@code reviewAgents} is non-empty, returns it as-is (preserving order).
+     * Otherwise, falls back to all enabled agents sorted alphabetically.
+     *
+     * @return ordered list of agent names for tournament rounds
+     */
+    public List<String> reviewAgentNames() {
+        if (!reviewAgents.isEmpty()) {
+            return reviewAgents;
+        }
+        return agents.entrySet().stream()
+            .filter(e -> e.getValue().enabled())
+            .map(Map.Entry::getKey)
+            .sorted()
+            .toList();
     }
 
     /**

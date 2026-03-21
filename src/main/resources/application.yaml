@@ -54,6 +54,8 @@ tournament:
 output:
   dir: .arena
 
+# review-agents: claude1, claude2, claude3  # Shorthand to select and order review agents
+
 # Default agents (can be overridden in arena.yaml)
 # Note: Prompt is delivered via stdin redirection (not as command argument)
 agents:
