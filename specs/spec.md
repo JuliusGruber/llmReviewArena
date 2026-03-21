@@ -49,7 +49,7 @@ AgentProcess
 ├── name              (claude, codex, gemini)
 ├── command           (shell command to start it)
 ├── working_directory (isolated per agent)
-├── prompt_file       (prompt injection via file reference, e.g., prompt.md)
+├── stdin             (prompt delivery via stdin pipe)
 ├── stdout            (captured logs + responses)
 ├── lifecycle         (start / stop / restart)
 ```
@@ -61,31 +61,25 @@ Agents are defined via YAML configuration with explicit flag management:
 ```yaml
 agents:
   claude:
-    command: ["claude", "-p", "@prompt.md"]
+    command: ["claude", "-p"]
     flags:
-      auto-approve: true              # Adds --dangerously-skip-permissions
-      allowed-tools:                  # Adds --allowedTools
-        - Read
-        - Write
-        - Edit
-        - Bash
-        - Glob
-        - Grep
+      auto-approve: true
+      output-format: json
 
   codex:
-    command: ["codex", "exec", "@prompt.md"]
+    command: ["codex", "exec", "--full-auto", "-o", "@output", "-"]
     flags:
-      auto-approve: true              # Adds --full-auto
+      auto-approve: false     # --full-auto already in command
 
   gemini:
-    command: ["gemini", "-p", "@prompt.md"]
+    command: ["gemini"]
     flags:
-      auto-approve: true              # Adds --yolo
+      auto-approve: true
 ```
 
-> **Note:** Prompts are passed via file reference (`@prompt.md`) for robustness with large or complex prompts. The orchestrator writes the prompt to a temporary file before invoking each agent.
+> **Note:** Prompts are delivered via **stdin** — the orchestrator reads the prompt file into memory and pipes it to the agent process's stdin. This avoids file locking issues on Windows and works uniformly across all agents.
 
-> **Note:** The `@output` placeholder in commands is replaced with the absolute path to the agent's output file (e.g., `.arena/rounds/round-0/claude/review.md`).
+> **Note:** The `@output` placeholder in commands is replaced with the absolute path to the agent's output file (e.g., `.arena/rounds/round-0/claude-1/review.md`).
 
 > **Note:** Agent working directories are set dynamically per round (see [Arena Filesystem](#arena-filesystem)).
 
@@ -97,6 +91,7 @@ The `flags` section provides a portable, CLI-agnostic way to configure agent beh
 |-------------|------------|-----------|------------|
 | `auto-approve: true` | `--dangerously-skip-permissions` | `--full-auto` | `--yolo` |
 | `allowed-tools: [...]` | `--allowedTools <list>` | N/A | N/A |
+| `output-format: <format>` | `--output-format <format>` | N/A | N/A |
 
 #### Mandatory vs Optional Flags
 
@@ -124,7 +119,7 @@ This abstraction keeps the arena:
 The arena **requires ephemeral agents** - stateless, short-lived processes that are created fresh for each round. This ensures a clean context window every time:
 
 1. **Start** agent process
-2. **Feed** it a prompt (via file reference: `@prompt.md`)
+2. **Feed** it a prompt (via stdin pipe)
 3. **Let it work** (agent executes autonomously)
 4. **Capture output** (from stdout)
 5. **Kill** process
@@ -164,11 +159,11 @@ The arena enforces limits on agent outputs to prevent runaway processes:
 
 ```yaml
 limits:
+  rounds: 5              # Number of cross-pollination rounds after Round 0 (default: 5, minimum: 1)
   max-output-size-kb: 500    # Maximum size per output file (e.g., review.md)
-  max-rounds: 5              # Number of cross-pollination rounds after Round 0 (default: 5, minimum: 1)
 ```
 
-**Constraint:** `max-rounds` must be at least 1. Cross-pollination is the core value proposition of the arena—running only Round 0 with no improvement cycle provides no tournament benefit over running a single agent directly. The orchestrator rejects `max-rounds: 0` with exit code 5 (config error).
+**Constraint:** `rounds` must be at least 1. Cross-pollination is the core value proposition of the arena—running only Round 0 with no improvement cycle provides no tournament benefit over running a single agent directly. The orchestrator rejects `rounds: 0` with exit code 5 (config error).
 
 #### Round Counting (0-indexed)
 
@@ -179,10 +174,10 @@ Rounds are **always 0-indexed**, both internally and in user-facing output:
 | Round 0 | Independent | Each agent reviews code independently, no cross-pollination |
 | Round 1-N | Cross-pollination | Agents see all previous reviews and improve |
 
-**`max-rounds` semantics:**
-- `max-rounds: 5` means 5 cross-pollination rounds (Rounds 1-5) after Round 0
-- Total rounds executed = Round 0 + `max-rounds` cross-pollination rounds
-- Example: `max-rounds: 5` → Rounds 0, 1, 2, 3, 4, 5 (6 total rounds)
+**`rounds` semantics:**
+- `rounds: 5` means 5 cross-pollination rounds (Rounds 1-5) after Round 0
+- Total rounds executed = Round 0 + `rounds` cross-pollination rounds
+- Example: `rounds: 5` → Rounds 0, 1, 2, 3, 4, 5 (6 total rounds)
 
 Progress output uses 0-indexed display: `Round 0/5`, `Round 1/5`, ..., `Round 5/5`
 
@@ -196,12 +191,12 @@ The arena enforces time limits on agent processes to prevent indefinite hangs:
 
 ```yaml
 timeouts:
-  agent-timeout-ms: 300000      # Per-agent process timeout (default: 5 minutes)
+  agent-timeout-ms: 600000      # Per-agent process timeout (default: 10 minutes)
   round-timeout-ms: 900000      # Per-round timeout (default: 15 minutes)
   grace-period-ms: 5000         # Graceful shutdown window before force kill
 ```
 
-> **Default Rationale:** 5 minutes allows thorough review of ~1000 LOC diffs.
+> **Default Rationale:** 10 minutes allows thorough review of complex diffs.
 
 **Timeout Behavior:**
 
@@ -265,7 +260,7 @@ The arena requires a minimum number of agents to maintain meaningful cross-polli
 
 ```yaml
 tournament:
-  min-agents: 2    # Minimum agents required (default: 2)
+  min-agents: 1    # Minimum agents required (default: 1)
 ```
 
 **Behavior:**
@@ -273,20 +268,22 @@ tournament:
 | Condition | Action |
 |-----------|--------|
 | Agents drop below `min-agents` | Tournament aborts with exit code 4 |
-| Single agent remains (default threshold) | Tournament aborts—no cross-pollination possible |
+| Single agent remains (if min-agents > 1) | Tournament aborts—no cross-pollination possible |
 | All agents fail in Round 0 | Tournament aborts with exit code 4 |
 
-**Rationale:** Cross-pollination requires at least 2 agents to be meaningful. A single-agent "tournament" provides no competitive benefit over running that agent directly.
+`min-agents: 1` allows single-agent continuation (useful when only Claude is enabled), though cross-pollination benefits require 2+ agents.
+
+**Rationale:** The default of 1 supports the common case where only Claude is installed and enabled. Cross-pollination is most valuable with 2+ agents, but a single-agent tournament still produces useful reviews through iterative self-refinement.
 
 **Example console output:**
 
 ```
 [ERROR] Agent 'codex' crashed in round 0: exit code 1
-[ERROR] Agent 'gemini' timed out in round 0 after 300000ms
-[ERROR] Tournament requires at least 2 agents, only 1 remaining. Aborting.
+[ERROR] Agent 'gemini' timed out in round 0 after 600000ms
+[WARN] Only 1 agent remaining. Cross-pollination benefits are reduced.
 ```
 
-> **Note:** Set `min-agents: 1` to allow single-agent continuation (useful for testing or fallback scenarios), though this disables the cross-pollination benefit.
+> **Note:** Set `min-agents: 2` to enforce cross-pollination — the tournament will abort if fewer than 2 agents are available.
 
 ## Arena Filesystem
 
@@ -299,18 +296,21 @@ The following structure is used for **code review tournaments** (the primary use
 ```
 project-root/                    # Agents run here (working directory)
 ├── .arena/
-│   ├── task.md                  # Task definition, rubric, git range to review
+│   ├── prompts/
+│   │   ├── task.md               # Task definition, rubric, git range
+│   │   ├── round-0-<agent>.md    # Pre-generated round prompts per agent
+│   │   └── round-N-<agent>.md
 │   ├── rounds/
 │   │   ├── round-0/
-│   │   │   ├── claude/
+│   │   │   ├── claude-1/
 │   │   │   │   └── review.md
-│   │   │   ├── codex/
+│   │   │   ├── codex-1/
 │   │   │   │   └── review.md
-│   │   │   └── gemini/
-│   │   │       └── review.md
+│   │   │   └── all_reviews.md
 │   │   ├── round-1/
 │   │   │   └── ...
 │   │   └── final/
+│   │       ├── prompt.md
 │   │       └── champion_review.md # Synthesized final review
 └── <project files>              # Full source tree accessible to agents
 ```
@@ -328,7 +328,7 @@ Agents are spawned with their working directory set to the **project root** (the
 - Build tools, test runners, linters
 - Any project tooling
 
-Agents write their review output to the path specified in the prompt (e.g., `.arena/rounds/round-0/claude/review.md`), but operate from the project root to leverage their full capabilities.
+Agents write their review output to the path specified in the prompt (e.g., `.arena/rounds/round-0/claude-1/review.md`), but operate from the project root to leverage their full capabilities.
 
 **Why not isolate agents?** The power of tool-enabled CLI agents comes from their ability to explore, run tests, and investigate. Sandboxing them to a subdirectory would severely limit their effectiveness.
 
@@ -338,14 +338,14 @@ Agents access all arena files using **relative paths from the project root**:
 
 | Resource | Path from project root |
 |----------|------------------------|
-| Task definition | `.arena/task.md` |
+| Task definition | `.arena/prompts/task.md` |
 | Own output | `.arena/rounds/round-N/<agent>/review.md` |
 | Previous round reviews | `.arena/rounds/round-N/all_reviews.md` |
 | Source code | Direct paths (e.g., `src/main/App.java`) |
 
 **Path format:** Prompts reference files using relative paths. Agents may internally resolve to absolute paths if needed, but all prompt-specified paths are relative to the project root.
 
-**Write access:** Agents can write anywhere within the project. The orchestrator specifies output paths in prompts (e.g., "Write your review to `.arena/rounds/round-1/claude/review.md`"). Agents are trusted to write only to their designated output locations.
+**Write access:** Agents can write anywhere within the project. The orchestrator specifies output paths in prompts (e.g., "Write your review to `.arena/rounds/round-1/claude-1/review.md`"). Agents are trusted to write only to their designated output locations.
 
 ### Agent Capabilities
 
@@ -401,19 +401,21 @@ The arena creates a deterministic structure for code review tasks:
 ```
 project-root/                           # Agents run here (working directory)
 ├── .arena/
-│   ├── task.md                         # Instructions + rubric + git range to review
+│   ├── prompts/
+│   │   ├── task.md                     # Task definition, rubric, git range
+│   │   ├── round-0-<agent>.md          # Pre-generated round prompts per agent
+│   │   └── round-N-<agent>.md
 │   ├── rounds/
 │   │   ├── round-0/
-│   │   │   ├── claude/
+│   │   │   ├── claude-1/
 │   │   │   │   └── review.md
-│   │   │   ├── codex/
-│   │   │   │   └── review.md
-│   │   │   ├── gemini/
+│   │   │   ├── codex-1/
 │   │   │   │   └── review.md
 │   │   │   └── all_reviews.md          # Combined reviews from all agents
 │   │   ├── round-1/
 │   │   │   └── ...
 │   │   └── final/
+│   │       ├── prompt.md
 │   │       └── champion_review.md      # Synthesized final review
 └── <project files>                     # Full source tree accessible to agents
 ```
@@ -425,12 +427,12 @@ For each agent (fresh process):
 1. Start agent in the **project root** directory
 2. Feed it:
    - The rubric + `task.md` (contains git range to review)
-   - Output path: `.arena/rounds/round-0/<agent>/review.md`
+   - Output path: `.arena/rounds/round-0/<agent>/review.md` (e.g., `claude-1`, `claude-2`)
 3. Agent explores code, runs `git diff`, investigates as needed
 4. Agent writes review to specified output path
 5. Stop the agent process (ephemeral processes = clean state)
 
-**Result:** Three independent reviews with no cross-contamination.
+**Result:** Independent reviews with no cross-contamination (e.g., 3 reviews from `claude-1`, `claude-2`, `claude-3`).
 
 ### 3) Build the Combined Submission
 
@@ -504,7 +506,7 @@ Repeat for a fixed number of rounds:
    - Tightens prioritization
    - Adds actionable patches/tests
 
-**Stop when:** Fixed round limit reached (configurable via `max-rounds`, see [Resource Limits](#resource-limits))
+**Stop when:** Fixed round limit reached (configurable via `rounds`, see [Resource Limits](#resource-limits))
 
 ### 6) Final Output
 
@@ -864,13 +866,13 @@ The following decisions supplement the specification with concrete implementatio
 The project uses **SmallRye Config** (MicroProfile Config reference implementation) for type-safe configuration injection:
 
 ```java
-@ConfigProperty(name = "limits.max-rounds", defaultValue = "5")
-int maxRounds;
+@ConfigProperty(name = "limits.rounds", defaultValue = "5")
+int rounds;
 ```
 
 **Key capabilities:**
 - `@ConfigProperty` annotation for type-safe YAML property injection
-- Hierarchical property names (e.g., `limits.max-rounds`, `timeouts.agent-timeout-ms`)
+- Hierarchical property names (e.g., `limits.rounds`, `timeouts.agent-timeout-ms`)
 - Multiple config sources: `application.yaml`, environment variables, system properties
 - Default values when configuration is missing
 
@@ -878,7 +880,7 @@ See [Implementation Decisions](implementation-decisions.md#configuration-with-mi
 
 ### task.md Generation
 
-The `task.md` file contains the **global invariants** (rubric, constraints, output contract) and is copied as-is during workspace initialization. It does not contain placeholders—review target information is passed via round-specific prompts.
+The `task.md` file is stored at `.arena/prompts/task.md` and contains the **global invariants** (rubric, constraints, output contract). It is copied as-is during workspace initialization. It does not contain placeholders—review target information is passed via round-specific prompts.
 
 ### Round Prompt Placeholders
 
@@ -899,7 +901,7 @@ Round prompts (`round-0.md`, `round-1.md`, etc.) are templated with placeholders
 
 ### Prompt Construction
 
-The prompt sent to agents (`@prompt.md`) is constructed by **concatenation**:
+Prompts are **pre-generated at initialization time** and stored in `.arena/prompts/`. The prompt sent to agents is constructed by **concatenation**:
 
 ```
 [Contents of task.md with placeholders resolved]
@@ -910,11 +912,9 @@ The prompt sent to agents (`@prompt.md`) is constructed by **concatenation**:
 ```
 
 The orchestrator:
-1. Loads `task.md` template and resolves placeholders
-2. Loads the appropriate round prompt (`round-0.md`, `round-1.md`, etc.)
-3. Concatenates them with a separator
-4. Writes to a temporary `prompt.md` file
-5. Invokes agent with `@prompt.md` reference
+1. Pre-generates all round prompts at workspace initialization and stores them in `.arena/prompts/`
+2. For rounds > 0, regenerates prompts with embedded previous review content
+3. Pipes prompt content to agent stdin
 
 ### Directory Creation
 
@@ -922,12 +922,16 @@ The **orchestrator pre-creates all directories** before spawning agents:
 
 ```
 .arena/
-├── task.md                          # Created and populated by orchestrator
+├── prompts/
+│   ├── task.md                      # Created and populated by orchestrator
+│   ├── round-0-claude-1.md          # Pre-generated prompt for claude-1 round 0
+│   ├── round-0-claude-2.md          # Pre-generated prompt for claude-2 round 0
+│   └── ...
 ├── rounds/
 │   ├── round-0/
-│   │   ├── claude/                  # Pre-created by orchestrator
-│   │   ├── codex/                   # Pre-created by orchestrator
-│   │   └── gemini/                  # Pre-created by orchestrator
+│   │   ├── claude-1/                # Pre-created by orchestrator
+│   │   ├── claude-2/                # Pre-created by orchestrator
+│   │   └── claude-3/                # Pre-created by orchestrator
 │   └── ...
 ```
 

@@ -47,6 +47,8 @@ This keeps the orchestrator simple and leverages the full power of tool-enabled 
 | `--sequential` | | Force sequential agent execution |
 | `--max-concurrent <n>` | | Limit concurrent agents (0=unlimited, 1=sequential) |
 | `--staged` | | Review staged changes instead of commits |
+| `--dry-run` | | Show what would happen without running agents |
+| `--quiet` | `-q` | Suppress agent output (don't stream to console) |
 
 
 ## Examples
@@ -119,7 +121,7 @@ Reviewing: abc1234..def5678 (15 files changed)
   Summary: 3 critical issues, 7 suggestions, 2 questions
 ```
 
-**Format:** `[Round X/N]` where X is the current round (0-indexed) and N is `max-rounds`.
+**Format:** `[Round X/N]` where X is the current round (0-indexed) and N is the `--rounds` value.
 
 ## Error Handling
 
