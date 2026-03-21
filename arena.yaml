@@ -28,12 +28,16 @@ agents:
       - opus
 
   # Codex: local execution (uses codex CLI from PATH)
+  # Note: --full-auto is in command directly, so auto-approve must be false
+  # to prevent CommandBuilder from adding a duplicate --full-auto flag
   codex:
     docker:
       enabled: false
+    flags:
+      auto-approve: false
     command:
       - codex
-      - -q
+      - exec
       - --full-auto
       - -o
       - "@output"
