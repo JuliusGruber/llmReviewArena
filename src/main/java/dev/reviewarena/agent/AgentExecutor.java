@@ -69,11 +69,11 @@ public class AgentExecutor {
             .filter(AgentConfig::enabled)
             .anyMatch(a -> a.docker().enabled());
 
-        // Check if Claude (synthesizer) is disabled but has Docker enabled for synthesis
-        AgentConfig claude = config.agents().get("claude");
-        boolean claudeSynthesisNeedsDocker = claude != null
-            && !claude.enabled()
-            && claude.docker().enabled();
+        // Check if synthesis agent is disabled but has Docker enabled for synthesis
+        AgentConfig synthesis = config.agents().get("synthesis");
+        boolean claudeSynthesisNeedsDocker = synthesis != null
+            && !synthesis.enabled()
+            && synthesis.docker().enabled();
 
         if (anyEnabledAgentUsesDocker || claudeSynthesisNeedsDocker) {
             dockerChecker.requireDocker();
@@ -297,10 +297,10 @@ public class AgentExecutor {
      * @throws AgentException if Claude is not configured
      */
     public void validateSynthesizerAvailable() {
-        AgentConfig claude = config.agents().get("claude");
-        if (claude == null) {
+        AgentConfig synthesis = config.agents().get("synthesis");
+        if (synthesis == null) {
             throw new AgentException(
-                "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml.");
+                "Final synthesis requires Claude CLI. Ensure 'synthesis' agent is configured in arena.yaml.");
         }
         // No additional validation needed - if claude is configured with a command,
         // it is assumed to be available for synthesis. The 'enabled' flag only controls
@@ -316,7 +316,7 @@ public class AgentExecutor {
      */
     public String getSynthesizerAgent() {
         validateSynthesizerAvailable();
-        return "claude";
+        return "synthesis";
     }
 
     /**

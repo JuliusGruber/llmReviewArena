@@ -223,9 +223,9 @@ class AgentExecutorTest {
     // ===== Synthesis-related tests =====
 
     @Test
-    void validateSynthesizerAvailable_claudeConfiguredAndEnabled_succeeds() {
+    void validateSynthesizerAvailable_synthesisConfiguredAndEnabled_succeeds() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", AgentConfig.of("claude", "claude", List.of("claude", "-p", "@prompt.md"))
+            "synthesis", AgentConfig.of("synthesis", "claude", List.of("claude", "-p", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -238,7 +238,7 @@ class AgentExecutorTest {
     }
 
     @Test
-    void validateSynthesizerAvailable_claudeNotConfigured_throwsAgentException() {
+    void validateSynthesizerAvailable_synthesisNotConfigured_throwsAgentException() {
         Map<String, AgentConfig> agents = Map.of(
             "codex", AgentConfig.of("codex", "codex", List.of("codex", "exec", "@prompt.md"))
         );
@@ -255,11 +255,11 @@ class AgentExecutorTest {
     }
 
     @Test
-    void validateSynthesizerAvailable_claudeDisabled_stillValid() {
+    void validateSynthesizerAvailable_synthesisDisabled_stillValid() {
         // Per spec: "If Claude did not participate in tournament rounds, it is still used for synthesis"
         // The 'enabled' flag only controls tournament participation, not synthesis availability
         Map<String, AgentConfig> agents = Map.of(
-            "claude", AgentConfig.disabled("claude", List.of("claude", "-p", "@prompt.md"))
+            "synthesis", AgentConfig.disabled("synthesis", List.of("claude", "-p", "@prompt.md"))
         );
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
@@ -267,14 +267,14 @@ class AgentExecutorTest {
 
         AgentExecutor executor = new AgentExecutor(config, workspace);
 
-        // Should NOT throw - disabled claude is still valid for synthesis
+        // Should NOT throw - disabled synthesis is still valid for synthesis
         assertDoesNotThrow(() -> executor.validateSynthesizerAvailable());
     }
 
     @Test
-    void getSynthesizerAgent_returnsClaude() {
+    void getSynthesizerAgent_returnsSynthesis() {
         Map<String, AgentConfig> agents = Map.of(
-            "claude", AgentConfig.of("claude", "claude", List.of("claude", "-p", "@prompt.md")),
+            "synthesis", AgentConfig.of("synthesis", "claude", List.of("claude", "-p", "@prompt.md")),
             "codex", AgentConfig.of("codex", "codex", List.of("codex", "exec", "@prompt.md"))
         );
         config = createConfig(agents);
@@ -283,11 +283,11 @@ class AgentExecutorTest {
 
         AgentExecutor executor = new AgentExecutor(config, workspace);
 
-        assertEquals("claude", executor.getSynthesizerAgent());
+        assertEquals("synthesis", executor.getSynthesizerAgent());
     }
 
     @Test
-    void getSynthesizerAgent_claudeNotAvailable_throwsAgentException() {
+    void getSynthesizerAgent_synthesisNotAvailable_throwsAgentException() {
         Map<String, AgentConfig> agents = Map.of(
             "codex", AgentConfig.of("codex", "codex", List.of("codex", "exec", "@prompt.md"))
         );
@@ -312,7 +312,7 @@ class AgentExecutorTest {
         AgentExecutor executor = new AgentExecutor(config, workspace);
 
         AgentException ex = assertThrows(AgentException.class, () ->
-            executor.executeSynthesis("claude", Path.of("/prompt.md"), Path.of("/output.md")));
+            executor.executeSynthesis("synthesis", Path.of("/prompt.md"), Path.of("/output.md")));
         assertTrue(ex.getMessage().contains("not found"));
     }
 
@@ -323,12 +323,12 @@ class AgentExecutorTest {
     // ===== Docker synthesis tests =====
 
     @Test
-    void validateSynthesizerAvailable_claudeDisabledButDockerEnabled_succeeds() {
-        // Claude disabled for tournament but Docker enabled for synthesis
+    void validateSynthesizerAvailable_synthesisDisabledButDockerEnabled_succeeds() {
+        // Synthesis disabled for tournament but Docker enabled for synthesis
         DockerConfig dockerEnabled = new DockerConfig(true, false, "claude-image:latest", null, null, null);
-        AgentConfig claudeWithDocker = new AgentConfig(
-            "claude", "claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false, dockerEnabled);
-        Map<String, AgentConfig> agents = Map.of("claude", claudeWithDocker);
+        AgentConfig synthesisWithDocker = new AgentConfig(
+            "synthesis", "claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false, dockerEnabled);
+        Map<String, AgentConfig> agents = Map.of("synthesis", synthesisWithDocker);
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
         workspace.initialize("test-commit", "", "");
@@ -337,17 +337,17 @@ class AgentExecutorTest {
         DockerChecker mockDockerChecker = () -> {}; // no-op, assumes Docker is available
         AgentExecutor executor = new AgentExecutor(config, workspace, mockDockerChecker);
 
-        // Should not throw - Claude is available via Docker
+        // Should not throw - synthesis is available via Docker
         assertDoesNotThrow(() -> executor.validateSynthesizerAvailable());
     }
 
     @Test
-    void getSynthesizerAgent_claudeDisabledButDockerEnabled_returnsClaude() {
-        // Claude disabled for tournament but Docker enabled for synthesis
+    void getSynthesizerAgent_synthesisDisabledButDockerEnabled_returnsSynthesis() {
+        // Synthesis disabled for tournament but Docker enabled for synthesis
         DockerConfig dockerEnabled = new DockerConfig(true, false, "claude-image:latest", null, null, null);
-        AgentConfig claudeWithDocker = new AgentConfig(
-            "claude", "claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false, dockerEnabled);
-        Map<String, AgentConfig> agents = Map.of("claude", claudeWithDocker);
+        AgentConfig synthesisWithDocker = new AgentConfig(
+            "synthesis", "claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false, dockerEnabled);
+        Map<String, AgentConfig> agents = Map.of("synthesis", synthesisWithDocker);
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
         workspace.initialize("test-commit", "", "");
@@ -356,17 +356,17 @@ class AgentExecutorTest {
         DockerChecker mockDockerChecker = () -> {}; // no-op, assumes Docker is available
         AgentExecutor executor = new AgentExecutor(config, workspace, mockDockerChecker);
 
-        // Should return "claude" - available via Docker
-        assertEquals("claude", executor.getSynthesizerAgent());
+        // Should return "synthesis" - available via Docker
+        assertEquals("synthesis", executor.getSynthesizerAgent());
     }
 
     @Test
-    void executeSynthesis_claudeDisabledButDockerEnabled_doesNotThrow() throws IOException {
-        // Claude disabled for tournament but Docker enabled for synthesis
+    void executeSynthesis_synthesisDisabledButDockerEnabled_doesNotThrow() throws IOException {
+        // Synthesis disabled for tournament but Docker enabled for synthesis
         DockerConfig dockerEnabled = new DockerConfig(true, false, "claude-image:latest", null, null, null);
-        AgentConfig claudeWithDocker = new AgentConfig(
-            "claude", "claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false, dockerEnabled);
-        Map<String, AgentConfig> agents = Map.of("claude", claudeWithDocker);
+        AgentConfig synthesisWithDocker = new AgentConfig(
+            "synthesis", "claude", List.of("claude", "-p", "@prompt.md"), Map.of(), false, dockerEnabled);
+        Map<String, AgentConfig> agents = Map.of("synthesis", synthesisWithDocker);
         config = createConfig(agents);
         workspace = new WorkspaceManager(tempDir, config);
         workspace.initialize("test-commit", "", "");
@@ -383,7 +383,7 @@ class AgentExecutorTest {
         // Should not throw AgentException for "disabled" - it proceeds to execution
         // (It will fail during actual Docker execution, but that's expected)
         try {
-            executor.executeSynthesis("claude", promptPath, outputPath);
+            executor.executeSynthesis("synthesis", promptPath, outputPath);
         } catch (AgentException e) {
             // Should NOT fail with "disabled" message
             assertFalse(e.getMessage().contains("disabled"),
