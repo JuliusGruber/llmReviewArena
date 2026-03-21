@@ -1,20 +1,23 @@
 # Local arena configuration - overrides only
 # Base defaults are in src/main/resources/application.yaml
 #
-# To enable Docker for claude1/2/3, add:
-#   agents.claude1.docker:
+# review-agents uses type shorthands (claude, codex, gemini).
+# The system auto-generates numbered instances (claude-1, codex-1, claude-2).
+#
+# To enable Docker for generated instances, configure it on the type template:
+#   agents.claude.docker:
 #     enabled: true
 #     image: "docker/sandbox-templates:claude-code"
 #
 # Authenticate locally first with: claude /login
 # Credentials from ~/.claude/ are mounted into the container
 
-review-agents: claude1, claude2, claude3
+review-agents: claude, codex, claude
 
 agents:
   # Synthesis agent: Docker + Opus model (ultrathink)
   # Disabled for tournament rounds, used only for final synthesis
-  claude:
+  synthesis:
     docker:
       enabled: true
       image: "docker/sandbox-templates:claude-code"

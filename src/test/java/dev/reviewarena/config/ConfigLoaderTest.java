@@ -45,10 +45,15 @@ class ConfigLoaderTest {
         ArenaConfig config = loader.load(tempDir.resolve("nonexistent.yaml"), CliOverrides.none());
 
         // Verify default agents from application.yaml are loaded
+        // review-agents: claude, claude, claude expands to claude-1, claude-2, claude-3
         assertFalse(config.agents().isEmpty());
-        assertTrue(config.agents().containsKey("claude1"));
-        assertTrue(config.agents().containsKey("claude2"));
-        assertTrue(config.agents().containsKey("claude3"));
+        assertTrue(config.agents().containsKey("claude-1"));
+        assertTrue(config.agents().containsKey("claude-2"));
+        assertTrue(config.agents().containsKey("claude-3"));
+        // Template "claude" should be removed after expansion
+        assertFalse(config.agents().containsKey("claude"));
+        // Synthesis agent should remain
+        assertTrue(config.agents().containsKey("synthesis"));
     }
 
     // ===== Loading from arena.yaml =====
@@ -519,52 +524,141 @@ class ConfigLoaderTest {
         assertThrows(ConfigException.class, () -> loader.load(arenaYaml, CliOverrides.none()));
     }
 
-    // ===== review-agents loading =====
+    // ===== review-agents loading (type shorthand expansion) =====
 
     @Test
-    void testLoad_reviewAgentsCommaString_parsesList() throws IOException {
+    void testLoad_reviewAgentsCommaString_expandsToNumberedInstances() throws IOException {
         Path arenaYaml = tempDir.resolve("arena.yaml");
         Files.writeString(arenaYaml, """
-            review-agents: claude1, claude2, claude3
+            review-agents: claude, claude, claude
             """);
 
         ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
 
-        assertEquals(List.of("claude1", "claude2", "claude3"), config.reviewAgents());
+        assertEquals(List.of("claude-1", "claude-2", "claude-3"), config.reviewAgents());
+        // Instances should exist in agents map
+        assertTrue(config.agents().containsKey("claude-1"));
+        assertTrue(config.agents().containsKey("claude-2"));
+        assertTrue(config.agents().containsKey("claude-3"));
+        // Template should be removed
+        assertFalse(config.agents().containsKey("claude"));
     }
 
     @Test
-    void testLoad_reviewAgentsYamlList_parsesList() throws IOException {
+    void testLoad_reviewAgentsYamlList_expandsToNumberedInstances() throws IOException {
         Path arenaYaml = tempDir.resolve("arena.yaml");
         Files.writeString(arenaYaml, """
             review-agents:
-              - claude1
-              - claude2
-              - claude3
+              - claude
+              - claude
+              - claude
             """);
 
         ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
 
-        assertEquals(List.of("claude1", "claude2", "claude3"), config.reviewAgents());
+        assertEquals(List.of("claude-1", "claude-2", "claude-3"), config.reviewAgents());
+    }
+
+    @Test
+    void testLoad_reviewAgentsMixedTypes_expandsCorrectly() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            review-agents: claude, codex, claude
+            agents:
+              codex:
+                type: codex
+                command:
+                  - codex
+                enabled: true
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        assertEquals(List.of("claude-1", "codex-1", "claude-2"), config.reviewAgents());
+        // Instances have correct types
+        assertEquals("claude", config.agents().get("claude-1").type());
+        assertEquals("codex", config.agents().get("codex-1").type());
+        assertEquals("claude", config.agents().get("claude-2").type());
     }
 
     @Test
     void testLoad_reviewAgentsNotSpecified_emptyList() {
+        // When no arena.yaml and application.yaml has review-agents, it will expand
+        // But with an arena.yaml that doesn't specify review-agents, the default applies
         ArenaConfig config = loader.load(tempDir.resolve("nonexistent.yaml"), CliOverrides.none());
 
-        assertTrue(config.reviewAgents().isEmpty());
+        // application.yaml has review-agents: claude, claude, claude
+        // so it should expand
+        assertFalse(config.reviewAgents().isEmpty());
     }
 
     @Test
-    void testLoad_reviewAgentsUnknownName_throwsConfigException() throws IOException {
+    void testLoad_reviewAgentsUnknownType_throwsConfigException() throws IOException {
         Path arenaYaml = tempDir.resolve("arena.yaml");
         Files.writeString(arenaYaml, """
-            review-agents: claude1, nonexistent-agent
+            review-agents: claude, nonexistent-type
             """);
 
         ConfigException ex = assertThrows(ConfigException.class,
             () -> loader.load(arenaYaml, CliOverrides.none()));
-        assertTrue(ex.getMessage().contains("unknown agent 'nonexistent-agent'"));
+        assertTrue(ex.getMessage().contains("unknown agent type 'nonexistent-type'"));
+    }
+
+    @Test
+    void testLoad_reviewAgentsSynthesisReserved_throwsConfigException() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            review-agents: claude, synthesis
+            """);
+
+        ConfigException ex = assertThrows(ConfigException.class,
+            () -> loader.load(arenaYaml, CliOverrides.none()));
+        assertTrue(ex.getMessage().contains("reserved name 'synthesis'"));
+    }
+
+    @Test
+    void testLoad_reviewAgentsExpansion_instancesCopyTemplateConfig() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            review-agents: claude
+            agents:
+              claude:
+                type: claude
+                command:
+                  - claude
+                  - -p
+                flags:
+                  auto-approve: true
+                docker:
+                  enabled: true
+                  image: my-image:latest
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        AgentConfig instance = config.agents().get("claude-1");
+        assertNotNull(instance);
+        assertEquals("claude", instance.type());
+        assertEquals(List.of("claude", "-p"), instance.command());
+        assertEquals(true, instance.flags().get("auto-approve"));
+        assertTrue(instance.docker().enabled());
+        assertEquals("my-image:latest", instance.docker().image());
+        assertTrue(instance.enabled()); // Instances are always enabled
+    }
+
+    @Test
+    void testLoad_reviewAgentsExpansion_removesUsedTemplates() throws IOException {
+        Path arenaYaml = tempDir.resolve("arena.yaml");
+        Files.writeString(arenaYaml, """
+            review-agents: claude
+            """);
+
+        ArenaConfig config = loader.load(arenaYaml, CliOverrides.none());
+
+        // Template "claude" should be removed
+        assertFalse(config.agents().containsKey("claude"));
+        // But synthesis and unused templates should remain
+        assertTrue(config.agents().containsKey("synthesis"));
     }
 
     @Test

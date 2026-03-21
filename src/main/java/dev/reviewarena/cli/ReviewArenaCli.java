@@ -397,7 +397,7 @@ public class ReviewArenaCli implements Callable<Integer> {
         for (int i = 1; i <= config.maxRounds(); i++) {
             log.info("  {}. Round {}: Cross-pollination (all agents)", i + 1, i);
         }
-        log.info("  {}. Final synthesis: Champion review (claude)", config.maxRounds() + 2);
-        log.info("Synthesis agent: claude (required)");
+        log.info("  {}. Final synthesis: Champion review (synthesis)", config.maxRounds() + 2);
+        log.info("Synthesis agent: synthesis (required)");
     }
 }

@@ -222,10 +222,18 @@ public class ConfigLoader {
         // Load agents
         Map<String, AgentConfig> agents = loadAgents(config);
 
-        // Load review-agents shorthand (optional)
-        List<String> reviewAgents = config.getOptionalValues("review-agents", String.class)
+        // Load review-agents shorthand (optional) - these are type shorthands, not instance names
+        List<String> reviewAgentShorthands = config.getOptionalValues("review-agents", String.class)
             .map(list -> list.stream().map(String::trim).filter(s -> !s.isEmpty()).toList())
             .orElse(List.of());
+
+        // Expand type shorthands into numbered instances
+        List<String> reviewAgents;
+        if (!reviewAgentShorthands.isEmpty()) {
+            reviewAgents = expandReviewAgents(reviewAgentShorthands, agents);
+        } else {
+            reviewAgents = List.of();
+        }
 
         return new ArenaConfig(
             maxRounds,
@@ -240,6 +248,66 @@ public class ConfigLoader {
             agents,
             reviewAgents
         );
+    }
+
+    /**
+     * Expands type shorthands in review-agents into numbered agent instances.
+     *
+     * <p>Each shorthand (e.g., "claude") is looked up as a template in the agents map.
+     * A numbered instance is created (e.g., "claude-1", "claude-2") with the template's
+     * config but always enabled. Template keys used for expansion are removed from the
+     * agents map to prevent fallback pollution.
+     *
+     * @param shorthands the list of type shorthands from review-agents config
+     * @param agents     the mutable agents map (templates will be removed after expansion)
+     * @return the list of expanded instance names
+     * @throws ConfigException if a shorthand references "synthesis" or an unknown template
+     */
+    private List<String> expandReviewAgents(List<String> shorthands, Map<String, AgentConfig> agents) {
+        // Track which templates were used and per-type counters
+        Map<String, Integer> typeCounters = new HashMap<>();
+        Set<String> usedTemplates = new HashSet<>();
+        List<String> expandedNames = new java.util.ArrayList<>();
+
+        for (String shorthand : shorthands) {
+            if ("synthesis".equals(shorthand)) {
+                throw new ConfigException(
+                    "review-agents cannot use reserved name 'synthesis'. " +
+                    "Use agent type names like 'claude', 'codex', 'gemini'.");
+            }
+
+            AgentConfig template = agents.get(shorthand);
+            if (template == null) {
+                throw new ConfigException(
+                    "review-agents references unknown agent type '" + shorthand + "'. " +
+                    "Available templates: " + agents.keySet());
+            }
+
+            // Generate numbered instance name
+            int counter = typeCounters.merge(shorthand, 1, Integer::sum);
+            String instanceName = shorthand + "-" + counter;
+
+            // Create instance config: always enabled, copies template's command/flags/docker
+            AgentConfig instance = new AgentConfig(
+                instanceName,
+                template.type(),
+                template.command(),
+                template.flags(),
+                true,  // Instances are always enabled
+                template.docker()
+            );
+
+            agents.put(instanceName, instance);
+            expandedNames.add(instanceName);
+            usedTemplates.add(shorthand);
+        }
+
+        // Remove used templates from agents map (prevents fallback pollution)
+        for (String template : usedTemplates) {
+            agents.remove(template);
+        }
+
+        return expandedNames;
     }
 
     private Map<String, AgentConfig> loadAgents(SmallRyeConfig config) {

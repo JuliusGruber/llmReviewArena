@@ -54,12 +54,13 @@ tournament:
 output:
   dir: .arena
 
-# review-agents: claude1, claude2, claude3  # Shorthand to select and order review agents
+review-agents: claude, claude, claude  # Shorthand: type names, auto-expanded to claude-1, claude-2, claude-3
 
-# Default agents (can be overridden in arena.yaml)
+# Default agents - type templates and synthesis agent
 # Note: Prompt is delivered via stdin redirection (not as command argument)
 agents:
-  claude1:
+  # Type templates: used by review-agents expansion to create numbered instances
+  claude:
     type: claude
     command:
       - claude
@@ -68,36 +69,6 @@ agents:
       auto-approve: true
       output-format: json     # Single JSON output with .result field
     enabled: true
-
-  claude2:
-    type: claude
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-      output-format: json
-    enabled: true
-
-  claude3:
-    type: claude
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-      output-format: json
-    enabled: true
-
-  # Synthesis agent - disabled for tournament rounds, but required for final synthesis
-  claude:
-    type: claude
-    command:
-      - claude
-      - -p
-    flags:
-      auto-approve: true
-    enabled: false            # Disabled for tournament, but used for synthesis
 
   codex:
     type: codex
@@ -115,3 +86,13 @@ agents:
     flags:
       auto-approve: true
     enabled: false            # Disabled by default - enable in arena.yaml if needed
+
+  # Synthesis agent - disabled for tournament rounds, but required for final synthesis
+  synthesis:
+    type: claude
+    command:
+      - claude
+      - -p
+    flags:
+      auto-approve: true
+    enabled: false            # Disabled for tournament, but used for synthesis
