@@ -15,6 +15,14 @@
 review-agents: claude, codex, claude
 
 agents:
+  # Claude review agent: use Opus model for highest-quality reviews
+  claude:
+    command:
+      - claude
+      - -p
+      - --model
+      - opus
+
   # Synthesis agent: Docker + Opus model (ultrathink)
   # Disabled for tournament rounds, used only for final synthesis
   synthesis:
