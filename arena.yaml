@@ -23,12 +23,9 @@ agents:
       - --model
       - opus
 
-  # Synthesis agent: Docker + Opus model (ultrathink)
+  # Synthesis agent: local execution with Opus model
   # Disabled for tournament rounds, used only for final synthesis
   synthesis:
-    docker:
-      enabled: true
-      image: "docker/sandbox-templates:claude-code"
     command:
       - claude
       - -p
