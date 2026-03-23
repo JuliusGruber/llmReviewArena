@@ -120,6 +120,13 @@ public class AgentProcess implements AutoCloseable {
             ProcessBuilder pb = new ProcessBuilder(effectiveCommand)
                 .directory(workingDir.toFile());
 
+            // For local Claude agents (non-Docker), remove ANTHROPIC_API_KEY from environment
+            // so the CLI uses subscription credentials (~/.claude/) instead of API credits.
+            // Docker agents handle env vars explicitly via -e flags in DockerCommandBuilder.
+            if ("claude".equals(agentType) && !dockerConfig.enabled()) {
+                pb.environment().remove("ANTHROPIC_API_KEY");
+            }
+
             // NOTE: We do NOT use pb.redirectInput(file) because that holds a file handle
             // that may not be released if the process crashes quickly (causes file locking on Windows)
 
