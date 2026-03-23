@@ -414,15 +414,21 @@ class DockerCommandBuilderTest {
 
         List<String> result = builder.build("test", "claude", docker, command, tempDir, "test-container");
 
-        // Check that -e flags are used for API keys that are set
-        List<String> apiKeyEnvVars = List.of(
-            "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
+        // ANTHROPIC_API_KEY should be skipped for Claude agents (use subscription credentials)
+        String anthropicKey = EnvLoader.getEnv("ANTHROPIC_API_KEY");
+        if (anthropicKey != null) {
+            assertFalse(result.contains("ANTHROPIC_API_KEY=" + anthropicKey),
+                "ANTHROPIC_API_KEY should NOT be passed to Docker Claude agents");
+        }
+
+        // Other API keys should still be passed if set
+        List<String> otherKeyEnvVars = List.of(
+            "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
         );
 
-        for (String keyName : apiKeyEnvVars) {
+        for (String keyName : otherKeyEnvVars) {
             String value = EnvLoader.getEnv(keyName);
             if (value != null) {
-                // Verify -e flag is present for this key
                 assertTrue(result.contains("-e"),
                     "Should use -e flag for environment variables");
                 assertTrue(result.contains(keyName + "=" + value),
@@ -440,11 +446,19 @@ class DockerCommandBuilderTest {
         // containerName is ignored for sandbox mode
         List<String> result = builder.build("claude", "claude", docker, command, tempDir, null);
 
-        List<String> apiKeyEnvVars = List.of(
-            "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
+        // ANTHROPIC_API_KEY should be skipped for Claude agents (use subscription credentials)
+        String anthropicKey = EnvLoader.getEnv("ANTHROPIC_API_KEY");
+        if (anthropicKey != null) {
+            assertFalse(result.contains("ANTHROPIC_API_KEY=" + anthropicKey),
+                "ANTHROPIC_API_KEY should NOT be passed to Docker Claude agents in sandbox mode");
+        }
+
+        // Other API keys should still be passed if set
+        List<String> otherKeyEnvVars = List.of(
+            "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
         );
 
-        for (String keyName : apiKeyEnvVars) {
+        for (String keyName : otherKeyEnvVars) {
             String value = EnvLoader.getEnv(keyName);
             if (value != null) {
                 assertTrue(result.contains("-e"),

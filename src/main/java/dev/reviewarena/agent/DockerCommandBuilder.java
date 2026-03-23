@@ -132,7 +132,8 @@ public class DockerCommandBuilder {
 
         // Pass API keys directly via -e flags.
         // Note: --env-file has path translation issues on Windows with Docker Desktop.
-        addApiKeyEnvVars(result);
+        // For Claude agents, skip ANTHROPIC_API_KEY so the CLI uses subscription credentials.
+        addApiKeyEnvVars(result, agentType);
 
         // Agent type (claude or gemini) for sandbox mode
         if (!SANDBOX_AGENTS.contains(agentType)) {
@@ -242,7 +243,9 @@ public class DockerCommandBuilder {
 
         // Pass API keys directly via -e flags.
         // Note: --env-file has path translation issues on Windows with Docker Desktop.
-        addApiKeyEnvVars(result);
+        // For Claude agents, skip ANTHROPIC_API_KEY so the CLI uses the mounted
+        // subscription credentials (~/.claude/.credentials.json) instead of API credits.
+        addApiKeyEnvVars(result, agentType);
 
         // Optional resource limits (already validated)
         if (docker.memory() != null) {
@@ -386,10 +389,18 @@ public class DockerCommandBuilder {
      * that is set in the environment. Using -e flags instead of --env-file avoids
      * path translation issues on Windows with Docker Desktop (WSL2 backend).
      *
-     * @param command The Docker command list to add flags to
+     * <p>For Claude agents, ANTHROPIC_API_KEY is skipped so the CLI uses the mounted
+     * subscription credentials (~/.claude/.credentials.json) instead of API credits.
+     *
+     * @param command   The Docker command list to add flags to
+     * @param agentType Agent type (claude, codex, gemini)
      */
-    private void addApiKeyEnvVars(List<String> command) {
+    private void addApiKeyEnvVars(List<String> command, String agentType) {
         for (String envVar : API_KEY_ENV_VARS) {
+            // Skip ANTHROPIC_API_KEY for Claude agents - use subscription credentials instead
+            if ("claude".equals(agentType) && "ANTHROPIC_API_KEY".equals(envVar)) {
+                continue;
+            }
             String value = EnvLoader.getEnv(envVar);
             if (value != null) {
                 command.add("-e");
