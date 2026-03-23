@@ -67,7 +67,9 @@ Verify: `codex --version && python --version`
 
 ### Agent Configuration
 
-Create `arena.yaml` in your project root to select which agents participate:
+Create `arena.yaml` in your **project root** (the directory you run `review-arena` from) to select which agents participate. The app loads `arena.yaml` from the current working directory — not from where the JAR is located. If no `arena.yaml` is found, built-in defaults are used (3 Claude agents, Codex and Gemini disabled).
+
+> **Tip:** If you use a shell alias or function to run the JAR, make sure each target project has its own `arena.yaml`, or pass `-c /path/to/arena.yaml` explicitly. See [docs/configuration.md](docs/configuration.md) for details.
 
 ```yaml
 # Select and order review agents using type shorthands
@@ -318,7 +320,7 @@ Code review is ideal for this tournament approach because:
 
 ## Configuration
 
-Configuration file: `arena.yaml`
+Configuration file: `arena.yaml` (loaded from the current working directory). See [docs/configuration.md](docs/configuration.md) for full details on config resolution, precedence, and common pitfalls.
 
 ```yaml
 # Select review agents using type shorthands (auto-expanded to numbered instances)
