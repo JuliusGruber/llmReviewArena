@@ -86,4 +86,4 @@ Remove or rewrite issues that fail this test.
 
 ## When You're Done
 
-Write your refined, calibrated review to `${outputPath}`.
+Write your refined, calibrated review to `${outputPath}`. Do not create any other files.

@@ -85,4 +85,4 @@ Before finalizing, verify:
 
 ## When You're Done
 
-Write your consolidated review to `${outputPath}`.
+Write your consolidated review to `${outputPath}`. Do not create any other files.

@@ -28,7 +28,7 @@ Evaluate the code with respect to:
 - **NEVER run `git add` on your review files** - leave them untracked
 
 ## Output Contract
-Write your review to `review.md` using **exactly** this structure:
+Your review must use **exactly** this structure:
 
 ### Summary
 ### High-risk issues (must fix)

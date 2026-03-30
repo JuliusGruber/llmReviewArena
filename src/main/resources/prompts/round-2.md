@@ -91,4 +91,4 @@ Write a review where every high-risk issue includes:
 
 ## When You're Done
 
-Write your refined, evidence-backed review to `${outputPath}`.
+Write your refined, evidence-backed review to `${outputPath}`. Do not create any other files.

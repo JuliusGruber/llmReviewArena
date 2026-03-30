@@ -89,6 +89,6 @@ Aim for a review that:
 
 ## When You're Done
 
-Write your final review to `${outputPath}`.
+Write your final review to `${outputPath}`. Do not create any other files.
 
 This is your best work.

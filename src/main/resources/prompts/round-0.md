@@ -27,4 +27,4 @@ Rules:
 - Do NOT mention other reviewers or models.
 - Write only the final review.
 
-Write your review to `${outputPath}` following the required structure above.
+Write your review to `${outputPath}` following the required structure above. Do not create any other files.
