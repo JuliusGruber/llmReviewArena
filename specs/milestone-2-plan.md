@@ -136,7 +136,7 @@ public class CommandBuilder {
      * @param promptFile   path to the prompt file to pass to agent
      * @return immutable list of command arguments
      */
-    public List<String> build(AgentConfig agentConfig, Path promptFile) {
+    public List<String> build(AgentConfig agentConfig, Path promptFile, Path outputFile) {
         List<String> command = new ArrayList<>(agentConfig.command());
 
         // Replace @prompt.md with actual path
@@ -192,6 +192,11 @@ public class AgentProcess {
     private final Path stderrLog;       // .arena/rounds/round-N/<agent>/stderr.log
     private final long timeoutMs;
     private final long gracePeriodMs;
+    private final String agentType;     // agent type (e.g., "claude", "codex", "gemini")
+    private final Path promptFile;      // path to the prompt file passed to agent
+    private final boolean showOutput;   // whether to stream agent output to console
+    private final boolean synthesis;    // whether this is a synthesis execution
+    private final DockerConfig dockerConfig; // optional Docker configuration
 
     private Process process;
     private Instant startTime;
@@ -277,6 +282,11 @@ AgentProcess agent = AgentProcess.builder()
     .stderrLog(workspaceManager.getAgentDir(0, "claude").resolve("stderr.log"))
     .timeoutMs(config.agentTimeoutMs())
     .gracePeriodMs(config.gracePeriodMs())
+    .agentType("claude")
+    .promptFile(promptFile)
+    .showOutput(config.showAgentOutput())
+    .synthesis(false)
+    .dockerConfig(agentConfig.docker().orElse(null))
     .build();
 ```
 
@@ -411,6 +421,11 @@ public class AgentExecutor {
 
         return Map.copyOf(results);
     }
+
+    // Note: Additional methods added in later milestones:
+    //   executeSynthesis()           - Milestone 4: executes the final synthesis step
+    //   getSynthesizerAgent()        - Milestone 4: returns the configured synthesizer agent name
+    //   validateSynthesizerAvailable() - Milestone 4: validates synthesizer agent is configured and enabled
 
     private AgentResult executeAgent(AgentConfig agentConfig, int round) {
         log.info("Starting agent '{}' for round {}", agentConfig.name(), round);

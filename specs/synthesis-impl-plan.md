@@ -482,35 +482,40 @@ public SynthesisResult executeSynthesis(String agentName, Path promptPath, Path 
 }
 
 /**
- * Validates that Claude is available for synthesis.
+ * Validates that the synthesis agent is available.
  * Per spec: "Claude is always used for this step regardless of which agents participated."
+ * The synthesis agent is configured as a separate entry named "synthesis" with type: claude.
  *
- * @throws AgentException if Claude is not configured or not enabled
+ * @throws AgentException if the synthesis agent is not configured or not enabled
  */
 public void validateSynthesizerAvailable() {
-    AgentConfig claude = config.agents().get("claude");
-    if (claude == null) {
+    AgentConfig synthesis = config.agents().get("synthesis");
+    if (synthesis == null) {
         throw new AgentException(
-            "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml.");
+            "Final synthesis requires Claude CLI. Ensure 'synthesis' agent is configured in arena.yaml.");
     }
-    if (!claude.enabled()) {
+    if (!synthesis.enabled()) {
         throw new AgentException(
-            "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled.");
+            "Final synthesis requires Claude CLI. The 'synthesis' agent is configured but disabled.");
     }
 }
 
 /**
  * Gets the synthesizer agent name.
  * Per spec: Claude is always used for synthesis.
+ * The synthesis agent is a separate config entry (type: claude) distinct from review agents.
  *
- * @return "claude" (the only valid synthesizer per spec)
- * @throws AgentException if Claude is not available
+ * @return "synthesis" (the dedicated synthesizer agent)
+ * @throws AgentException if the synthesis agent is not available
  */
 public String getSynthesizerAgent() {
     validateSynthesizerAvailable();
-    return "claude";
+    return "synthesis";
 }
 ```
+
+> **Note:** The `synthesis` agent uses `type: claude` and is a separate config entry from review agents.
+> It is not included in the `review-agents` list and cannot be used as a review-agent shorthand.
 
 ---
 
@@ -741,8 +746,8 @@ The arena starts the tournament without checking if agents are actually runnable
 | Scenario | Exit Code | Log Prefix | Message |
 |----------|-----------|------------|---------|
 | Success (synthesis complete) | 0 | - | "Tournament complete! Champion review: ..." |
-| Claude not configured | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. Ensure 'claude' is configured in arena.yaml." |
-| Claude disabled | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. The 'claude' agent is configured but disabled." |
+| Synthesis agent not configured | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. Ensure 'synthesis' agent is configured in arena.yaml." |
+| Synthesis agent disabled | 4 | [SYNTHESIS] | "Final synthesis requires Claude CLI. The 'synthesis' agent is configured but disabled." |
 | `all_reviews.md` missing | 4 | [SYNTHESIS] | "Final round reviews not found: <path>. Ensure cross-pollination completed successfully." |
 | Synthesis prompt generation failed | 4 | [SYNTHESIS] | "Failed to generate synthesis prompt: ..." |
 | Synthesis execution failed | 4 | [SYNTHESIS] | "Synthesis failed: <reason>" |
@@ -761,7 +766,7 @@ The feature is complete when:
 - [x] `WorkspaceManager.generateSynthesisPrompt()` uses `config.outputDir()` (not hardcoded `.arena`) ✅
 - [x] `WorkspaceManager.generateSynthesisPrompt()` validates `all_reviews.md` exists ✅
 - [x] `WorkspaceManager.regenerateRoundPrompts()` fixed to use `config.outputDir()` ✅
-- [x] `AgentExecutor.getSynthesizerAgent()` returns Claude (required per spec, no fallback) ✅
+- [x] `AgentExecutor.getSynthesizerAgent()` returns "synthesis" agent (type: claude, required per spec, no fallback) ✅
 - [x] `AgentExecutor.executeSynthesis()` returns `SynthesisResult` ✅
 - [x] `ReviewArenaCli` tracks final round successes for synthesis metadata ✅
 - [x] `ReviewArenaCli` integrates synthesis after cross-pollination ✅

@@ -25,7 +25,9 @@
 │                           WORKSPACE SETUP                                    │
 │  project-root/            ← agents run here (working directory)             │
 │  ├── .arena/                                                                │
-│  │   ├── task.md          ← rubric + git range to review                    │
+│  │   ├── prompts/                                                           │
+│  │   │   ├── task.md      ← rubric + git range to review                    │
+│  │   │   └── round-N-*.md ← pre-generated agent prompts                    │
 │  │   └── rounds/          ← review outputs per round                        │
 │  └── <project files>      ← full source tree accessible                     │
 └─────────────────────────────────────────────────────────────────────────────┘

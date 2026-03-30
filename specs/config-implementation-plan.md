@@ -46,6 +46,7 @@ Create the main configuration record that holds all tournament settings.
 package dev.reviewarena.config;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -55,30 +56,17 @@ import java.util.Map;
  * CLI arguments > Environment variables > arena.yaml > application.yaml defaults
  */
 public record ArenaConfig(
-    // Limits
     int maxRounds,
     int maxOutputSizeKb,
-
-    // Execution
     int maxConcurrent,
-
-    // Timeouts (milliseconds)
+    boolean showAgentOutput,
     long agentTimeoutMs,
     long roundTimeoutMs,
     long gracePeriodMs,
-
-    // Timeout behavior
-    String onTimeout,              // "kill-and-skip" or "abort"
-    boolean preservePartialOutput,
-
-    // Tournament constraints
     int minAgents,
-
-    // Output
     Path outputDir,
-
-    // Agents
-    Map<String, AgentConfig> agents
+    Map<String, AgentConfig> agents,
+    List<String> reviewAgents
 ) {
     /**
      * Default configuration values.
@@ -86,20 +74,19 @@ public record ArenaConfig(
     public static final int DEFAULT_MAX_ROUNDS = 5;
     public static final int DEFAULT_MAX_OUTPUT_SIZE_KB = 500;
     public static final int DEFAULT_MAX_CONCURRENT = 0; // unlimited
-    public static final long DEFAULT_AGENT_TIMEOUT_MS = 300_000; // 5 minutes
+    public static final boolean DEFAULT_SHOW_AGENT_OUTPUT = true;
+    public static final long DEFAULT_AGENT_TIMEOUT_MS = 600_000; // 10 minutes
     public static final long DEFAULT_ROUND_TIMEOUT_MS = 900_000; // 15 minutes
     public static final long DEFAULT_GRACE_PERIOD_MS = 5_000; // 5 seconds
-    public static final String DEFAULT_ON_TIMEOUT = "kill-and-skip";
-    public static final boolean DEFAULT_PRESERVE_PARTIAL_OUTPUT = false;
-    public static final int DEFAULT_MIN_AGENTS = 2;
+    public static final int DEFAULT_MIN_AGENTS = 1;
     public static final String DEFAULT_OUTPUT_DIR = ".arena";
 
     /**
      * Compact constructor with validation.
      */
     public ArenaConfig {
-        if (maxRounds < 0) {
-            throw new ConfigException("maxRounds must be non-negative, got: " + maxRounds);
+        if (maxRounds < 1) {
+            throw new ConfigException("maxRounds must be at least 1, got: " + maxRounds);
         }
         if (maxOutputSizeKb <= 0) {
             throw new ConfigException("maxOutputSizeKb must be positive, got: " + maxOutputSizeKb);
@@ -116,9 +103,6 @@ public record ArenaConfig(
         if (gracePeriodMs < 0) {
             throw new ConfigException("gracePeriodMs must be non-negative, got: " + gracePeriodMs);
         }
-        if (!onTimeout.equals("kill-and-skip") && !onTimeout.equals("abort")) {
-            throw new ConfigException("onTimeout must be 'kill-and-skip' or 'abort', got: " + onTimeout);
-        }
         if (minAgents < 1) {
             throw new ConfigException("minAgents must be at least 1, got: " + minAgents);
         }
@@ -128,8 +112,12 @@ public record ArenaConfig(
         if (agents == null) {
             throw new ConfigException("agents must not be null");
         }
-        // Make agents map immutable
+        if (reviewAgents == null) {
+            throw new ConfigException("reviewAgents must not be null");
+        }
+        // Make collections immutable
         agents = Map.copyOf(agents);
+        reviewAgents = List.copyOf(reviewAgents);
     }
 
     /**
@@ -140,14 +128,14 @@ public record ArenaConfig(
             DEFAULT_MAX_ROUNDS,
             DEFAULT_MAX_OUTPUT_SIZE_KB,
             DEFAULT_MAX_CONCURRENT,
+            DEFAULT_SHOW_AGENT_OUTPUT,
             DEFAULT_AGENT_TIMEOUT_MS,
             DEFAULT_ROUND_TIMEOUT_MS,
             DEFAULT_GRACE_PERIOD_MS,
-            DEFAULT_ON_TIMEOUT,
-            DEFAULT_PRESERVE_PARTIAL_OUTPUT,
             DEFAULT_MIN_AGENTS,
             Path.of(DEFAULT_OUTPUT_DIR),
-            Map.of()
+            Map.of(),
+            List.of()
         );
     }
 }
@@ -157,16 +145,16 @@ public record ArenaConfig(
 
 | Field | Rule | Error Message |
 |-------|------|---------------|
-| `maxRounds` | >= 0 | "maxRounds must be non-negative" |
+| `maxRounds` | >= 1 | "maxRounds must be at least 1" |
 | `maxOutputSizeKb` | > 0 | "maxOutputSizeKb must be positive" |
 | `maxConcurrent` | >= 0 | "maxConcurrent must be non-negative" |
 | `agentTimeoutMs` | > 0 | "agentTimeoutMs must be positive" |
 | `roundTimeoutMs` | > 0 | "roundTimeoutMs must be positive" |
 | `gracePeriodMs` | >= 0 | "gracePeriodMs must be non-negative" |
-| `onTimeout` | "kill-and-skip" or "abort" | "onTimeout must be 'kill-and-skip' or 'abort'" |
 | `minAgents` | >= 1 | "minAgents must be at least 1" |
 | `outputDir` | not null | "outputDir must not be null" |
 | `agents` | not null | "agents must not be null" |
+| `reviewAgents` | not null | "reviewAgents must not be null" |
 
 ### Tests
 
@@ -202,15 +190,19 @@ import java.util.Map;
  * Configuration for a single AI agent.
  *
  * @param name     Agent identifier (e.g., "claude", "codex", "gemini")
+ * @param type     Agent type (e.g., "review", "synthesis")
  * @param command  Command and arguments to spawn the agent
  * @param flags    Agent-specific flags (auto-approve, etc.)
  * @param enabled  Whether this agent participates in tournaments
+ * @param docker   Docker configuration for the agent (nullable)
  */
 public record AgentConfig(
     String name,
+    String type,
     List<String> command,
     Map<String, Object> flags,
-    boolean enabled
+    boolean enabled,
+    DockerConfig docker
 ) {
     /**
      * Compact constructor with validation and immutability.
@@ -388,13 +380,6 @@ public class ConfigLoader {
         long gracePeriodMs = config.getOptionalValue("timeouts.grace-period-ms", Long.class)
             .orElse(ArenaConfig.DEFAULT_GRACE_PERIOD_MS);
 
-        // Load timeout behavior
-        String onTimeout = config.getOptionalValue("timeouts.on-timeout", String.class)
-            .orElse(ArenaConfig.DEFAULT_ON_TIMEOUT);
-
-        boolean preservePartialOutput = config.getOptionalValue("timeouts.preserve-partial-output", Boolean.class)
-            .orElse(ArenaConfig.DEFAULT_PRESERVE_PARTIAL_OUTPUT);
-
         // Load tournament constraints
         int minAgents = config.getOptionalValue("tournament.min-agents", Integer.class)
             .orElse(ArenaConfig.DEFAULT_MIN_AGENTS);
@@ -408,18 +393,26 @@ public class ConfigLoader {
         // Load agents
         Map<String, AgentConfig> agents = loadAgents(config);
 
+        // Load show-agent-output
+        boolean showAgentOutput = config.getOptionalValue("execution.show-agent-output", Boolean.class)
+            .orElse(ArenaConfig.DEFAULT_SHOW_AGENT_OUTPUT);
+
+        // Load review agents
+        List<String> reviewAgents = config.getOptionalValues("review-agents", String.class)
+            .orElse(List.of());
+
         return new ArenaConfig(
             maxRounds,
             maxOutputSizeKb,
             maxConcurrent,
+            showAgentOutput,
             agentTimeoutMs,
             roundTimeoutMs,
             gracePeriodMs,
-            onTimeout,
-            preservePartialOutput,
             minAgents,
             outputDir,
-            agents
+            agents,
+            reviewAgents
         );
     }
 
@@ -545,21 +538,22 @@ execution:
   max-concurrent: 0  # 0 = unlimited
 
 timeouts:
-  agent-timeout-ms: 300000    # 5 minutes
+  agent-timeout-ms: 600000    # 10 minutes
   round-timeout-ms: 900000    # 15 minutes
   grace-period-ms: 5000       # 5 seconds
-  on-timeout: kill-and-skip
-  preserve-partial-output: false
 
 tournament:
-  min-agents: 2
+  min-agents: 1
 
 output:
   dir: .arena
 
+review-agents: claude, claude, claude
+
 # Default agents (can be overridden in arena.yaml)
 agents:
   claude:
+    type: review
     command:
       - claude
       - -p
@@ -569,6 +563,7 @@ agents:
     enabled: true
 
   codex:
+    type: review
     command:
       - codex
       - exec
@@ -578,8 +573,19 @@ agents:
     enabled: true
 
   gemini:
+    type: review
     command:
       - gemini
+      - -p
+      - "@prompt.md"
+    flags:
+      auto-approve: true
+    enabled: true
+
+  synthesis:
+    type: synthesis
+    command:
+      - claude
       - -p
       - "@prompt.md"
     flags:

@@ -54,32 +54,28 @@ public class TemplateLoader {
 
 ```java
 public record TemplateContext(
-    String reviewTarget,    // "abc1234", "abc1234..def5678", or "--staged"
-    int fileCount,          // Number of files changed
-    int roundNumber,        // 0, 1, 2, ... N
-    String agentName,       // "claude", "codex", "gemini"
-    String outputPath,      // ".arena/rounds/round-0/claude/review.md"
-    String allReviewsPath   // ".arena/rounds/round-0/all_reviews.md" (null for round 0)
+    int roundNumber,        // 0, 1, 2, ... N (-1 for task-only context)
+    String outputPath,      // ".arena/rounds/round-0/claude-1/review.md"
+    String allReviewsPath,  // ".arena/rounds/round-0/all_reviews.md" (null for round 0)
+    String previousReviewsContent, // Embedded all_reviews.md content (null for round 0)
+    String commit1,         // First commit hash (empty if --staged)
+    String commit2,         // Second commit hash (empty for single commit or --staged)
+    String stagedFlag       // "--staged" or empty string
 ) {
-    /**
-     * Creates a context for task.md generation (workspace setup).
-     */
-    public static TemplateContext forTask(String reviewTarget, int fileCount) {
-        return new TemplateContext(reviewTarget, fileCount, -1, null, null, null);
+    public static TemplateContext forTask() {
+        return new TemplateContext(-1, null, null, null, "", "", "");
     }
 
-    /**
-     * Creates a context for round prompt generation.
-     */
     public static TemplateContext forRound(
-            String reviewTarget,
-            int fileCount,
             int roundNumber,
-            String agentName,
             String outputPath,
-            String allReviewsPath) {
-        return new TemplateContext(reviewTarget, fileCount, roundNumber,
-                                   agentName, outputPath, allReviewsPath);
+            String allReviewsPath,
+            String previousReviewsContent,
+            String commit1,
+            String commit2,
+            String stagedFlag) {
+        return new TemplateContext(roundNumber, outputPath, allReviewsPath,
+                                   previousReviewsContent, commit1, commit2, stagedFlag);
     }
 }
 ```
@@ -189,20 +185,21 @@ public String render(String templateName, TemplateContext context) {
 
 private Map<String, Object> buildDataModel(TemplateContext context) {
     Map<String, Object> model = new HashMap<>();
-    model.put("reviewTarget", context.reviewTarget());
-    model.put("fileCount", context.fileCount());
+    model.put("commit1", context.commit1());
+    model.put("commit2", context.commit2());
+    model.put("stagedFlag", context.stagedFlag());
 
     if (context.roundNumber() >= 0) {
         model.put("roundNumber", context.roundNumber());
-    }
-    if (context.agentName() != null) {
-        model.put("agentName", context.agentName());
     }
     if (context.outputPath() != null) {
         model.put("outputPath", context.outputPath());
     }
     if (context.allReviewsPath() != null) {
         model.put("allReviewsPath", context.allReviewsPath());
+    }
+    if (context.previousReviewsContent() != null) {
+        model.put("previousReviewsContent", context.previousReviewsContent());
     }
     return model;
 }
@@ -225,17 +222,17 @@ public class WorkspaceManager {
         // ...
     }
 
-    private void generateTaskMd(Path arenaDir, String reviewTarget, int fileCount) {
-        TemplateContext context = TemplateContext.forTask(reviewTarget, fileCount);
+    private void generateTaskMd(Path arenaDir) {
+        TemplateContext context = TemplateContext.forTask();
         String content = templateLoader.render("task.md", context);
-        Files.writeString(arenaDir.resolve("task.md"), content, StandardCharsets.UTF_8);
+        Files.writeString(arenaDir.resolve("prompts").resolve("task.md"), content, StandardCharsets.UTF_8);
     }
 }
 ```
 
-**Note:** WorkspaceManager.initialize() signature changes to accept `fileCount`:
+**Note:** WorkspaceManager.initialize() signature changes to accept commit parameters:
 ```java
-public Path initialize(String reviewTarget, int fileCount)
+public Path initialize(String commit1, String commit2, String stagedFlag)
 ```
 
 ### 2. TournamentOrchestrator (Future)
@@ -244,9 +241,10 @@ Will use TemplateLoader to build agent prompts:
 
 ```java
 TemplateContext context = TemplateContext.forRound(
-    reviewTarget, fileCount, roundNumber, agentName, outputPath, allReviewsPath);
+    roundNumber, outputPath, allReviewsPath, previousReviewsContent,
+    commit1, commit2, stagedFlag);
 
-String taskContent = templateLoader.render("task.md", context);
+String taskContent = templateLoader.render("task.md", TemplateContext.forTask());
 String roundContent = templateLoader.render("round-" + roundNumber + ".md", context);
 
 String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
@@ -254,35 +252,17 @@ String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
 
 ---
 
-## File Count Retrieval
+## Commit Information Passing
 
-The `fileCount` placeholder requires git diff information. Options:
-
-### Option A: GitService provides file count
-
-Add method to GitService:
-
-```java
-public int getChangedFileCount(String ref1, String ref2) {
-    // Use JGit to count files in diff
-}
-
-public int getStagedFileCount() {
-    // Use JGit to count staged files
-}
-```
-
-### Option B: Pass through CLI
-
-CLI calls GitService, passes count to WorkspaceManager:
+The CLI passes commit information to WorkspaceManager for template placeholders:
 
 ```java
 // In ReviewArenaCli.call()
-int fileCount = gitService.getChangedFileCount(ref1, ref2);
-workspaceManager.initialize(reviewTarget, fileCount);
+String commit1 = staged ? "" : (ref1 != null ? ref1 : "");
+String commit2 = staged ? "" : (ref2 != null ? ref2 : "");
+String stagedFlagValue = staged ? "--staged" : "";
+workspaceManager.initialize(commit1, commit2, stagedFlagValue);
 ```
-
-**Recommendation:** Option B - keeps WorkspaceManager decoupled from GitService.
 
 ---
 
@@ -352,12 +332,13 @@ class TemplateLoaderTest {
 
 | Placeholder | Type | Used In | Description |
 |-------------|------|---------|-------------|
-| `${reviewTarget}` | String | task.md | Git ref or `--staged` |
-| `${fileCount}` | int | task.md | Number of changed files |
 | `${roundNumber}` | int | round-N.md | Current round (0-indexed) |
-| `${agentName}` | String | (future) | Agent identifier |
 | `${outputPath}` | String | round-N.md | Where agent writes review |
 | `${allReviewsPath}` | String | round-1+.md | Path to combined reviews |
+| `${previousReviewsContent}` | String | round-1+.md | Embedded content of previous all_reviews.md |
+| `${commit1}` | String | round-N.md | First commit hash (empty if --staged) |
+| `${commit2}` | String | round-N.md | Second commit hash (empty for single/staged) |
+| `${stagedFlag}` | String | round-N.md | "--staged" or empty string |
 
 ---
 
