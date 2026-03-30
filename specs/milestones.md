@@ -114,8 +114,7 @@ src/main/java/dev/reviewarena/io/
 ├── WorkspaceManager.java    # Creates .arena/ structure ✅
 ├── WorkspaceException.java  # Workspace errors ✅
 ├── TemplateLoader.java      # Loads prompt templates ✅
-├── TemplateContext.java     # Template data model ✅
-└── ReviewAggregator.java    # Writes all_reviews.md ✅
+└── TemplateContext.java     # Template data model ✅
 ```
 
 **WorkspaceManager responsibilities:** ✅

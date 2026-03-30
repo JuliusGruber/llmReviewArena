@@ -13,7 +13,8 @@ Change the templating approach so **all round prompts are pre-generated at start
 ## New Approach
 
 - **All prompts for all rounds** generated at workspace initialization
-- **One prompt per round** shared by all agents
+- **Per-agent prompts** (`round-{n}-{name}.md`) for each round
+- For rounds > 0, prompts are regenerated before execution with embedded previous review content
 - Agents receive pre-rendered prompt files, not templates
 
 ---
@@ -24,13 +25,13 @@ Change the templating approach so **all round prompts are pre-generated at start
 .arena/
 ├── task.md                    # General task description
 ├── diff.patch                 # Code under review
-├── prompts/                   # NEW - pre-rendered prompts
-│   ├── round-0.md
-│   ├── round-1.md
-│   ├── round-2.md
-│   ├── round-3.md
-│   ├── round-4.md
-│   └── round-5.md
+├── prompts/                   # NEW - pre-rendered prompts (per agent)
+│   ├── task.md
+│   ├── round-0-claude-1.md
+│   ├── round-0-claude-2.md
+│   ├── round-0-claude-3.md
+│   ├── round-1-claude-1.md
+│   └── ...
 └── rounds/                    # Agent outputs (unchanged)
     └── round-N/
         ├── {agent}/review.md
@@ -55,17 +56,21 @@ Each pre-generated `round-N.md` contains a **complete, standalone prompt**:
 
 | Placeholder | Value Source |
 |-------------|--------------|
-| `${reviewTarget}` | CLI arg |
-| `${fileCount}` | GitService |
 | `${roundNumber}` | Loop counter (0-5) |
+| `${outputPath}` | Computed per agent: `.arena/rounds/round-{N}/{agent}/review.md` |
 | `${allReviewsPath}` | `.arena/rounds/round-{N-1}/all_reviews.md` (null for round 0) |
+| `${previousReviewsContent}` | Embedded content of previous all_reviews.md (null for round 0) |
+| `${commit1}` | CLI arg - first commit hash (empty if --staged) |
+| `${commit2}` | CLI arg - second commit hash (empty for single/staged) |
+| `${stagedFlag}` | CLI arg - "--staged" or empty string |
 
 ### Removed Placeholders
 
 | Placeholder | Reason |
 |-------------|--------|
-| `${agentName}` | Not needed - prompt is agent-agnostic |
-| `${outputPath}` | Orchestrator tells agent where to write, not the prompt |
+| `${agentName}` | Not needed - agent identity is encoded in the filename |
+| `${reviewTarget}` | Replaced by `${commit1}`, `${commit2}`, `${stagedFlag}` |
+| `${fileCount}` | Replaced by `${commit1}`, `${commit2}`, `${stagedFlag}` |
 
 ---
 
@@ -75,21 +80,28 @@ Each pre-generated `round-N.md` contains a **complete, standalone prompt**:
 
 ```java
 public record TemplateContext(
-    String reviewTarget,
-    int fileCount,
-    int roundNumber,
-    String allReviewsPath  // null for round 0
+    int roundNumber,        // 0, 1, 2, ... N (-1 for task-only context)
+    String outputPath,      // ".arena/rounds/round-0/claude-1/review.md"
+    String allReviewsPath,  // ".arena/rounds/round-0/all_reviews.md" (null for round 0)
+    String previousReviewsContent, // Embedded all_reviews.md content (null for round 0)
+    String commit1,         // First commit hash (empty if --staged)
+    String commit2,         // Second commit hash (empty for single commit or --staged)
+    String stagedFlag       // "--staged" or empty string
 ) {
-    public static TemplateContext forTask(String reviewTarget, int fileCount) {
-        return new TemplateContext(reviewTarget, fileCount, -1, null);
+    public static TemplateContext forTask() {
+        return new TemplateContext(-1, null, null, null, "", "", "");
     }
 
     public static TemplateContext forRound(
-            String reviewTarget,
-            int fileCount,
             int roundNumber,
-            String allReviewsPath) {
-        return new TemplateContext(reviewTarget, fileCount, roundNumber, allReviewsPath);
+            String outputPath,
+            String allReviewsPath,
+            String previousReviewsContent,
+            String commit1,
+            String commit2,
+            String stagedFlag) {
+        return new TemplateContext(roundNumber, outputPath, allReviewsPath,
+                                   previousReviewsContent, commit1, commit2, stagedFlag);
     }
 }
 ```
@@ -99,28 +111,33 @@ public record TemplateContext(
 Add method to generate all prompts:
 
 ```java
-private void generateAllRoundPrompts(Path arenaDir, String reviewTarget, int fileCount) {
+private void generateAllRoundPrompts(Path arenaDir, String commit1, String commit2, String stagedFlag) {
     Path promptsDir = arenaDir.resolve("prompts");
     Files.createDirectories(promptsDir);
 
     String taskContent = templateLoader.render("task.md",
-        TemplateContext.forTask(reviewTarget, fileCount));
+        TemplateContext.forTask());
 
     int maxRounds = config.getMaxRounds(); // e.g., 6
 
     for (int round = 0; round < maxRounds; round++) {
-        String allReviewsPath = (round == 0) ? null
-            : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
+        for (String agentName : config.reviewAgents()) {
+            String outputPath = ".arena/rounds/round-" + round + "/" + agentName + "/review.md";
+            String allReviewsPath = (round == 0) ? null
+                : ".arena/rounds/round-" + (round - 1) + "/all_reviews.md";
+            String previousReviewsContent = null; // Populated at regeneration time for rounds > 0
 
-        TemplateContext ctx = TemplateContext.forRound(
-            reviewTarget, fileCount, round, allReviewsPath);
+            TemplateContext ctx = TemplateContext.forRound(
+                round, outputPath, allReviewsPath, previousReviewsContent,
+                commit1, commit2, stagedFlag);
 
-        String roundContent = templateLoader.render("round-" + round + ".md", ctx);
+            String roundContent = templateLoader.render("round-" + round + ".md", ctx);
 
-        String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
+            String fullPrompt = taskContent + "\n\n---\n\n" + roundContent;
 
-        Files.writeString(promptsDir.resolve("round-" + round + ".md"),
-            fullPrompt, StandardCharsets.UTF_8);
+            Files.writeString(promptsDir.resolve("round-" + round + "-" + agentName + ".md"),
+                fullPrompt, StandardCharsets.UTF_8);
+        }
     }
 }
 ```
@@ -128,13 +145,13 @@ private void generateAllRoundPrompts(Path arenaDir, String reviewTarget, int fil
 Update `initialize()`:
 
 ```java
-public Path initialize(String reviewTarget, int fileCount) throws IOException {
+public Path initialize(String commit1, String commit2, String stagedFlag) throws IOException {
     Path arenaDir = projectRoot.resolve(ARENA_DIR);
     Files.createDirectories(arenaDir);
 
-    generateTaskMd(arenaDir, reviewTarget, fileCount);
-    generateDiffPatch(arenaDir, reviewTarget);
-    generateAllRoundPrompts(arenaDir, reviewTarget, fileCount);  // NEW
+    generateTaskMd(arenaDir, commit1, commit2, stagedFlag);
+    generateDiffPatch(arenaDir, commit1, commit2, stagedFlag);
+    generateAllRoundPrompts(arenaDir, commit1, commit2, stagedFlag);  // NEW
 
     return arenaDir;
 }
@@ -145,19 +162,22 @@ public Path initialize(String reviewTarget, int fileCount) throws IOException {
 Reading prompts becomes trivial:
 
 ```java
-public String getPromptForRound(int roundNumber) throws IOException {
-    Path promptFile = arenaDir.resolve("prompts/round-" + roundNumber + ".md");
+public String getPromptForRound(int roundNumber, String agentName) throws IOException {
+    Path promptFile = arenaDir.resolve("prompts/round-" + roundNumber + "-" + agentName + ".md");
     return Files.readString(promptFile);
 }
 ```
 
-No template rendering at tournament time - just file reads.
+No template rendering at tournament time - just file reads. For rounds > 0, prompts are regenerated before execution to embed `${previousReviewsContent}`.
 
 ### 4. Template File Updates
 
-Remove `${agentName}` and `${outputPath}` from round templates. Keep:
+Remove `${agentName}` from round templates. Keep:
 - `${roundNumber}`
+- `${outputPath}`
 - `${allReviewsPath}` (for rounds 1+)
+- `${previousReviewsContent}` (for rounds 1+)
+- `${commit1}`, `${commit2}`, `${stagedFlag}`
 
 ---
 
@@ -165,7 +185,7 @@ Remove `${agentName}` and `${outputPath}` from round templates. Keep:
 
 | Step | Task | Files |
 |------|------|-------|
-| 1 | Simplify TemplateContext (remove agentName, outputPath) | `TemplateContext.java` |
+| 1 | Simplify TemplateContext (remove agentName, reviewTarget, fileCount; add commit1, commit2, stagedFlag, previousReviewsContent) | `TemplateContext.java` |
 | 2 | Update round templates (remove agent-specific placeholders) | `prompts/round-*.md` |
 | 3 | Add `generateAllRoundPrompts()` to WorkspaceManager | `WorkspaceManager.java` |
 | 4 | Update `initialize()` to call prompt generation | `WorkspaceManager.java` |
@@ -176,7 +196,7 @@ Remove `${agentName}` and `${outputPath}` from round templates. Keep:
 
 ## Benefits
 
-- **Simpler**: One prompt per round, not per agent
+- **Simpler**: Pre-rendered per-agent prompts, no runtime template logic
 - **Predictable**: All prompts visible before tournament starts
 - **Debuggable**: User can inspect/edit `.arena/prompts/` before running
 - **Simpler orchestrator**: Just reads files, no template logic

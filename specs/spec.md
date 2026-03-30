@@ -61,25 +61,42 @@ Agents are defined via YAML configuration with explicit flag management:
 ```yaml
 agents:
   claude:
+    type: claude
     command: ["claude", "-p"]
     flags:
       auto-approve: true
       output-format: json
+    docker:
+      enabled: false
 
   codex:
+    type: codex
     command: ["codex", "exec", "--full-auto", "-o", "@output", "-"]
     flags:
       auto-approve: false     # --full-auto already in command
+    enabled: false             # Disabled by default
 
   gemini:
+    type: gemini
     command: ["gemini"]
     flags:
       auto-approve: true
+    enabled: false             # Disabled by default
+
+  synthesis:
+    type: claude
+    command: ["claude", "-p"]
+    flags:
+      auto-approve: true
+      output-format: json
+    enabled: false             # Not a review agent; used only for final synthesis
 ```
 
 > **Note:** Prompts are delivered via **stdin** — the orchestrator reads the prompt file into memory and pipes it to the agent process's stdin. This avoids file locking issues on Windows and works uniformly across all agents.
 
 > **Note:** The `@output` placeholder in commands is replaced with the absolute path to the agent's output file (e.g., `.arena/rounds/round-0/claude-1/review.md`).
+
+> **Note:** The `type` field determines flag translation behavior (see Flag Configuration Reference). If omitted, type is inferred from the agent name.
 
 > **Note:** Agent working directories are set dynamically per round (see [Arena Filesystem](#arena-filesystem)).
 
@@ -111,6 +128,53 @@ This abstraction keeps the arena:
 - **Model-agnostic** - No coupling to specific LLM providers
 - **Future-proof** - New CLI agents can be added via configuration
 - **Extensible** - Compatible with any CLI agent, including custom MCP-based ones
+
+### Review Agent Expansion
+
+The arena supports a `review-agents` configuration that enables running multiple instances of the same agent type:
+
+```yaml
+review-agents: claude, claude, claude   # Expands to claude-1, claude-2, claude-3
+```
+
+**Expansion rules:**
+- Type shorthands (e.g., `claude`) are expanded to numbered instances (`claude-1`, `claude-2`, `claude-3`)
+- Each instance inherits the agent type's configuration (command, flags, docker settings)
+- The `synthesis` agent is reserved and cannot be used as a review-agent shorthand
+- If `review-agents` is not specified, all enabled agents participate
+
+### Docker Support (Optional)
+
+Agents can optionally run inside Docker containers for improved isolation and reproducibility:
+
+```yaml
+agents:
+  claude:
+    type: claude
+    command: ["claude", "-p"]
+    docker:
+      enabled: true
+      image: "ghcr.io/zeeno-atl/claude-code:latest"
+      memory: "4g"
+      cpus: "2"
+```
+
+**Two Docker modes:**
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| Docker Run | `docker run` | Standard container with volume mounts, env vars |
+| Docker Sandbox | `docker sandbox run` | Docker Desktop sandbox mode (automatic cleanup) |
+
+**Key behaviors:**
+- The project root is mounted as `/workspace` inside the container
+- API keys are passed via environment variables (`-e`)
+- For Claude agents using subscription credentials, the `.credentials.json` file is mounted read-only
+- `ANTHROPIC_API_KEY` is skipped for local Claude agents to use subscription credentials instead
+- The `DockerContainerRegistry` tracks active containers and stops them on JVM shutdown (Ctrl+C, SIGTERM)
+- Container names match agent names for deterministic tracking
+
+**Docker availability** is validated at startup. If any agent has Docker enabled but Docker is not available, the arena fails fast with a clear error.
 
 ## Agent Execution Model
 
@@ -146,7 +210,8 @@ Results are semantically identical regardless of execution order within a round.
 
 ```yaml
 execution:
-  max-concurrent: 0    # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
+  max-concurrent: 0          # 0 = unlimited parallel, 1 = sequential, N = max N agents at once
+  show-agent-output: true     # Stream agent stdout/stderr to console (--quiet disables)
 ```
 
 > **Note:** Higher concurrency increases resource usage (memory, API rate limits). Use bounded or sequential execution when running agents that share rate-limited backends.
@@ -164,6 +229,8 @@ limits:
 ```
 
 **Constraint:** `rounds` must be at least 1. Cross-pollination is the core value proposition of the arena—running only Round 0 with no improvement cycle provides no tournament benefit over running a single agent directly. The orchestrator rejects `rounds: 0` with exit code 5 (config error).
+
+> **Note:** The `rounds` value is capped at a maximum of 5 by the configuration loader, regardless of the configured value.
 
 #### Round Counting (0-indexed)
 
@@ -859,6 +926,8 @@ The following decisions supplement the specification with concrete implementatio
 | Minimum Version | Java 21 LTS |
 | Configuration | SmallRye Config (MicroProfile Config) |
 
+The arena also supports `.env` files for environment variable loading (API keys, etc.) via `EnvLoader`. The `.env` file in the project root is loaded at startup before any other initialization.
+
 **Rationale:** Java 21 LTS provides virtual threads for efficient concurrent agent execution, pattern matching for cleaner code, and long-term support stability.
 
 ### Configuration Management
@@ -899,6 +968,8 @@ Round prompts (`round-0.md`, `round-1.md`, etc.) are templated with placeholders
 
 > **Note:** Placeholders use FreeMarker syntax (`${name}`) and are substituted at prompt generation time.
 
+> **Note:** For rounds > 0, the orchestrator **embeds** the content of the previous round's `all_reviews.md` directly into the prompt via the `${previousReviewsContent}` placeholder. This is necessary because some CLI agents (e.g., Gemini CLI) cannot read files in `.gitignored` directories. The `${allReviewsPath}` placeholder is still available for agents that can read files directly.
+
 ### Prompt Construction
 
 Prompts are **pre-generated at initialization time** and stored in `.arena/prompts/`. The prompt sent to agents is constructed by **concatenation**:
@@ -913,7 +984,7 @@ Prompts are **pre-generated at initialization time** and stored in `.arena/promp
 
 The orchestrator:
 1. Pre-generates all round prompts at workspace initialization and stores them in `.arena/prompts/`
-2. For rounds > 0, regenerates prompts with embedded previous review content
+2. For rounds > 0, **regenerates** prompts before execution with the actual `all_reviews.md` content embedded via `${previousReviewsContent}`
 3. Pipes prompt content to agent stdin
 
 ### Directory Creation

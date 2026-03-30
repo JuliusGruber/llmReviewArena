@@ -122,7 +122,7 @@ int maxRounds = config.getValue("limits.rounds", Integer.class);
 ```
 dev.reviewarena
 ├── cli          # CLI entry point, argument parsing (picocli)
-├── config       # Configuration loading, YAML parsing, defaults
+├── config       # Configuration loading, YAML parsing, defaults, DockerConfig, EnvLoader
 ├── git          # Git operations (JGit), startup validation
 ├── agent        # AgentProcess, AgentExecutor, CommandBuilder, ReviewAggregator, OutputValidator
 └── io           # WorkspaceManager, TemplateLoader, template contexts
@@ -146,6 +146,7 @@ ArenaException (exit 1 - general error)
 ├── UsageException (exit 2 - invalid arguments)
 ├── GitValidationException (exit 3 - git errors)
 ├── AgentException (exit 4 - agent failures)
+├── WorkspaceException (exit 4 - workspace/IO errors)
 └── ConfigException (exit 5 - config errors)
 ```
 
@@ -208,6 +209,7 @@ ArenaException (exit 1 - general error)
 | Feature | Decision |
 |---------|----------|
 | `--dry-run` mode | Yes - show what would happen without running agents |
+| `--quiet` flag | Yes - suppress agent stdout/stderr streaming to console |
 | `--verbose` flag | No - not for v1 |
 | Security warning | No - flag names are self-documenting |
 
@@ -235,6 +237,32 @@ ArenaException (exit 1 - general error)
 **Milestone 1:** Git validation + Configuration + Workspace setup
 
 **Milestone 2:** Agent process layer
+
+## Docker Support
+
+| Decision | Choice |
+|----------|--------|
+| Docker mode | Optional, per-agent configuration via `docker` section |
+| Docker sandbox | Supported via `docker sandbox run` for Docker Desktop |
+| Container naming | Agent name used as container name for deterministic tracking |
+| Shutdown cleanup | JVM shutdown hook stops all active Docker containers |
+| Credential handling | Claude `.credentials.json` mounted read-only; ANTHROPIC_API_KEY skipped for local agents |
+| Path translation | Host paths translated to `/workspace/...` in DockerCommandBuilder |
+
+## Environment Loading
+
+| Decision | Choice |
+|----------|--------|
+| `.env` file | Supported via EnvLoader, loaded at startup before all other initialization |
+| Purpose | API keys, credentials, and other environment variables |
+
+## Review Agent Expansion
+
+| Decision | Choice |
+|----------|--------|
+| `review-agents` config | Type shorthands expanded to numbered instances (e.g., `claude, claude` → `claude-1, claude-2`) |
+| Default | `claude, claude, claude` (3 Claude instances) |
+| Synthesis reserved | `synthesis` cannot be used as a review-agent shorthand |
 
 ## Summary of Key Choices
 
@@ -276,3 +304,8 @@ ArenaException (exit 1 - general error)
 | Synthesizer agent? | Claude required (no fallback) |
 | Synthesis prompt persistence? | Yes, saved to `.arena/rounds/final/prompt.md` |
 | TemplateContext for synthesis? | Separate SynthesisContext record |
+| Docker support? | Optional per-agent, via DockerConfig |
+| .env file? | Yes, loaded at startup via EnvLoader |
+| Review agent expansion? | Type shorthands → numbered instances |
+| Quiet mode? | --quiet flag suppresses agent output streaming |
+| Synthesizer agent name? | "synthesis" (separate from review agents, type=claude) |

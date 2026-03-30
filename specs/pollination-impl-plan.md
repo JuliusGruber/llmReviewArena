@@ -27,9 +27,7 @@ This document describes the implementation plan for Rounds 1-N cross-pollination
 ### What's Missing
 
 1. **Multi-round loop** (rounds 1 through `maxRounds`)
-2. **Failed agent tracking** across rounds
-3. **Dynamic agent filtering** per round (exclude failed agents)
-4. **Minimum threshold check** after each round
+2. **Minimum threshold check** after each round
 5. **Config validation** for `maxRounds >= 1`
 6. **Round-level timeout** enforcement (`roundTimeoutMs`)
 7. **Grace period** handling before force-kill (`gracePeriodMs`)
@@ -45,16 +43,16 @@ Startup:
 Round 0:
   AgentExecutor.executeRound(0) → results
   ReviewAggregator.aggregateRound(0, results) → .arena/rounds/round-0/all_reviews.md
-  activeAgents = getSuccessfulAgents(results)
+  allAgents = results.keySet()
+  Check: successCount >= minAgents
 
 Round 1:
-  Log active agents for this round
-  AgentExecutor.executeRound(1, activeAgents) → results
+  Regenerate prompts with embedded previous reviews
+  AgentExecutor.executeRound(1, allAgents) → results
   ReviewAggregator.aggregateRound(1, results) → .arena/rounds/round-1/all_reviews.md
-  activeAgents = intersection(activeAgents, getSuccessfulAgents(results))
-  Check: activeAgents.size() >= minAgents
+  Check: successCount >= minAgents
 
-...repeat for rounds 2-N...
+...repeat for rounds 2-N (all agents retry every round)...
 
 Done:
   Log final all_reviews.md location
@@ -63,9 +61,9 @@ Done:
 
 ### Key Design Decisions
 
-1. **Agent filtering approach**: Create `executeRound(int, Set<String>)` overload to execute specific agents
-2. **Failure tracking**: Use `Set<String> activeAgents` and `retainAll()` after each round
-3. **Early termination**: Abort tournament if `activeAgents.size() < minAgents`
+1. **Agent retry approach**: All agents participate in every round regardless of prior failures (per spec "retry" strategy)
+2. **Minimum threshold**: Abort tournament if successful agents in a round drop below `minAgents`
+3. **Prompt regeneration**: Before each round > 0, regenerate prompts with embedded previous reviews content
 4. **Config constraint**: Require `maxRounds >= 1` (no skipping cross-pollination)
 5. **Result filtering**: `ReviewAggregator` internally filters to successful agents only
 
@@ -277,7 +275,7 @@ public Map<String, AgentResult> executeRound(int round, Set<String> agentNames) 
 
 **Rationale:** This refactoring:
 1. Eliminates code duplication between the two overloads
-2. Allows rounds 1-N to exclude agents that failed in previous rounds
+2. Allows rounds 1-N to specify which agents to run (all agents retry per spec)
 3. Keeps all concurrency and timeout logic in one place
 
 ---
@@ -329,24 +327,19 @@ Path allReviews = aggregator.aggregateRound(0, round0Results);
 log.info("Round 0 complete: {} agents produced reviews, aggregated to {}",
     successCount, allReviews);
 
-// Track active agents (start with all successful from round 0)
-// Use explicit HashSet for guaranteed mutability (Collectors.toSet() is implementation-dependent)
-Set<String> activeAgents = new HashSet<>(AgentExecutor.getSuccessfulAgents(round0Results));
+// Track all enabled agents - agents participate in every round even if they failed previously
+Set<String> allAgents = new HashSet<>(round0Results.keySet());
 int lastCompletedRound = 0;
+Map<String, AgentResult> lastRoundResults = round0Results;
 
 // === CROSS-POLLINATION ROUNDS (1 through maxRounds) ===
 for (int round = 1; round <= config.maxRounds(); round++) {
-    log.info("Starting round {}/{} with active agents: {}",
-        round, config.maxRounds(), activeAgents);
+    // Regenerate prompts with embedded previous reviews content
+    // (necessary because some AI agents cannot read files in .gitignored directories)
+    workspaceManager.regenerateRoundPrompts(round, commit1, commit2, stagedFlagValue);
 
-    // Safety check: ensure we have agents to execute (should not happen if threshold checks pass)
-    if (activeAgents.isEmpty()) {
-        log.error("[ROUND] No active agents remaining for round {} (internal error)", round);
-        return 4;
-    }
-
-    // Execute round with only active agents
-    Map<String, AgentResult> roundResults = executor.executeRound(round, activeAgents);
+    // Execute round with all agents (agents participate even if they failed in previous rounds)
+    Map<String, AgentResult> roundResults = executor.executeRound(round, allAgents);
 
     // Handle round failure (all agents timed out, crashed, or were filtered)
     if (roundResults.isEmpty()) {
@@ -355,29 +348,29 @@ for (int round = 1; round <= config.maxRounds(); round++) {
         return 4;
     }
 
-    // Update active agents: keep only those that succeeded in ALL rounds so far
-    Set<String> successfulThisRound = AgentExecutor.getSuccessfulAgents(roundResults);
-    activeAgents.retainAll(successfulThisRound);
+    // Count successful agents this round
+    long successfulThisRound = roundResults.values().stream()
+        .filter(AgentResult::isSuccess)
+        .count();
 
-    // Check minimum threshold
-    if (activeAgents.size() < config.minAgents()) {
-        log.error("[THRESHOLD] Only {} agents remain active after round {}, minimum {} required. " +
-            "Aborting tournament.", activeAgents.size(), round, config.minAgents());
+    // Check minimum threshold based on successful agents in this round
+    if (successfulThisRound < config.minAgents()) {
+        log.error("[THRESHOLD] Only {} agents succeeded in round {}, minimum {} required. " +
+            "Aborting tournament.", successfulThisRound, round, config.minAgents());
         return 4;
     }
 
-    // Aggregate this round's reviews
+    // Aggregate this round's reviews (only successful ones are included)
     Path roundAllReviews = aggregator.aggregateRound(round, roundResults);
     log.info("Round {} complete: {} agents succeeded, aggregated to {}",
-        round, activeAgents.size(), roundAllReviews);
+        round, successfulThisRound, roundAllReviews);
 
     lastCompletedRound = round;
+    lastRoundResults = roundResults;
 }
 
-// === TOURNAMENT COMPLETE ===
-Path finalAllReviews = workspaceManager.getRoundDir(lastCompletedRound).resolve("all_reviews.md");
-log.info("Cross-pollination complete! Final reviews: {}", finalAllReviews);
-log.info("Synthesis step not yet implemented (Milestone 4)");
+// === TOURNAMENT COMPLETE - START SYNTHESIS ===
+// (See synthesis-impl-plan.md for Milestone 4)
 
 return 0;
 ```
@@ -642,11 +635,11 @@ The current implementation pre-generates all round prompts during `WorkspaceMana
 
 Per spec (`spec.md`, Error Handling section):
 
-> When an agent fails during a round (crash, timeout, or invalid output), the orchestrator uses the **skip** strategy:
+> When an agent fails during a round (crash, timeout, or invalid output), the orchestrator uses the **retry** strategy:
 > - **Exclude from current round** - The failed agent's output is not included in `all_reviews.md`
-> - **Exclude from subsequent rounds** - The agent is removed from the tournament entirely
+> - **Retry in subsequent rounds** - The agent still participates in all subsequent rounds
 
-This means we maintain a `Set<String> activeAgents` and use `retainAll()` after each round to keep only agents that succeeded in ALL rounds so far.
+This means we maintain a `Set<String> allAgents` containing all agents from Round 0, and pass it to every subsequent round. Failed agents are retried because transient failures (API timeouts, rate limits) should not permanently disqualify an agent.
 
 ### Config Constraint Rationale
 
