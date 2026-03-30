@@ -221,7 +221,7 @@ public class AgentExecutor {
             .timeoutMs(config.agentTimeoutMs())
             .gracePeriodMs(config.gracePeriodMs())
             .outputValidator(outputValidator)
-            .showOutput(config.showAgentOutput())
+            .showOutput(resolveShowOutput(agentConfig))
             .dockerConfig(agentConfig.docker())  // Pass Docker config
             .build()) {
 
@@ -254,6 +254,18 @@ public class AgentExecutor {
                 log.error("Agent execution error: {}", e.getCause().getMessage());
             }
         }
+    }
+
+    /**
+     * Resolves whether to show output for a specific agent.
+     * Per-agent {@code show-output} flag takes precedence over the global setting.
+     */
+    private boolean resolveShowOutput(AgentConfig agentConfig) {
+        Object showOutput = agentConfig.flags().get("show-output");
+        if (showOutput instanceof Boolean) {
+            return (Boolean) showOutput;
+        }
+        return config.showAgentOutput();
     }
 
     private List<AgentConfig> getEnabledAgents() {
@@ -371,7 +383,7 @@ public class AgentExecutor {
             .timeoutMs(config.agentTimeoutMs())
             .gracePeriodMs(config.gracePeriodMs())
             .outputValidator(outputValidator)
-            .showOutput(config.showAgentOutput())
+            .showOutput(resolveShowOutput(agentConfig))
             .dockerConfig(agentConfig.docker())  // Pass Docker config
             .synthesis(true)                     // Mark as synthesis (not a competitive round)
             .build()) {

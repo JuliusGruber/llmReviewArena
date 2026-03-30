@@ -81,6 +81,8 @@ agents:
       - "-"                   # Read prompt from stdin
     flags:
       auto-approve: false     # --full-auto already embedded in command above
+      show-output: false      # Codex CLI streams verbose internal output (prompt echoes, exec commands);
+                              # suppress console display - output is still captured in stdout.log
     enabled: false            # Disabled by default; enable in arena.yaml if codex is installed
 
   gemini:

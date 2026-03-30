@@ -18,6 +18,7 @@ import java.util.Map;
  *   <li>allowed-tools: claude only → --allowedTools</li>
  *   <li>verbose: claude only → --verbose (shows tool use and reasoning in batch mode)</li>
  *   <li>output-format: claude only → --output-format (json, stream-json, or text)</li>
+ *   <li>show-output: handled by AgentExecutor (not a CLI flag) — controls console streaming per agent</li>
  * </ul>
  *
  * <p>Supports placeholders in command templates:
