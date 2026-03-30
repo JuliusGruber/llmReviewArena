@@ -83,4 +83,4 @@ Produce a review that:
 
 ## When You're Done
 
-Once you have worked through all points and synthesized your review, write it to `${outputPath}`.
+Once you have worked through all points and synthesized your review, write it to `${outputPath}`. Do not create any other files.

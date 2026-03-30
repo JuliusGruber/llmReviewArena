@@ -39,7 +39,7 @@ The reviews evaluated code with respect to:
 
 ## Output Contract
 
-Produce one final review in `${outputPath}` using **exactly** this structure:
+Produce one final review in `${outputPath}` using **exactly** this structure (do not create any other files):
 
 ### Summary
 ### High-risk issues (must fix)
