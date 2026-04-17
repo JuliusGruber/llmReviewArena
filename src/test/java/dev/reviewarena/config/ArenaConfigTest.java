@@ -21,8 +21,8 @@ class ArenaConfigTest {
         assertEquals(500, config.maxOutputSizeKb());
         assertEquals(0, config.maxConcurrent());
         assertTrue(config.showAgentOutput());
-        assertEquals(600_000, config.agentTimeoutMs());
-        assertEquals(900_000, config.roundTimeoutMs());
+        assertEquals(1_800_000, config.agentTimeoutMs());
+        assertEquals(2_700_000, config.roundTimeoutMs());
         assertEquals(5_000, config.gracePeriodMs());
         assertEquals(1, config.minAgents()); // Changed from 2 to 1 for self-consistency
         assertEquals(Path.of(".arena"), config.outputDir());

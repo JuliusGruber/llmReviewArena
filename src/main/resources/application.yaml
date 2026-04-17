@@ -42,8 +42,11 @@ execution:
   show-agent-output: true  # Stream agent output to console with prefixes
 
 timeouts:
-  agent-timeout-ms: 600000    # 10 minutes per agent
-  round-timeout-ms: 900000    # 15 minutes
+  # Cross-pollination rounds (1+) re-read every prior finding and verify each
+  # against the code. With Opus 4.7 this routinely exceeds 10 min; the old
+  # default timed out every Round 1 agent and aborted the tournament.
+  agent-timeout-ms: 1800000   # 30 minutes per agent
+  round-timeout-ms: 2700000   # 45 minutes (3 agents x 30 min with parallel execution)
   grace-period-ms: 5000       # 5 seconds
   on-timeout: kill-and-skip
   preserve-partial-output: false
