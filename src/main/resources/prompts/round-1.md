@@ -56,7 +56,6 @@ For **every issue** raised by competing reviewers:
 Use your tools actively:
 - Run `git diff` to see the actual changes
 - Read the relevant source files
-- Run existing tests (`mvn test`, `npm test`, etc.) to verify behavior
 - Grep for usages to understand impact
 - Check if "bugs" are actually handled elsewhere
 

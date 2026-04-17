@@ -14,6 +14,12 @@
 
 review-agents: claude, claude, claude
 
+timeouts:
+  # Cross-pollination rounds (1+) require agents to re-read all prior reviews,
+  # verify each claim, and produce a synthesized review. The default 10 min is
+  # only enough for Round 0; Opus 4.7 reliably exceeds it on Round 1+.
+  agent-timeout-ms: 1800000   # 30 minutes per agent
+
 agents:
   # Claude review agent: use Opus 4.7 model for highest-quality reviews
   claude:
