@@ -12,25 +12,25 @@
 # Authenticate locally first with: claude /login
 # Credentials from ~/.claude/ are mounted into the container
 
-review-agents: claude, codex, claude
+review-agents: claude, claude, claude
 
 agents:
-  # Claude review agent: use Opus model for highest-quality reviews
+  # Claude review agent: use Opus 4.7 model for highest-quality reviews
   claude:
     command:
       - claude
       - -p
       - --model
-      - opus
+      - claude-opus-4-7
 
-  # Synthesis agent: local execution with Opus model
+  # Synthesis agent: local execution with Opus 4.7 model
   # Disabled for tournament rounds, used only for final synthesis
   synthesis:
     command:
       - claude
       - -p
       - --model
-      - opus
+      - claude-opus-4-7
 
   # Codex: local execution (uses codex CLI from PATH)
   # --full-auto is embedded in command above; auto-approve: false prevents CommandBuilder
