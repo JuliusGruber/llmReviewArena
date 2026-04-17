@@ -36,7 +36,7 @@ class ConfigLoaderTest {
         assertEquals(5, config.maxRounds());
         assertEquals(500, config.maxOutputSizeKb());
         assertEquals(0, config.maxConcurrent());
-        assertEquals(600_000, config.agentTimeoutMs());
+        assertEquals(1_800_000, config.agentTimeoutMs());
     }
 
     @Test
